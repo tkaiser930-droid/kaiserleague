@@ -3,6 +3,11 @@ KAISER FAMILY FANTASY SMX — NODE.JS + RENDER DEPLOYMENT
 THIS PACKAGE IS READY TO DEPLOY, BUT IT IS NOT ALREADY LIVE. You must connect the project to a Git repository and create the Render service in your account.
 
 RENDER DEPLOYMENT (RECOMMENDED)
+
+IF RENDER SAYS “FAILED TO READ DOCKER FILE: NO SUCH FILE OR DIRECTORY”
+This means the Render service is configured for the Docker runtime but cannot find a Dockerfile. This project now includes a Dockerfile at the project root. Upload the project contents (including Dockerfile, package.json, and server.js) to the root of the connected Git repository, or set the Render Root Directory / Dockerfile Path to the directory that contains them. Then redeploy.
+
+For the simplest setup, use Render's native Node runtime instead of Docker: create a Web Service with Language = Node, Build Command = npm install, Start Command = npm start, and Health Check Path = /healthz. The included render.yaml configures this native Node approach. Do not configure a Docker runtime if you intend to use the native Node runtime.
 1. Download and extract this ZIP.
 2. Create a new private GitHub repository for the project. Upload the CONTENTS of the `kaiser-family-fantasy-smx` folder to the repository root (so `render.yaml`, `package.json`, and `server.js` are at the top level). Do not upload your local `data/league-data.json`; `.gitignore` excludes it.
 3. In Render, choose New > Blueprint and connect that GitHub repository. Render reads `render.yaml` to configure the Node web service.
@@ -20,7 +25,7 @@ LOCAL DEVELOPMENT
 4. Open `http://127.0.0.1:5500/`. The local database is stored in `data/league-data.json`.
 5. Stop Live Server first if it is using port 5500.
 
-MANUAL RENDER WEB SERVICE SETTINGS (if not using Blueprint)
+MANUAL RENDER WEB SERVICE SETTINGS — NATIVE NODE (if not using Blueprint)
 - Root Directory: repository root, where `package.json` and `server.js` live. Upload the contents of this project folder to the repository root, not a nested folder.
 - Build Command: `npm install`
 - Start Command: `npm start`
@@ -28,6 +33,13 @@ MANUAL RENDER WEB SERVICE SETTINGS (if not using Blueprint)
 - Add a persistent disk mounted at `/var/data` (Starter/paid web service required).
 - Health Check Path: `/healthz`
 - `PORT` is assigned by Render; do not hardcode it in the dashboard. The server binds to `0.0.0.0` by default.
+
+MANUAL RENDER WEB SERVICE SETTINGS — DOCKER RUNTIME
+- Root Directory: folder containing Dockerfile, package.json, and server.js.
+- Dockerfile Path: ./Dockerfile (unless the file is in a subdirectory).
+- Do not enter a separate Build Command; Render builds the Dockerfile.
+- The Dockerfile runs `npm start` and sets DATA_DIR=/var/data. Add a persistent disk mounted at /var/data.
+- Health Check Path: /healthz.
 
 RENDER STORAGE NOTES
 Render's default filesystem is ephemeral. This package explicitly writes the database under `/var/data` and defines a persistent disk there through `render.yaml`. Do not remove the disk or change `DATA_DIR` to a location outside its mount path. A disk is attached to one service instance and doesn't support scaling that service to multiple instances.
