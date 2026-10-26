@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data &amp; Backup | Kaiser Family Fantasy SMX</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="data">
+  <header class="top">
+    <a class="brand" href="index.html">KF <span>Kaiser Family<br><b>Fantasy SMX</b></span></a>
+    <nav>
+      <a href="index.html">Home</a><a href="teams.html">Teams</a><a href="team-manage.html">Manage Team</a>
+      <a href="available-athletes.html">Available Athletes</a><a href="all-athletes.html">All Athletes</a>
+      <a href="trades.html">Trades</a><a href="draft.html">Draft</a><a href="schedule.html">Schedule</a>
+      <a href="commissioner.html">Commissioner</a><a href="data.html">Data &amp; Backup</a>
+    </nav>
+  </header>
+  <main class="wrap">
+    <p class="eyebrow">LEAGUE STORAGE</p>
+    <h1>Data &amp; Backup</h1>
+    <section class="panel">
+      <h2>Where your league saves</h2>
+      <p id="dataModeDetail" class="storage-detail">Checking the active storage mode…</p>
+      <p id="dataCategoryCount" class="muted"></p>
+      <p class="muted">With local development, riders, teams, scores, trades, draft picks, settings, and schedule events are stored in <code>data/league-data.json</code>. On Render, the same database file is stored on the attached persistent disk at <code>/var/data/league-data.json</code>. The database file is not served directly to the browser.</p>
+      <button id="saveDataNow" class="btn">Check / Flush Saved Changes</button>
+      <p id="dataMessage" class="message" role="status" aria-live="polite"></p>
+    </section>
+    <section class="panel">
+      <h2>Export a backup</h2>
+      <p>Download a JSON backup of the saved league. Keep a backup before replacing project files, importing old data, or resetting the league.</p>
+      <button id="exportData" class="btn">Download League Backup</button>
+    </section>
+    <section class="panel">
+      <h2>Restore a backup</h2>
+      <p>Choose a backup JSON file previously downloaded from this page. Restoring replaces the current league data, so export a backup first if you need to keep the current version.</p>
+      <label for="importData">Backup file (.json)</label>
+      <input id="importData" type="file" accept="application/json,.json">
+    </section>
+    <section class="panel">
+      <h2>Important</h2>
+      <p>Run locally with <code>npm start</code> for project-file saving. On Render, configure the service using the included <code>render.yaml</code> and keep the persistent disk mounted at <code>/var/data</code>. If you open the site with VS Code Live Server, the banner will say “Browser-only storage”; changes then stay in that browser's storage until exported. Render data persists across deploys only when a persistent disk is attached.</p>
+      <p>If your terminal reports that port 5500 is already in use, stop Live Server in VS Code first, then run <code>npm start</code> again.</p>
+    </section>
+  </main>
+  <footer>Kaiser Family Fantasy SMX <span>League data and backups</span></footer>
+  <script src="bootstrap.js"></script>
+</body>
+</html>

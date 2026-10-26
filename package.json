@@ -1,0 +1,13 @@
+{
+  "name": "kaiser-family-fantasy-smx",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kaiser Family Fantasy SMX Node.js web service, deployable to Render with persistent JSON storage",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

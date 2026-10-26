@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=Teko:wght@600;700&display=swap');
+:root{--bg:#0c0d12;--panel:#171923;--panel2:#202331;--line:#343746;--text:#f5f5f8;--muted:#a7aaba;--gold:#e4c16a;--purple:#8e67f2;--red:#ef5b5b;--green:#67d7a0}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 85% 0%,#211b3a,transparent 36%),var(--bg);color:var(--text);font:14px Inter,Arial,sans-serif;line-height:1.55}.top{display:flex;justify-content:space-between;align-items:center;gap:22px;padding:16px 4vw;border-bottom:1px solid #ffffff16;background:#0c0d12ed;position:sticky;top:0;z-index:5;backdrop-filter:blur(12px)}.brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:12px;white-space:nowrap}.brand:first-letter{color:var(--gold)}.brand>span{color:var(--muted)}.brand b{color:var(--gold);font-size:15px}.brand{color:var(--gold)}nav{display:flex;flex-wrap:wrap;gap:13px;justify-content:flex-end}nav a{font-size:11px;font-weight:700;color:var(--muted)}nav a:hover{color:var(--gold)}.wrap{width:min(1180px,92vw);margin:auto;padding:38px 0 65px}h1,h2{font-family:'Barlow Condensed',Impact,sans-serif;text-transform:uppercase;line-height:1.05}h1{font-size:clamp(42px,6vw,68px);margin:0 0 12px}h2{font-size:28px;margin:0 0 16px}h3{font-size:15px}.eyebrow{font-size:10px;letter-spacing:.18em;color:var(--gold);font-weight:800;text-transform:uppercase;margin:0 0 12px}.hero{display:grid;grid-template-columns:1.5fr .6fr;gap:35px;align-items:center;padding:35px 0 55px}.hero p{color:var(--muted);max-width:600px}.hero em{font-style:normal;color:var(--gold)}.hero aside{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:20px;border:1px solid var(--line);background:linear-gradient(145deg,#27233c,#15161f);border-radius:16px}.hero aside strong{font:800 42px 'Barlow Condensed';color:var(--gold)}.hero aside span{font-size:11px;color:var(--muted);align-self:center}.btn{display:inline-block;padding:11px 16px;border-radius:8px;border:1px solid transparent;background:var(--gold);color:#18140b;font-weight:800;font-size:12px;cursor:pointer;text-decoration:none;margin:5px 5px 5px 0}.btn:hover{filter:brightness(1.08)}.btn.alt{background:#282b39;border-color:#414455;color:var(--text)}.btn.danger{background:#512329;color:#ffe4e4}.panel,.team-card,.cards article{background:linear-gradient(145deg,#1a1c27,#13151c);border:1px solid var(--line);border-radius:14px;padding:20px;margin:18px 0}.teams{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}.team-card{margin:0;position:relative}.team-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--purple)}.team-card h2{margin:0}.muted,.team-owner{color:var(--muted);font-size:12px}.team-points{font:800 38px 'Barlow Condensed';color:var(--gold)}.team-meta{display:flex;gap:12px;color:var(--muted);font-size:11px}.table{overflow:auto;border:1px solid var(--line);border-radius:10px;background:#12141b}table{border-collapse:collapse;width:100%;min-width:620px}th,td{text-align:left;padding:12px 14px;border-bottom:1px solid #ffffff12;font-size:12px;white-space:nowrap}th{background:#202330;color:#b6b9c7;text-transform:uppercase;letter-spacing:.07em;font-size:10px}tr:last-child td{border-bottom:0}tbody tr:hover{background:#ffffff06}.points{font-weight:800;color:var(--gold)}label{display:block;font-size:12px;font-weight:700;color:#d9dbe4;margin:12px 0 6px}input,select,textarea{display:block;width:100%;border:1px solid #3a3d4c;border-radius:8px;padding:11px;background:#0e1017;color:var(--text);font:13px Inter,Arial,sans-serif}input[type=checkbox]{width:auto;display:inline-block;accent-color:var(--gold)}.filters{display:flex;gap:10px;margin:18px 0}.filters input{flex:1}.filters select{max-width:220px}.narrow{max-width:470px;margin:25px auto}.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}.quota{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.quota>div{border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:10px;font-size:12px}.quota strong{display:block;color:var(--gold);font-size:19px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}.summary>div{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:16px}.summary strong{display:block;font:800 28px 'Barlow Condensed';color:var(--gold)}.summary span{font-size:11px;color:var(--muted)}.checks{display:flex;flex-wrap:wrap;gap:8px 14px}.checks label{font-weight:500;margin:4px 0}.message{color:var(--gold);font-size:12px;min-height:18px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:25px}.cards article{margin:0}.cards p{color:var(--muted);font-size:12px}.badge{display:inline-block;background:#343748;border-radius:5px;padding:3px 7px;font-size:10px}.manufacturer{border-left:5px solid var(--mfr,#777);padding-left:9px}.series{font-weight:800;color:var(--gold)}.muted{color:var(--muted)}footer{display:flex;justify-content:space-between;gap:15px;border-top:1px solid #ffffff14;padding:22px 4vw;color:#85899a;font-size:10px;letter-spacing:.08em}footer span{letter-spacing:0}code{color:var(--gold)}[hidden]{display:none!important}@media(max-width:900px){.top{align-items:flex-start;flex-direction:column}nav{justify-content:flex-start}.hero{grid-template-columns:1fr}.teams,.cards{grid-template-columns:repeat(2,1fr)}}@media(max-width:580px){.teams,.cards,.cols,.summary{grid-template-columns:1fr}.filters{flex-direction:column}.filters select{max-width:none}.quota{grid-template-columns:repeat(2,1fr)}footer{flex-direction:column}.wrap{padding-top:25px}}
+
+/* Manufacturer-specific styling and legible race-number plates */
+.brand-badge{display:inline-flex;align-items:center;gap:7px;max-width:220px;padding:5px 8px;border:1px solid color-mix(in srgb,var(--brand-color,#6B7280) 55%,transparent);border-radius:6px;background:color-mix(in srgb,var(--brand-color,#6B7280) 13%,#11131a);color:#f7f8fb;font-size:10px;font-weight:800;white-space:nowrap}
+.brand-badge img{display:block;width:auto;height:17px;max-width:68px;object-fit:contain;filter:brightness(0) invert(1)}
+.brand-badge img[hidden]{display:none}
+.race-number{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;text-align:center;min-width:34px;height:29px;padding:0 6px;margin-right:7px;border:1px solid var(--number-ink,#fff);border-radius:3px;background:var(--number-color,#6B7280);color:var(--number-ink,#fff);font-family:'Teko',Impact,'Arial Black',sans-serif;font-size:21px;font-weight:700;font-style:italic;line-height:1;text-shadow:none;letter-spacing:.02em;box-shadow:0 1px 2px #0005;vertical-align:middle}
+.race-number-no-outline{border:1px solid var(--number-ink,#fff)!important;box-shadow:0 1px 2px #0005!important;border-radius:3px!important}
+.athlete-name{display:flex;align-items:center;gap:2px;min-height:28px}
+.athlete-name b{white-space:normal}
+.manufacturer{border-left:4px solid var(--mfr,#777);padding-left:9px}
+.brand-badge img{filter:none;background:#fff;border-radius:3px;padding:2px}
+
+/* Commissioner edit-rider form */
+.edit-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.edit-heading h2{margin:0 0 8px}.edit-heading .eyebrow{margin-bottom:6px}
+.edit-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.action-cell{white-space:nowrap}.action-cell .inline{margin:2px 3px 2px 0}
+#editAthletePanel{scroll-margin-top:20px}
+@media(max-width:650px){.edit-heading{flex-direction:column}.action-cell{white-space:normal}}
+
+
+/* Manufacturer badges and athlete sidebars use the actual manufacturer color. Aprilia is purple. */
+.brand-badge{border-color:color-mix(in srgb,var(--brand-color,#6B7280) 72%,transparent);background:color-mix(in srgb,var(--brand-color,#6B7280) 17%,#11131a)}
+.brand-badge img{width:auto;height:20px;max-width:68px;object-fit:contain;background:#fff;border-radius:3px;padding:2px;flex:0 0 auto}
+.brand-badge img.brand-logo-wide{max-width:72px;height:20px}
+.brand-badge img.brand-logo-square{width:22px;height:22px;max-width:22px;padding:1px}
+.manufacturer{border-left-color:var(--mfr,#777)!important}
+
+/* Nationality flags displayed beside riders throughout all athlete tables. */
+.nationality-flag{display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;min-width:20px;vertical-align:middle;margin-right:3px;white-space:nowrap}
+.athlete-name{gap:6px}
+.brand-badge{min-height:30px}
+
+/* JHL shows its red letter-only wordmark plus the manufacturer name, like other brands. */
+.brand-badge-jhl{gap:7px}
+
+/* Commissioner race scoring grid */
+.score-entry-table table{min-width:980px}.score-entry-table th,.score-entry-table td{padding:7px 9px;vertical-align:middle}.score-entry-table .score-place{font-weight:900;color:var(--gold);text-align:center;width:56px}.score-entry-table select{min-width:260px;padding:7px;font-size:12px}.score-entry-table .score-bonus-cell{min-width:116px;text-align:center}.score-bonus{display:flex;align-items:center;justify-content:center;gap:5px;margin:0;white-space:normal;font-size:10px;font-weight:600}.score-bonus input{flex:0 0 auto}.score-entry-table .score-bonus-points{text-align:center;font-weight:700}.score-entry-table .score-total{font-weight:900}.score-entry-table tr.score-row-selected{background:#e4c16a0d}.score-controls{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:10px}.score-panel .muted{max-width:900px}.score-panel .score-entry-table{margin:12px 0 14px}
+@media(max-width:580px){.score-controls{grid-template-columns:1fr}.score-entry-table select{min-width:220px}}
+
+/* Race-day roster lock notice */
+.lock-notice{border-color:#b94a55;background:linear-gradient(145deg,#321b24,#1a151d);box-shadow:0 0 0 1px #b94a5533}.lock-notice h2{color:#ff8c96}.lock-notice p{color:#f0d7dc}.lock-notice ul{margin:8px 0 0;padding-left:22px}.lock-notice li{margin:5px 0;color:#fff}
+
+/* Local project database status and backup page */
+.storage-banner{margin:0;padding:8px 4vw;font-size:11px;font-weight:700;letter-spacing:.02em;border-bottom:1px solid #ffffff18}
+.storage-banner.info{background:#202331;color:#e1e4ed}
+.storage-banner.saving{background:#2d2a1b;color:#f2d780}
+.storage-banner.good{background:#14291f;color:#91e2b6}
+.storage-banner.warn{background:#322a18;color:#f4d388}
+.storage-banner.error{background:#3a1b22;color:#ffb4bc}
+.storage-detail{padding:12px 14px;border-radius:8px;background:#202331;border:1px solid var(--line);font-weight:700}
+.storage-detail.good{color:#91e2b6;border-color:#2f8f60}
+.storage-detail.warn{color:#f4d388;border-color:#8b6b2c}
+.storage-detail.error{color:#ffb4bc;border-color:#b94a55}

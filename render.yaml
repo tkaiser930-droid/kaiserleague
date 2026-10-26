@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: kaiser-family-fantasy-smx
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: kaiser-family-fantasy-smx-data
+      mountPath: /var/data
+      sizeGB: 1
