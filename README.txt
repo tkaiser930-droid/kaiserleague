@@ -49,3 +49,20 @@ The existing site's password and role checks were originally designed for a loca
 
 BACKUPS
 Use Data & Backup to download JSON backups regularly and before deploying updates. The persistent disk protects against ordinary redeploy/restart data loss, but is not a substitute for backups.
+
+LATEST WEBSITE CHANGES — SCHEDULE + LIVE TEAM DRAFTS
+
+SCHEDULE PAGE
+- Schedule event dates are displayed as a written month, day, and year (example: May 30, 2027). Multi-day events display both dates in that format.
+- Series badges have distinct color boxes: SMX purple, F1 gold, MXGP red, and MotoGP black.
+
+LIVE TEAM DRAFT FLOW
+1. Claim all five fantasy teams and create a team password for each team before starting a draft.
+2. Sign in to Commissioner > Draft Management. Select a room (SMX, MXGP, MotoGP, or F1) and click Start Draft. Each room has its own independent status and pick history.
+3. Draft order follows the team order displayed on the Teams page / team records. The order repeats each round. The draft page displays the next team, pick number, and round.
+4. Each team opens Draft, selects the correct room, chooses its team, and signs in with that team's password. Only the team currently on the clock can submit a pick. After each pick, the turn moves to the next team.
+5. The player list is limited to the selected room: SMX offers 250 and 450 riders; MXGP offers MXGP and MX2 riders; MotoGP and F1 offer their respective riders. Existing roster caps are enforced at selection time. Teams can pass a pick if needed.
+6. The draft page refreshes the saved league state from the server every few seconds while open, so connected team browsers receive pick and turn updates without a manual page refresh.
+7. The commissioner can pause or complete each room from Draft Management. Clicking Start Draft again resumes the existing pick history; it does not erase previous picks.
+
+Draft room data is stored in the existing `kaiserFantasyDraftState` and `kaiserFantasyDraftSettings` categories in the project database. The app does not automatically randomize the order: the commissioner sets and saves a separate order for each draft room. Drafts use a snake sequence, reversing the order every other round. The site should only be used for private/trusted league testing until server-side authentication and authorization are implemented, as described in the Security Notice above.

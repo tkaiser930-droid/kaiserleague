@@ -54,3 +54,29 @@
 .storage-detail.good{color:#91e2b6;border-color:#2f8f60}
 .storage-detail.warn{color:#f4d388;border-color:#8b6b2c}
 .storage-detail.error{color:#ffb4bc;border-color:#b94a55}
+
+/* Schedule series color tags */
+.schedule-series-badge{display:inline-flex;align-items:center;justify-content:center;min-width:72px;padding:4px 10px;border:2px solid currentColor;border-radius:6px;font-size:10px;line-height:1.15;font-weight:900;letter-spacing:.06em;text-transform:uppercase;background:#171923;color:#fff}
+.schedule-series-smx{color:#b99aff;border-color:#8e67f2;background:#2b2047;box-shadow:0 0 0 1px #8e67f233}
+.schedule-series-f1{color:#f5d477;border-color:#e4c16a;background:#3c321b;box-shadow:0 0 0 1px #e4c16a33}
+.schedule-series-mxgp{color:#ff9a9f;border-color:#e64b54;background:#421d24;box-shadow:0 0 0 1px #e64b5433}
+.schedule-series-motogp{color:#fff;border-color:#8b8e99;background:#08090c;box-shadow:0 0 0 1px #ffffff22}
+.draft-team-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.draft-team-heading h2{margin-bottom:4px}.draft-turn-notice{border:1px solid #8e67f2;background:#251d3c;border-radius:9px;padding:12px 14px;color:#e7ddff;font-weight:800}
+#draftPassButton{margin-top:6px}
+#draftLogin{max-width:520px}
+@media(max-width:580px){.draft-team-heading{flex-direction:column}.draft-team-heading .btn{margin-left:0}}
+
+/* Commissioner-configured snake draft order */
+.draft-order-editor-wrap{margin:18px 0;padding:16px;border:1px solid var(--line);border-radius:12px;background:#11131a}
+.draft-order-title{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.draft-order-title h3{margin:0;color:var(--gold);font:800 18px 'Barlow Condensed',Impact,sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.draft-order-list{display:grid;gap:7px;max-width:640px}
+.draft-order-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 11px;border:1px solid #343746;border-radius:8px;background:#1c1f2b}
+.draft-order-rank{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;background:#35294f;color:#d8c7ff;font-weight:900}
+.draft-order-row strong{font-size:12px}
+.draft-order-controls{display:flex;gap:5px}
+.draft-order-controls .inline{min-width:34px;margin:0;padding:5px 8px;font-size:16px;line-height:1}
+.draft-order-controls .inline:disabled{opacity:.3;cursor:not-allowed}
+#saveDraftOrder:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:580px){.draft-order-title{align-items:flex-start;flex-direction:column}.draft-order-editor-wrap{padding:12px}}

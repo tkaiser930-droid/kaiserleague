@@ -71,6 +71,22 @@
     await pending;
     if (lastError) throw lastError;
   }
+  async function refreshFromServer() {
+    if (mode !== "server") return false;
+    const remote = await apiState();
+    let changed = false;
+    for (const key of KEYS) {
+      if (!Object.prototype.hasOwnProperty.call(remote.state, key)) continue;
+      const remoteTs = Number(remote.keyUpdatedAt[key] || 0);
+      const localTs = localTime(key);
+      const localValue = parseLocal(key);
+      if (remoteTs > localTs || (remoteTs === localTs && JSON.stringify(localValue) !== JSON.stringify(remote.state[key]))) {
+        loadLocal(key, remote.state[key], remoteTs);
+        changed = true;
+      }
+    }
+    return changed;
+  }
   async function exportState() {
     if (mode === "server") {
       await flush();
@@ -114,6 +130,7 @@
     get location() { return storageLabel; },
     write: storageWrite,
     flush,
+    refreshFromServer,
     exportState,
     replaceState,
     clearAll,
