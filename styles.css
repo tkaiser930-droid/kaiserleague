@@ -95,3 +95,17 @@
 .nationality-location{font-size:10px;line-height:1.2;color:var(--muted);font-weight:600;white-space:normal}
 #scheduleForm label select{max-width:100%}
 #commSchedule .action-cell{min-width:150px}
+
+/* Consistent rider-number alignment across every table. The flag and number
+   occupy fixed slots so variable country names and number lengths never shift
+   the rider-name or number-plate columns from row to row. */
+.athlete-name{display:grid;grid-template-columns:24px 42px minmax(125px,max-content) minmax(110px,1fr);align-items:center;column-gap:7px;row-gap:2px;min-height:32px;width:100%}
+.athlete-name.no-number{grid-template-columns:24px minmax(125px,max-content) minmax(110px,1fr)}
+.athlete-name .nationality-flag{display:inline-flex;align-items:center;justify-content:center;width:24px;min-width:24px;height:24px;margin:0;font-size:16px;line-height:1;white-space:nowrap}
+.athlete-name .race-number,.race-number{display:inline-flex;flex:0 0 42px;align-items:center;justify-content:center;width:42px;min-width:42px;max-width:42px;margin:0;padding:0;text-align:center;box-sizing:border-box}
+.race-number-slot{display:inline-flex;flex:0 0 42px;align-items:center;justify-content:center;width:42px;min-width:42px;max-width:42px;height:29px}
+.athlete-name b{display:block;min-width:125px;white-space:normal;line-height:1.25}
+.athlete-nationality-detail{display:block;min-width:110px;max-width:240px;color:var(--muted);font-size:10px;line-height:1.2;white-space:normal}
+/* A number shown in its own table column uses the same fixed 42px plate. */
+td>.race-number{vertical-align:middle}
+@media(max-width:700px){.athlete-name{grid-template-columns:24px 42px minmax(125px,max-content) minmax(100px,1fr);column-gap:6px}.athlete-name.no-number{grid-template-columns:24px minmax(125px,max-content) minmax(100px,1fr)}}
