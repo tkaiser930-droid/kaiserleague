@@ -93,3 +93,9 @@ RIDER NATIONALITY / SUB-REGIONS
 - Add Athlete and Edit Rider now have a country/nationality dropdown and a state / province / region dropdown.
 - The country flag is shown first, followed by the country and selected sub-region beside the rider name throughout athlete, roster, Commissioner, scoring history, draft, and trade tables.
 - Existing rider nationalities are retained. Existing riders can be edited to add a sub-region. Region data is stored with the rider and carried into future score and draft records.
+
+
+MANUFACTURER LOGO UPDATE — GASGAS
+- Added the GASGAS red emblem and wordmark image to manufacturer badges and rider sidebars.
+- Recognizes both “GasGas” and “Gas Gas” spellings in manufacturer/team labels.
+- The logo is served from Wikimedia Commons, which identifies the SVG as originating from the GASGAS media asset bank. An internet connection is required for this image.

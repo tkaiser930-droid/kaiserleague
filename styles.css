@@ -109,3 +109,6 @@
 /* A number shown in its own table column uses the same fixed 42px plate. */
 td>.race-number{vertical-align:middle}
 @media(max-width:700px){.athlete-name{grid-template-columns:24px 42px minmax(125px,max-content) minmax(100px,1fr);column-gap:6px}.athlete-name.no-number{grid-template-columns:24px minmax(125px,max-content) minmax(100px,1fr)}}
+
+/* GASGAS official stacked G + wordmark logo; retain the brand red. */
+.brand-badge img.brand-logo-gasgas{height:25px;max-width:38px;object-fit:contain}

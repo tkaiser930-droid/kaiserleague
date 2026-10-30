@@ -64,7 +64,7 @@ Kove:{color:"#22A7A7",logo:"kove",image:"https://static.wixstatic.com/media/2280
 Fantic:{color:"#FFFFFF",logo:"fantic",image:"https://fantic.com/Content/img/logo.svg",fit:"wide"},
 ZXMoto:{color:"#477DBB",logo:"zxmoto",image:"https://pbs.twimg.com/profile_images/2038585392216113152/R3eIOSVy.jpg",fit:"square"},
 JHL:{color:"#D71920",logo:"jhl",image:"assets/logos/jhl-wordmark.svg",fit:"wide"},
-Husqvarna:{color:"#FFFFFF",logo:"husqvarna",image:"https://cdn.simpleicons.org/husqvarna/002550"},GasGas:{color:"#E4002B",logo:"gasgas"},Suzuki:{color:"#FFD400",logo:"suzuki",image:"https://cdn.simpleicons.org/suzuki/111111"},
+Husqvarna:{color:"#FFFFFF",logo:"husqvarna",image:"https://cdn.simpleicons.org/husqvarna/002550"},GasGas:{color:"#E4002B",logo:"gasgas",image:"https://upload.wikimedia.org/wikipedia/commons/0/03/GASGAS_Logo.svg",fit:"wide"},Suzuki:{color:"#FFD400",logo:"suzuki",image:"https://cdn.simpleicons.org/suzuki/111111"},
 Triumph:{color:"#111111",logo:"triumph",image:"https://lirp.cdn-website.com/072a18a0/dms3rep/multi/opt/triumph-logo-640w.jpg",fit:"square"},
 Beta:{color:"#D71920",logo:"beta",image:"https://media.cdnws.com/_i/46016/6385/1693/88/stickers-beta-ref8beta-autocollant-beta-moto-sticker-pour-moto-sport.jpeg",fit:"square"},Ducati:{color:"#800020",logo:"ducati"},
 Aprilia:{color:"#8E67F2",logo:"aprilia",image:"https://poptuning.fr/8726-large_default/aprilia-lion-sticker-autocollant.jpg",fit:"square"},
@@ -84,6 +84,7 @@ function brandKey(value){
  const m=clean(value).toLowerCase();
  // Check Racing Bulls before Red Bull Racing so the teams keep separate colors.
  if(m.includes("racing bulls")||m.includes("visa cash app rb")||m==="rb") return "Racing Bulls";
+ if(m.replace(/[^a-z]/g,"").includes("gasgas")) return "GasGas";
  if(m.includes("aston martin")) return "Aston Martin";
  if(m.includes("williams")) return "Williams";
  if(m.replace(/[^a-z]/g,"").includes("zxmoto")) return "ZXMoto";
@@ -98,7 +99,7 @@ function brandBadge(value){
  const k=brandKey(value),b=BRAND[k],label=esc(value||k||"Unknown");
  const image=b?.image|| (b?.logo?`https://cdn.simpleicons.org/${b.logo}/${(b.color||MANUFACTURER_PURPLE).slice(1)}`:"");
  const isJHL=k==="JHL";
- return `<span class="brand-badge${isJHL?" brand-badge-jhl":""}" style="--brand-color:${mcolor(value)}" title="${label}">${image?`<img class="${b?.fit==="wide"?"brand-logo-wide":b?.fit==="square"?"brand-logo-square":"brand-logo"}${isJHL?" brand-logo-wordmark":""}" src="${image}" alt="${isJHL?"JHL wordmark":`${label} logo`}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`:""}<span class="brand-label">${label}</span></span>`
+ return `<span class="brand-badge${isJHL?" brand-badge-jhl":""}" style="--brand-color:${mcolor(value)}" title="${label}">${image?`<img class="${b?.fit==="wide"?"brand-logo-wide":b?.fit==="square"?"brand-logo-square":"brand-logo"}${isJHL?" brand-logo-wordmark":""}${k==="GasGas"?" brand-logo-gasgas":""}" src="${image}" alt="${isJHL?"JHL wordmark":`${label} logo`}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`:""}<span class="brand-label">${label}</span></span>`
 }
 function numberHTML(value,manufacturer,athlete={}){
  const n=clean(value).replace(/^#+/,"").trim();if(!n)return "";
