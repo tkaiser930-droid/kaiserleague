@@ -80,3 +80,12 @@
 .draft-order-controls .inline:disabled{opacity:.3;cursor:not-allowed}
 #saveDraftOrder:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:580px){.draft-order-title{align-items:flex-start;flex-direction:column}.draft-order-editor-wrap{padding:12px}}
+
+
+/* Home-page standings and undrafted scoring leaders */
+.undrafted-section{margin-top:28px}
+.undrafted-section>h2{margin-bottom:8px}
+.undrafted-section>.muted{margin:0 0 12px}
+#homeStandings table{min-width:900px}
+#topUndraftedAthletes table{min-width:680px}
+@media(max-width:700px){#homeStandings table{min-width:900px}.undrafted-section{margin-top:24px}}

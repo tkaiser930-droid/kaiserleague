@@ -66,3 +66,16 @@ LIVE TEAM DRAFT FLOW
 7. The commissioner can pause or complete each room from Draft Management. Clicking Start Draft again resumes the existing pick history; it does not erase previous picks.
 
 Draft room data is stored in the existing `kaiserFantasyDraftState` and `kaiserFantasyDraftSettings` categories in the project database. The app does not automatically randomize the order: the commissioner sets and saves a separate order for each draft room. Drafts use a snake sequence, reversing the order every other round. The site should only be used for private/trusted league testing until server-side authentication and authorization are implemented, as described in the Security Notice above.
+
+
+LATEST HOME PAGE CHANGES — STANDINGS + UNDRAFTED LEADERS
+
+HOME PAGE TEAM STANDINGS
+- The standings table includes separate F1, MotoGP, SMX, and MXGP point columns, plus the overall team total.
+- SMX points include 250 and 450 race scoring. MXGP points include MXGP and MX2 race scoring.
+- Series totals use the team attribution recorded when race results were submitted, so past points do not move when a rider later changes teams.
+
+TOP SCORING UNDRAFTED ATHLETES
+- A leaderboard appears directly under Team Standings with one current free agent from each division: 250, 450, MXGP, MX2, F1, and MotoGP.
+- The leader is the currently unrostered athlete with the most accumulated recorded race points in that division.
+- If no unrostered athlete in a division has recorded results yet, the table shows an empty-state message for that division.

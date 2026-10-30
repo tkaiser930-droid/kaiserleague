@@ -111,11 +111,38 @@ for(const k of [K.S,K.TR,K.CAL])if(!Array.isArray(read(k,null)))write(k,[]);if(!
 }
 function owner(a){return teams().find(t=>roster(t).some((r,i)=>id(r)===id(a)||(norm(name(r))===norm(name(a))&&norm(cls(r))===norm(cls(a)))))}
 function total(t){return scores().filter(s=>String(s.teamKey)===key(t)).reduce((n,s)=>n+Number(s.points||0),0)}
+function scoreSeriesBucket(record){
+ const value=clean(record?.series||record?.division||record?.riderClass||""),key=norm(value);
+ if(["smx","250","450"].includes(key))return "SMX";
+ if(["mxgp","mx2"].includes(key))return "MXGP";
+ if(key==="motogp")return "MotoGP";
+ if(key==="f1")return "F1";
+ return value;
+}
+function teamSeriesTotal(t,series){return scores().filter(s=>String(s.teamKey)===key(t)&&scoreSeriesBucket(s)===series).reduce((n,s)=>n+Number(s.points||0),0)}
+function athleteScoreRecords(a){return scores().filter(s=>{const byId=s.riderId&&String(s.riderId)===id(a);const byName=norm(s.riderName||s.athleteName)===norm(name(a))&&(!s.riderClass||norm(s.riderClass)===norm(cls(a)));return !!byId||byName})}
+function athleteSeasonPoints(a){return athleteScoreRecords(a).reduce((n,s)=>n+Number(s.points||0),0)}
 function counts(t){let c={};SERIES.forEach(s=>c[s]=0);roster(t).forEach(a=>{if(c[cls(a)]!==undefined)c[cls(a)]++});return c}
 function quota(t){const c=counts(t);return Object.entries(REQ).map(([s,n])=>`<div><strong>${c[s]}/${n}</strong>${s}</div>`).join("")}
 function table(h,rows){return rows.length?`<table><thead><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`:'<p class="muted">Nothing to display yet.</p>'}
 function options(sel,items,placeholder){if(!sel)return;sel.replaceChildren(new Option(placeholder,""));items.forEach(x=>sel.add(new Option(x.label,x.value)))}
-function standings(){const el=$("homeStandings");if(!el)return;el.innerHTML=table(["Rank","Team","Owner","Roster","Season Points"],teams().sort((a,b)=>total(b)-total(a)).map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(tname(t))}</b></td><td>${esc(t.owner||"Unclaimed")}</td><td>${roster(t).length}/${MAX_ROSTER_SIZE}</td><td class="points">${total(t).toLocaleString()}</td></tr>`))}
+function renderTopUndraftedAthletes(){
+ const el=$("topUndraftedAthletes");if(!el)return;
+ const divisions=["250","450","MXGP","MX2","F1","MotoGP"];
+ const rows=divisions.map(division=>{
+  const candidates=athletes().filter(a=>norm(cls(a))===norm(division)&&!owner(a)).map(a=>({athlete:a,records:athleteScoreRecords(a),points:athleteSeasonPoints(a)})).filter(x=>x.records.length).sort((a,b)=>b.points-a.points||compareRiderNumbers(a.athlete,b.athlete));
+  const top=candidates[0];
+  if(!top)return `<tr><td><b>${esc(division)}</b></td><td colspan="3" class="muted">No scored undrafted athletes yet</td></tr>`;
+  const a=top.athlete;
+  return `<tr><td><b>${esc(division)}</b></td><td><div class="manufacturer" style="--mfr:${mcolor(a.manufacturer)}">${athleteNameHTML(a)}</div></td><td>${brandBadge(a.manufacturer||"—")}</td><td class="points">${top.points.toLocaleString()}</td></tr>`;
+ });
+ el.innerHTML=table(["Division","Top Undrafted Athlete","Manufacturer","Season Points"],rows)
+}
+function standings(){
+ const el=$("homeStandings");
+ if(el){const ranked=teams().slice().sort((a,b)=>total(b)-total(a));el.innerHTML=table(["Rank","Team","Owner","Roster","F1 Points","MotoGP Points","SMX Points","MXGP Points","Total Points"],ranked.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(tname(t))}</b></td><td>${esc(t.owner||"Unclaimed")}</td><td>${roster(t).length}/${MAX_ROSTER_SIZE}</td><td class="points">${teamSeriesTotal(t,"F1").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"MotoGP").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"SMX").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"MXGP").toLocaleString()}</td><td class="points">${total(t).toLocaleString()}</td></tr>`))}
+ renderTopUndraftedAthletes()
+}
 async function claim(k){const t=teams().find(t=>key(t)===k),msg=$("teamMessage");if(!t||t.owner){msg.textContent="That team is already claimed or unavailable.";return}const o=prompt("Enter the team owner's name:");if(o===null)return;if(!clean(o)){msg.textContent="Owner name is required.";return}const p=prompt("Create a team password (at least 6 characters):");if(p===null)return;if(p.length<6){msg.textContent="Password must be at least 6 characters.";return}t.owner=clean(o);t.passwordHash=await hash(p);saveTeams(teams().map(x=>key(x)===k?t:x));msg.textContent=`${tname(t)} claimed. Save the password somewhere safe.`;renderTeams()}
 function renderTeams(){const el=$("teamsGrid");if(!el)return;el.innerHTML=teams().map(t=>`<article class="team-card"><h2>${esc(tname(t))}</h2><p class="team-owner">${t.owner?"Owned by "+esc(t.owner):"Available to claim"}</p><div class="team-points">${total(t).toLocaleString()}</div><span class="muted">Season points</span><p class="team-meta">${roster(t).length}/${MAX_ROSTER_SIZE} athletes</p>${t.owner?`<a class="btn alt" href="team-manage.html?team=${encodeURIComponent(key(t))}">Manage / Sign In</a>`:`<button class="btn" data-claim="${esc(key(t))}">Claim Team</button>`}</article>`).join("");el.querySelectorAll("[data-claim]").forEach(b=>b.onclick=()=>claim(b.dataset.claim));if($("requirements"))$("requirements").innerHTML=Object.entries(REQ).map(([s,n])=>`<div><strong>${n}</strong>${s} athletes</div>`).join("")}
 function renderAthletes(){const target=$("athleteTable");if(!target)return;const page=document.body.dataset.page,search=clean($("search")?.value).toLowerCase(),c=$("classFilter")?.value||"",of=$("ownerFilter")?.value||"";const list=athletes().filter(a=>{const o=owner(a),free=!o;return [name(a),a.number,a.raceTeam,a.manufacturer,cls(a),countryName(a.nationality),o?tname(o):"free agent"].join(" ").toLowerCase().includes(search)&&(!c||cls(a)===c)&&(page!=="available"||free)&&(!of||(of==="free"?free:!free))}).sort(compareRiderNumbers);target.innerHTML=table(["Athlete","Series","Race Team","Manufacturer","Season Points","Fantasy Team"],list.map(a=>{const o=owner(a),pts=scores().filter(s=>String(s.riderId)===id(a)||(norm(s.riderName)===norm(name(a))&&norm(s.riderClass)===norm(cls(a)))).reduce((n,s)=>n+Number(s.points||0),0),badges=[a.pointsLeader?"Points Leader":"",a.reigningSMXChampion?"SMX Champion":"",a.reigningWorldChampion?"World Champion":""].filter(Boolean).map(x=>`<span class="badge">${x}</span>`).join(" ");return `<tr><td><div class="manufacturer" style="--mfr:${mcolor(a.manufacturer)}">${athleteNameHTML(a)}<div>${badges}</div></div></td><td class="series">${esc(cls(a))}</td><td>${esc(a.raceTeam||"—")}</td><td>${brandBadge(a.manufacturer||"—")}</td><td class="points">${pts.toLocaleString()}</td><td>${esc(o?tname(o):"Free Agent")}</td></tr>`}))}
