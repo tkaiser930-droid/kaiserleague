@@ -79,3 +79,17 @@ TOP SCORING UNDRAFTED ATHLETES
 - A leaderboard appears directly under Team Standings with one current free agent from each division: 250, 450, MXGP, MX2, F1, and MotoGP.
 - The leader is the currently unrostered athlete with the most accumulated recorded race points in that division.
 - If no unrostered athlete in a division has recorded results yet, the table shows an empty-state message for that division.
+
+LATEST COMMISSIONER FEATURES — EVENT EDITING + COUNTRY / SUB-REGIONS
+
+SCHEDULE EVENTS
+- The Commissioner Dashboard's schedule event table now has an Edit Event button beside each event, plus Delete.
+- Editing loads the event into the schedule form and saves changes to the existing event record; it does not create a duplicate.
+- New events require a country. The state / province / region selector appears with options for the United States, Canada, Australia, United Kingdom, New Zealand, Germany, Brazil, Mexico, Japan, India, South Africa, Spain, Italy, and Argentina. For other countries, the country flag and country name can still be saved without a sub-region.
+- Schedule and Commissioner tables display the country flag first, followed by the country name and selected state / province / region.
+- Older saved events without country data display "Not set" until edited. Open Edit Event to add their country and optional sub-region.
+
+RIDER NATIONALITY / SUB-REGIONS
+- Add Athlete and Edit Rider now have a country/nationality dropdown and a state / province / region dropdown.
+- The country flag is shown first, followed by the country and selected sub-region beside the rider name throughout athlete, roster, Commissioner, scoring history, draft, and trade tables.
+- Existing rider nationalities are retained. Existing riders can be edited to add a sub-region. Region data is stored with the rider and carried into future score and draft records.

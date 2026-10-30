@@ -89,3 +89,9 @@
 #homeStandings table{min-width:900px}
 #topUndraftedAthletes table{min-width:680px}
 @media(max-width:700px){#homeStandings table{min-width:900px}.undrafted-section{margin-top:24px}}
+
+/* Country flag comes first, followed by country and optional state/province/region. */
+.nationality-flag{gap:5px;min-width:0}
+.nationality-location{font-size:10px;line-height:1.2;color:var(--muted);font-weight:600;white-space:normal}
+#scheduleForm label select{max-width:100%}
+#commSchedule .action-cell{min-width:150px}
