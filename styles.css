@@ -130,17 +130,21 @@ td>.race-number{vertical-align:middle}
 .schedule-series-triple-crown{color:#c9f2d0;border-color:#228B22;background:#17351f;box-shadow:0 0 0 1px #228B2233}
 
 
-/* Home-page championship background photo */
-body[data-page="home"] {
-  background:
+/* Enhanced motocross action photo used as the shared background on every page. */
+body {
+  background-color: #0c0d12;
+  background-image:
     linear-gradient(
       180deg,
-      rgba(7, 9, 14, .52) 0%,
-      rgba(7, 9, 14, .67) 42%,
-      rgba(7, 9, 14, .88) 100%
+      rgba(7, 9, 14, .58) 0%,
+      rgba(7, 9, 14, .68) 44%,
+      rgba(7, 9, 14, .84) 100%
     ),
-    url("assets/homepage-background.webp") center 16% / cover fixed no-repeat;
-  background-color: #0c0d12;
+    url("assets/site-background.webp");
+  background-position: center, center 36%;
+  background-size: cover, cover;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
 }
 body[data-page="home"] .hero {
   min-height: min(680px, 76vh);
@@ -168,9 +172,10 @@ body[data-page="home"] #topUndraftedAthletes {
   box-shadow: 0 12px 34px #0006;
 }
 @media (max-width: 700px) {
-  body[data-page="home"] {
-    background-attachment: scroll;
-    background-position: 54% top;
+  body {
+    background-attachment: scroll, scroll;
+    background-position: center top, 58% top;
+    background-size: cover, cover;
   }
   body[data-page="home"] .hero {
     min-height: 0;

@@ -184,3 +184,8 @@ Logo references:
 - TeamViewer: https://commons.wikimedia.org/wiki/File:TeamViewer_logo_new.svg
 - American Express: https://commons.wikimedia.org/wiki/File:American_Express_Square_Logo.png
 - Puma: https://simpleicons.org/?q=puma
+
+
+SITE-WIDE BACKGROUND IMAGE
+--------------------------
+The enhanced motocross action image is stored locally at assets/site-background.webp and is used as the background on every page through styles.css. The previous homepage-only background image has been removed.
