@@ -61,7 +61,7 @@ LIVE TEAM DRAFT FLOW
 2. Sign in to Commissioner > Draft Management. Select a room (SMX, Triple Crown Series, MXGP, MotoGP, or F1) and click Start Draft. Each room has its own independent status and pick history.
 3. Draft order follows the team order displayed on the Teams page / team records. The order repeats each round. The draft page displays the next team, pick number, and round.
 4. Each team opens Draft, selects the correct room, chooses its team, and signs in with that team's password. Only the team currently on the clock can submit a pick. After each pick, the turn moves to the next team.
-5. The player list is limited to the selected draft room: SMX includes 250, 450, SMX Next, and USA WMX; MXGP includes MXGP, MX2, and WMX; Triple Crown Series includes CAN 250, CAN 450, and CAN WMX; MotoGP offers MotoGP, Moto2, and Moto3 riders; F1 offers F1, F2, and F3 riders. Existing primary-series roster caps are enforced at selection time. Teams can pass a pick if needed.
+5. The player list is limited to the selected draft room: SMX includes 250, 450, SMX Next, and USA WMX; MXGP includes MXGP, MX2, and WMX; Triple Crown Series includes CAN 250, CAN 450, and CAN WMX; MotoGP offers MotoGP, Moto2, and Moto3 riders; F1 offers F1, F2, F3, and F1 Academy riders. Existing primary-series roster caps are enforced at selection time. Teams can pass a pick if needed.
 6. The draft page refreshes the saved league state from the server every few seconds while open, so connected team browsers receive pick and turn updates without a manual page refresh.
 7. The commissioner can pause or complete each room from Draft Management. Clicking Start Draft again resumes the existing pick history; it does not erase previous picks.
 
@@ -76,7 +76,7 @@ HOME PAGE TEAM STANDINGS
 - Series totals use the team attribution recorded when race results were submitted, so past points do not move when a rider later changes teams.
 
 TOP SCORING UNDRAFTED ATHLETES
-- A leaderboard appears directly under Team Standings with one current free agent from each primary roster class, including 250, 450, SMX Next, USA WMX, MXGP, MX2, WMX, CAN 250, CAN 450, CAN WMX, F1, F2, F3, MotoGP, Moto2, and Moto3.
+- A leaderboard appears directly under Team Standings with one current free agent from each primary roster class, including 250, 450, SMX Next, USA WMX, MXGP, MX2, WMX, CAN 250, CAN 450, CAN WMX, F1, F2, F3, F1 Academy, MotoGP, Moto2, and Moto3.
 - The leader is the currently unrostered athlete with the most accumulated recorded race points in that division.
 - If no unrostered athlete in a division has recorded results yet, the table shows an empty-state message for that division.
 
@@ -112,9 +112,9 @@ SERIES GROUPS AND ROSTER REQUIREMENTS
 - SMX draft room: 250 (3), 450 (3), SMX Next (1), USA WMX (1).
 - MXGP draft room: MXGP (3), MX2 (3), WMX (1).
 - Triple Crown Series draft room: CAN 250 (2), CAN 450 (2), CAN WMX (1).
-- F1 draft room and scoring selector: F1 (2), F2 (2), and F3 (2).
-- MotoGP draft room and scoring selector: MotoGP (2), Moto2 (2), and Moto3 (2).
-- Total maximum roster size is 32 athletes per team.
+- F1 draft room and scoring selector: F1 (3), F2 (2), F3 (2), and F1 Academy (1).
+- MotoGP draft room and scoring selector: MotoGP (3), Moto2 (2), and Moto3 (2).
+- Total maximum roster size is 35 athletes per team.
 
 SCHEDULE AND SCORING EVENT TYPES
 - Schedule event types include SMX, Triple Crown Series, MXGP, MotoGP, F1, and MXON.
@@ -144,10 +144,20 @@ TRIPLE CROWN CHAMPION AND SERIES NUMBER-PLATE COLORS
 - MXON schedule badges use blue styling.
 
 
-LATEST SERIES UPDATE — F2 / F3 / MOTO2 / MOTO3
+SERIES UPDATE — F2 / F3 / MOTO2 / MOTO3
 - F2 and F3 are subcategories within the F1 draft room and F1 scoring selector.
 - Moto2 and Moto3 are subcategories within the MotoGP draft room and MotoGP scoring selector.
-- Each of F1, F2, F3, MotoGP, Moto2, and Moto3 has a two-rider primary-series roster quota.
+- Current quotas: F1 (3), F2 (2), F3 (2), F1 Academy (1), MotoGP (3), Moto2 (2), and Moto3 (2) primary-series riders per team.
 - F2/F3 number plates use the same black background and manufacturer-colored number styling as F1. Moto2/Moto3 use the same styling as MotoGP.
 - F1 and MotoGP standings columns include points scored in their respective subcategories.
 - Riders can still have multiple secondary-series affiliations, but only their primary series counts toward a roster quota.
+
+
+LATEST SERIES UPDATE — F1 ACADEMY AND UPDATED FORMULA / MOTORCYCLE QUOTAS
+- F1 Academy is a subcategory in the existing F1 draft room and F1 scoring selector; it does not create a separate draft room or schedule category.
+- F1 Academy requires one primary-series rider per team and uses the same number-plate style and scoring bonuses as F1.
+- F1 now requires three primary-series riders per team. F2 and F3 remain at two each.
+- MotoGP now requires three primary-series riders per team. Moto2 and Moto3 remain at two each.
+- All other roster-class requirements remain unchanged. The updated maximum is 35 roster spots across 17 primary roster classes per team.
+- F1, F2, F3, and F1 Academy results contribute to the F1 standings column.
+- Secondary-series affiliations remain available, but roster counts and quotas are based only on each rider's primary series.

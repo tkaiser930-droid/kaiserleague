@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const K={A:"kaiserFantasyAthletes",T:"kaiserFantasyTeams",S:"kaiserFantasyScores",TR:"kaiserFantasyTrades",D:"kaiserFantasyDraftState",DS:"kaiserFantasyDraftSettings",CAL:"kaiserFantasySchedule"};
-const REQ={"250":3,"450":3,"SMX Next":1,"USA WMX":1,MXGP:3,MX2:3,WMX:1,"CAN 250":2,"CAN 450":2,"CAN WMX":1,F1:2,F2:2,F3:2,MotoGP:2,Moto2:2,Moto3:2},SERIES=Object.keys(REQ),MAX_ROSTER_SIZE=Object.values(REQ).reduce((sum,n)=>sum+n,0),SERIES_GROUPS={SMX:["250","450","SMX Next","USA WMX"],"Triple Crown Series":["CAN 250","CAN 450","CAN WMX"],MXGP:["MXGP","MX2","WMX"],MotoGP:["MotoGP","Moto2","Moto3"],F1:["F1","F2","F3"]},DRAFT_ROOMS=Object.keys(SERIES_GROUPS),SCHEDULE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SCORE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SECONDARY_SERIES_OPTIONS=[...SERIES,"Triple Crown Series"],MXON_PRIMARY_CLASSES=["250","450","SMX Next","USA WMX","CAN 250","CAN 450","CAN WMX","MXGP","MX2","WMX"],$=id=>document.getElementById(id);
+const REQ={"250":3,"450":3,"SMX Next":1,"USA WMX":1,MXGP:3,MX2:3,WMX:1,"CAN 250":2,"CAN 450":2,"CAN WMX":1,F1:3,F2:2,F3:2,"F1 Academy":1,MotoGP:3,Moto2:2,Moto3:2},SERIES=Object.keys(REQ),MAX_ROSTER_SIZE=Object.values(REQ).reduce((sum,n)=>sum+n,0),SERIES_GROUPS={SMX:["250","450","SMX Next","USA WMX"],"Triple Crown Series":["CAN 250","CAN 450","CAN WMX"],MXGP:["MXGP","MX2","WMX"],MotoGP:["MotoGP","Moto2","Moto3"],F1:["F1","F2","F3","F1 Academy"]},DRAFT_ROOMS=Object.keys(SERIES_GROUPS),SCHEDULE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SCORE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SECONDARY_SERIES_OPTIONS=[...SERIES,"Triple Crown Series"],MXON_PRIMARY_CLASSES=["250","450","SMX Next","USA WMX","CAN 250","CAN 450","CAN WMX","MXGP","MX2","WMX"],$=id=>document.getElementById(id);
 const SMX_POSITION_POINTS=[25,22,20,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
 const SCORE_BONUSES={SMX:[["fastestQualifier","Fastest qualifier",2],["heatWinner","Heat winner",2],["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["fastestLap","Fastest lap",1]],MXGP:[["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["qualifyingRaceWinner","Qualifying race winner",2],["fastestLap","Fastest lap",1]],MotoGP:[["sprintWinner","Sprint winner",5],["fastestQualifier","Fastest qualifier",2],["sprintFastestQualifier","Sprint fastest qualifier",2],["fastestLap","Fastest lap",1]],F1:[["sprintWinner","Sprint winner",5],["fastestQualifier","Fastest qualifier",2],["sprintFastestQualifier","Sprint fastest qualifier",2],["fastestLap","Fastest lap",1]]};
 let draftOrderEditorRoom="",draftOrderEditorKeys=[];
@@ -125,7 +125,7 @@ function numberHTML(value,manufacturer,athlete={}){
  else if(series==="CAN 450"||series==="450"||series==="MXGP") colors=["#FFFFFF","#000000"];
  else if(series==="WMX"||series==="CAN WMX"||series==="USA WMX") colors=["#1769C2","#FFFFFF"];
  else if(series==="SMX NEXT") colors=["#FFFFFF","#6B2FB9"];
- else if(["MOTOGP","MOTO2","MOTO3","F1","F2","F3"].includes(series)) colors=["#000000",mcolor(manufacturer)];
+ else if(["MOTOGP","MOTO2","MOTO3","F1","F2","F3","F1 ACADEMY"].includes(series)) colors=["#000000",mcolor(manufacturer)];
  else colors=[mcolor(manufacturer),"#FFFFFF"];
  // Special status colors override series colors. Current points leader remains the highest priority.
  if(athlete.pointsLeader) colors=["#E60012","#FFFFFF"];
@@ -169,7 +169,7 @@ function scoreSeriesBucket(record){
  if(["smx","250","450","smxnext","usawmx"].includes(key))return "SMX";
  if(["mxgp","mx2","wmx"].includes(key))return "MXGP";
  if(["motogp","moto2","moto3"].includes(key))return "MotoGP";
- if(["f1","f2","f3"].includes(key))return "F1";
+ if(["f1","f2","f3","f1academy"].includes(key))return "F1";
  return value;
 }
 function teamSeriesTotal(t,series){return scores().filter(s=>String(s.teamKey)===key(t)&&scoreSeriesBucket(s)===series).reduce((n,s)=>n+Number(s.points||0),0)}
@@ -233,7 +233,7 @@ function setupManage(){options($("manageTeam"),teams().map(t=>({value:key(t),lab
 
 function showManage(k){if(renderRosterLockNotice("manage"))return;const t=teams().find(t=>key(t)===k);if(!t)return;$("manageLogin").hidden=true;$("manageBody").hidden=false;$("manageTitle").textContent=tname(t);$("managedSummary").innerHTML=`<div><strong>${roster(t).length}/${MAX_ROSTER_SIZE}</strong><span>Roster spots</span></div><div><strong>${total(t).toLocaleString()}</strong><span>Season points</span></div><div><strong>${esc(t.owner||"Owner")}</strong><span>Team owner</span></div>`;$("teamQuota").innerHTML=quota(t);options($("freeAgent"),sortRiders(athletes().filter(a=>!owner(a))).map(a=>({value:id(a),label:`${nationalityText(a.nationality,a.nationalityRegion)} #${clean(a.number)||"—"} ${name(a)} — ${seriesDisplayText(a)}`})),"Choose a free agent");$("managedRoster").innerHTML=table(["Athlete","Series","Manufacturer","Action"],sortRiders(roster(t)).map(a=>`<tr><td>${athleteNameHTML(a)}</td><td>${seriesDisplayHTML(a)}</td><td>${brandBadge(a.manufacturer||"—")}</td><td><button class="inline" data-drop="${esc(id(a))}">Drop</button></td></tr>`));$("managedRoster").querySelectorAll("[data-drop]").forEach(b=>b.onclick=()=>{if(renderRosterLockNotice("manage"))return;if(confirm("Drop this athlete?")){if(renderRosterLockNotice("manage"))return;t.roster=t.roster.filter(a=>id(a)!==b.dataset.drop);saveTeams(teams().map(x=>key(x)===k?t:x));showManage(k);refresh()}});$("managedScores").innerHTML=table(["Place","Athlete","Event / Round","Bonuses","Points","Recorded"],scores().filter(s=>String(s.teamKey)===k).slice().sort(compareScoreRiders).map(s=>`<tr><td>${s.place?esc(s.place):"—"}</td><td>${athleteNameHTML(riderFromRecord(s))}</td><td>${scoreEventLabel(s)}</td><td>${bonusText(s)}</td><td class="points">${Number(s.points||0)}</td><td>${new Date(s.recordedAt).toLocaleDateString()}</td></tr>`))}
 function scoreClasses(series){if(series==="MXON")return ["MXON"];return SERIES_GROUPS[series]||[series]}
-function scoreBonusConfig(series,division=""){if(series==="MXGP"||(series==="Triple Crown Series"&&division==="CAN WMX"))return SCORE_BONUSES.MXGP;if(["MotoGP","Moto2","Moto3"].includes(series))return SCORE_BONUSES.MotoGP;if(["F1","F2","F3"].includes(series))return SCORE_BONUSES.F1;return SCORE_BONUSES.SMX}
+function scoreBonusConfig(series,division=""){if(series==="MXGP"||(series==="Triple Crown Series"&&division==="CAN WMX"))return SCORE_BONUSES.MXGP;if(["MotoGP","Moto2","Moto3"].includes(series))return SCORE_BONUSES.MotoGP;if(["F1","F2","F3","F1 Academy"].includes(series))return SCORE_BONUSES.F1;return SCORE_BONUSES.SMX}
 function athleteEligibleForScoring(a,series,division){if(!a)return false;if(series==="MXON")return athleteSeries(a).some(item=>MXON_PRIMARY_CLASSES.includes(item)||item==="Triple Crown Series");return hasAthleteSeries(a,division)}
 function scoreEventLabel(s){const base=esc(clean(s?.event)||"—");return s?.round!==undefined&&s?.round!==null&&clean(s.round)!==""?`${base} · Round ${esc(s.round)}`:base}
 function bonusText(s){return Array.isArray(s?.bonuses)&&s.bonuses.length?s.bonuses.map(esc).join(", "):"—"}
