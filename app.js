@@ -92,7 +92,15 @@ Cadillac:{color:"#C7A96B",logo:"cadillac"},
 Audi:{color:"#444444",logo:"audi",image:"https://cdn.simpleicons.org/audi/444444"},
 Haas:{color:"#FFFFFF",logo:"haas",image:"https://f1store4.formula1.com/content/ws/all/686828d2-e6e4-4e2f-9056-412cd5fffbaf__1179X1179.jpg",fit:"square"},
 Williams:{color:"#00AEEF",logo:"williamsf1",image:"https://brandlogo.org/wp-content/uploads/2025/02/Williams-Racing-Icon-2020.png",fit:"square"},
-Alpine:{color:"#F08ACB",logo:"alpine",image:"assets/logos/alpine-pink-a.png",fit:"wide"}
+Alpine:{color:"#F08ACB",logo:"alpine",image:"assets/logos/alpine-pink-a.png",fit:"wide"},
+// Sponsor / partner brands used in manufacturer-style badges and athlete sidebars.
+"TAG Heuer":{color:"#009B55",image:"https://upload.wikimedia.org/wikipedia/commons/5/57/TAG_HEUER_logo.svg",fit:"wide"},
+Gatorade:{color:"#F36F21",image:"https://upload.wikimedia.org/wikipedia/commons/4/43/Gatorade_2025.svg",fit:"wide"},
+Sephora:{color:"#363636",image:"https://upload.wikimedia.org/wikipedia/commons/2/21/Sephora_logo.svg",fit:"wide"},
+LEGO:{color:"#FFD500",image:"https://upload.wikimedia.org/wikipedia/commons/2/24/LEGO_logo.svg",fit:"square"},
+TeamViewer:{color:"#87CEEB",image:"https://upload.wikimedia.org/wikipedia/commons/e/ea/TeamViewer_logo_new.svg",fit:"wide"},
+"American Express":{color:"#87CEEB",image:"https://upload.wikimedia.org/wikipedia/commons/7/7e/American_Express_Square_Logo.png",fit:"square"},
+Puma:{color:"#363636",logo:"puma",image:"https://cdn.simpleicons.org/puma/363636",fit:"square"}
 };
 const MANUFACTURER_PURPLE="#8E67F2";
 function brandKey(value){

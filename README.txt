@@ -161,3 +161,26 @@ LATEST SERIES UPDATE — F1 ACADEMY AND UPDATED FORMULA / MOTORCYCLE QUOTAS
 - All other roster-class requirements remain unchanged. The updated maximum is 35 roster spots across 17 primary roster classes per team.
 - F1, F2, F3, and F1 Academy results contribute to the F1 standings column.
 - Secondary-series affiliations remain available, but roster counts and quotas are based only on each rider's primary series.
+
+
+ADDED SPONSOR BRAND BADGES
+--------------------------
+The manufacturer-style badge system now recognizes these additional brands and applies their requested sidebar colors:
+- TAG Heuer: green (#009B55)
+- Gatorade: orange (#F36F21)
+- Sephora: dark gray (#363636)
+- LEGO: yellow (#FFD500)
+- TeamViewer: baby blue (#87CEEB)
+- American Express: baby blue (#87CEEB)
+- Puma: dark gray (#363636)
+
+Their logo images are loaded from Wikimedia Commons / Simple Icons image URLs. An internet connection is required to display these new logo images. If a logo host is unavailable, the badge falls back to the manufacturer name and still uses the configured brand color.
+
+Logo references:
+- TAG Heuer: https://commons.wikimedia.org/wiki/File:TAG_HEUER_logo.svg
+- Gatorade: https://commons.wikimedia.org/wiki/File:Gatorade_2025.svg
+- Sephora: https://commons.wikimedia.org/wiki/File:Sephora_logo.svg
+- LEGO: https://commons.wikimedia.org/wiki/File:LEGO_logo.svg (original logo source listed as LEGO Group)
+- TeamViewer: https://commons.wikimedia.org/wiki/File:TeamViewer_logo_new.svg
+- American Express: https://commons.wikimedia.org/wiki/File:American_Express_Square_Logo.png
+- Puma: https://simpleicons.org/?q=puma
