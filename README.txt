@@ -134,3 +134,11 @@ TRIPLE CROWN SERIES UPDATE
 - MXON athlete selection includes riders primarily or secondarily affiliated with SMX, Triple Crown divisions, or MXGP divisions.
 
 - Draft room and scoring eligibility can recognize either a rider's primary or secondary division affiliation; roster quota accounting always uses primary series only. A rider is still assigned to only one fantasy team across all rooms.
+
+TRIPLE CROWN CHAMPION AND SERIES NUMBER-PLATE COLORS
+- Add Athlete and Edit Rider include a “Reigning Triple Crown Champion” checkbox. The status is saved on the rider and current roster copies and is shown as a rider status badge.
+- Reigning Triple Crown Champions receive gold numbers on a purple plate. Current Points Leader remains the highest-priority status color; the Triple Crown Champion color takes priority over the other champion status colors.
+- CAN 250 numbers are white on black; CAN 450 numbers are black on white.
+- WMX, CAN WMX, and USA WMX numbers are white on blue.
+- SMX Next numbers are purple on white.
+- MXON schedule badges use blue styling.
