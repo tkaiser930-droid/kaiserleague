@@ -128,3 +128,53 @@ td>.race-number{vertical-align:middle}
 .schedule-series-can{color:#f3c7c7;border-color:#d84c53;background:#3a2026;box-shadow:0 0 0 1px #d84c5333}
 .schedule-series-mxon{color:#eaf4ff;border-color:#3187ed;background:#153b70;box-shadow:0 0 0 1px #3187ed55}
 .schedule-series-triple-crown{color:#c9f2d0;border-color:#228B22;background:#17351f;box-shadow:0 0 0 1px #228B2233}
+
+
+/* Home-page championship background photo */
+body[data-page="home"] {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(7, 9, 14, .52) 0%,
+      rgba(7, 9, 14, .67) 42%,
+      rgba(7, 9, 14, .88) 100%
+    ),
+    url("assets/homepage-background.webp") center 16% / cover fixed no-repeat;
+  background-color: #0c0d12;
+}
+body[data-page="home"] .hero {
+  min-height: min(680px, 76vh);
+  margin: 18px 0 28px;
+  padding: clamp(28px, 5vw, 58px);
+  border: 1px solid #ffffff20;
+  border-radius: 18px;
+  background: linear-gradient(90deg, rgba(8, 10, 15, .78) 0%, rgba(8, 10, 15, .58) 56%, rgba(8, 10, 15, .20) 100%);
+  box-shadow: 0 18px 55px #0007;
+}
+body[data-page="home"] .hero > div {
+  max-width: 690px;
+}
+body[data-page="home"] .hero > div > p:not(.eyebrow) {
+  color: #f0f1f5;
+  text-shadow: 0 2px 9px #000b;
+}
+body[data-page="home"] .hero aside {
+  background: linear-gradient(145deg, rgba(25, 25, 38, .92), rgba(12, 14, 22, .90));
+  border-color: #ffffff35;
+  backdrop-filter: blur(8px);
+}
+body[data-page="home"] #homeStandings,
+body[data-page="home"] #topUndraftedAthletes {
+  box-shadow: 0 12px 34px #0006;
+}
+@media (max-width: 700px) {
+  body[data-page="home"] {
+    background-attachment: scroll;
+    background-position: 54% top;
+  }
+  body[data-page="home"] .hero {
+    min-height: 0;
+    padding: 26px 20px;
+    background: linear-gradient(180deg, rgba(8, 10, 15, .80), rgba(8, 10, 15, .60));
+  }
+}
