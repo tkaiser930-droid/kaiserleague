@@ -171,8 +171,8 @@ function scoreSeriesBucket(record){
   return "SMX";
  }
  if(key==="triplecrownseries"||key==="can"){
-  if(division==="canwmx"||primary==="canwmx")return "MXGP";
-  return "SMX";
+  // Triple Crown Series has its own standings bucket, separate from SMX and MXGP.
+  return "TCS";
  }
  if(["smx","250","450","smxnext","usawmx"].includes(key))return "SMX";
  if(["mxgp","mx2","wmx"].includes(key))return "MXGP";
@@ -201,7 +201,7 @@ function renderTopUndraftedAthletes(){
 }
 function standings(){
  const el=$("homeStandings");
- if(el){const ranked=teams().slice().sort((a,b)=>total(b)-total(a));el.innerHTML=table(["Rank","Team","Owner","Roster","F1 Points","MotoGP Points","SMX Points","MXGP Points","Total Points"],ranked.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(tname(t))}</b></td><td>${esc(t.owner||"Unclaimed")}</td><td>${roster(t).length}/${MAX_ROSTER_SIZE}</td><td class="points">${teamSeriesTotal(t,"F1").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"MotoGP").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"SMX").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"MXGP").toLocaleString()}</td><td class="points">${total(t).toLocaleString()}</td></tr>`))}
+ if(el){const ranked=teams().slice().sort((a,b)=>total(b)-total(a));el.innerHTML=table(["Rank","Team","Owner","Roster","F1 Points","MotoGP Points","SMX Points","MXGP Points","TCS Points","Total Points"],ranked.map((t,i)=>`<tr><td>${i+1}</td><td><b>${esc(tname(t))}</b></td><td>${esc(t.owner||"Unclaimed")}</td><td>${roster(t).length}/${MAX_ROSTER_SIZE}</td><td class="points">${teamSeriesTotal(t,"F1").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"MotoGP").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"SMX").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"MXGP").toLocaleString()}</td><td class="points">${teamSeriesTotal(t,"TCS").toLocaleString()}</td><td class="points">${total(t).toLocaleString()}</td></tr>`))}
  renderTopUndraftedAthletes()
 }
 async function claim(k){const t=teams().find(t=>key(t)===k),msg=$("teamMessage");if(!t||t.owner){msg.textContent="That team is already claimed or unavailable.";return}const o=prompt("Enter the team owner's name:");if(o===null)return;if(!clean(o)){msg.textContent="Owner name is required.";return}const p=prompt("Create a team password (at least 6 characters):");if(p===null)return;if(p.length<6){msg.textContent="Password must be at least 6 characters.";return}t.owner=clean(o);t.passwordHash=await hash(p);saveTeams(teams().map(x=>key(x)===k?t:x));msg.textContent=`${tname(t)} claimed. Save the password somewhere safe.`;renderTeams()}
