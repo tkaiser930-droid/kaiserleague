@@ -58,10 +58,10 @@ SCHEDULE PAGE
 
 LIVE TEAM DRAFT FLOW
 1. Claim all five fantasy teams and create a team password for each team before starting a draft.
-2. Sign in to Commissioner > Draft Management. Select a room (SMX, MXGP, MotoGP, or F1) and click Start Draft. Each room has its own independent status and pick history.
+2. Sign in to Commissioner > Draft Management. Select a room (SMX, Triple Crown Series, MXGP, MotoGP, or F1) and click Start Draft. Each room has its own independent status and pick history.
 3. Draft order follows the team order displayed on the Teams page / team records. The order repeats each round. The draft page displays the next team, pick number, and round.
 4. Each team opens Draft, selects the correct room, chooses its team, and signs in with that team's password. Only the team currently on the clock can submit a pick. After each pick, the turn moves to the next team.
-5. The player list is limited to the selected room: SMX offers 250 and 450 riders; MXGP offers MXGP and MX2 riders; MotoGP and F1 offer their respective riders. Existing roster caps are enforced at selection time. Teams can pass a pick if needed.
+5. The player list is limited to the selected draft room: SMX includes 250, 450, SMX Next, and USA WMX; MXGP includes MXGP, MX2, and WMX; Triple Crown Series includes CAN 250, CAN 450, and CAN WMX; MotoGP and F1 offer their respective riders. Existing primary-series roster caps are enforced at selection time. Teams can pass a pick if needed.
 6. The draft page refreshes the saved league state from the server every few seconds while open, so connected team browsers receive pick and turn updates without a manual page refresh.
 7. The commissioner can pause or complete each room from Draft Management. Clicking Start Draft again resumes the existing pick history; it does not erase previous picks.
 
@@ -72,11 +72,11 @@ LATEST HOME PAGE CHANGES — STANDINGS + UNDRAFTED LEADERS
 
 HOME PAGE TEAM STANDINGS
 - The standings table includes separate F1, MotoGP, SMX, and MXGP point columns, plus the overall team total.
-- SMX points include 250 and 450 race scoring. MXGP points include MXGP and MX2 race scoring.
+- SMX standings include results scored in 250, 450, SMX Next, USA WMX, CAN 250, and CAN 450 divisions. MXGP standings include results scored in MXGP, MX2, WMX, and CAN WMX divisions. Triple Crown Series remains a separate schedule, draft, and scoring category; its division results are also attributed to the corresponding SMX or MXGP team standings column. MXON scores are attributed to the relevant rider primary-series bucket.
 - Series totals use the team attribution recorded when race results were submitted, so past points do not move when a rider later changes teams.
 
 TOP SCORING UNDRAFTED ATHLETES
-- A leaderboard appears directly under Team Standings with one current free agent from each division: 250, 450, MXGP, MX2, F1, and MotoGP.
+- A leaderboard appears directly under Team Standings with one current free agent from each primary roster class, including 250, 450, SMX Next, USA WMX, MXGP, MX2, WMX, CAN 250, CAN 450, CAN WMX, F1, and MotoGP.
 - The leader is the currently unrostered athlete with the most accumulated recorded race points in that division.
 - If no unrostered athlete in a division has recorded results yet, the table shows an empty-state message for that division.
 
@@ -99,3 +99,38 @@ MANUFACTURER LOGO UPDATE — GASGAS
 - Added the GASGAS red emblem and wordmark image to manufacturer badges and rider sidebars.
 - Recognizes both “GasGas” and “Gas Gas” spellings in manufacturer/team labels.
 - The logo is served from Wikimedia Commons, which identifies the SVG as originating from the GASGAS media asset bank. An internet connection is required for this image.
+
+
+LATEST SERIES / RIDER AFFILIATION / ROSTER UPDATE
+
+PRIMARY SERIES
+- Rider creation and Edit Rider support one required Primary Series and multiple optional Secondary Series affiliations. Secondary affiliations are not limited to two; the rider can be linked to any number of the available additional series.
+- Roster quotas, roster validation, draft quota checks, trades, roster display counts, and team management count each athlete only against the athlete's Primary Series. Secondary Series are displayed as additional affiliations and do not consume extra roster spots.
+- Triple Crown Series is a standalone schedule/scoring category and draft room. Its divisions are CAN 250, CAN 450, and CAN WMX.
+
+SERIES GROUPS AND ROSTER REQUIREMENTS
+- SMX draft room: 250 (3), 450 (3), SMX Next (1), USA WMX (1).
+- MXGP draft room: MXGP (3), MX2 (3), WMX (1).
+- Triple Crown Series draft room: CAN 250 (2), CAN 450 (2), CAN WMX (1).
+- MotoGP draft room: MotoGP (3).
+- F1 draft room: F1 (3).
+- Total maximum roster size is 26 athletes per team.
+
+SCHEDULE AND SCORING EVENT TYPES
+- Schedule event types include SMX, Triple Crown Series, MXGP, MotoGP, F1, and MXON.
+- The Triple Crown Series scoring selection offers separate CAN 250, CAN 450, and CAN WMX divisions. CAN 250 and CAN 450 results contribute to the SMX standings bucket; CAN WMX results contribute to MXGP.
+- WMX is included with MXGP series riders. USA WMX and SMX Next are included in the SMX group.
+- MXON is a special schedule/scoring event type. Its athlete picker includes riders with SMX, CAN 250 / CAN 450 / CAN WMX, or MXGP / MX2 / WMX primary/secondary affiliations. MXON results are attributed to each rider's primary-series standings bucket.
+- Rider primary and secondary series affiliations are saved in the existing athlete and roster data records; no new database category or migration reset is required.
+
+
+TRIPLE CROWN SERIES UPDATE
+- Triple Crown Series is its own schedule/scoring category and its own snake-draft room.
+- Its divisions are CAN 250, CAN 450, and CAN WMX.
+- Roster requirements remain CAN 250: 2, CAN 450: 2, CAN WMX: 1.
+- Older saved CAN draft picks and draft settings are migrated to the Triple Crown Series room on startup. Legacy CAN schedule events and scoring records are displayed and editable as Triple Crown Series.
+- Legacy CAN schedule events and scoring groups are treated as Triple Crown Series for filtering and editing.
+- Triple Crown CAN 250/450 results contribute to SMX team category points; CAN WMX results contribute to MXGP team category points.
+- MXON athlete selection includes riders primarily or secondarily affiliated with SMX, Triple Crown divisions, or MXGP divisions.
+
+- Draft room and scoring eligibility can recognize either a rider's primary or secondary division affiliation; roster quota accounting always uses primary series only. A rider is still assigned to only one fantasy team across all rooms.

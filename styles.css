@@ -112,3 +112,16 @@ td>.race-number{vertical-align:middle}
 
 /* GASGAS official stacked G + wordmark logo; retain the brand red. */
 .brand-badge img.brand-logo-gasgas{height:25px;max-width:38px;object-fit:contain}
+
+/* Expanded athlete primary/secondary series controls */
+.series-affiliations{grid-column:1/-1;border:1px solid #3b3d4b;border-radius:12px;padding:14px 16px;margin:4px 0 12px;min-width:0;background:#171923}
+.series-affiliations legend{padding:0 8px;font-weight:800;color:#e8e3f2}
+.series-affiliations .muted{margin:2px 0 12px;font-size:13px}
+.series-check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.series-check{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid #383b49;border-radius:8px;background:#202331;font-size:13px}
+.series-check input{accent-color:#9a76f2}
+.series-secondary{display:block;margin-top:3px;color:#a9a7b5;font-size:11px;line-height:1.35}
+.series-primary{font-weight:800}
+.schedule-series-can{color:#f3c7c7;border-color:#d84c53;background:#3a2026;box-shadow:0 0 0 1px #d84c5333}
+.schedule-series-mxon{color:#e9d6ff;border-color:#9a65cc;background:#2b2038;box-shadow:0 0 0 1px #9a65cc33}
+.schedule-series-triple-crown{color:#d9e5ff;border-color:#5276c9;background:#202b48;box-shadow:0 0 0 1px #5276c933}
