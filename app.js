@@ -267,19 +267,20 @@ function formatScheduleDate(value){const raw=clean(value);if(!raw)return "—";c
 function eventDateLabel(e){const start=clean(e?.date),end=clean(e?.endDate)||start;if(!start)return "—";const first=formatScheduleDate(start),last=formatScheduleDate(end);return end&&end!==start?`${first} – ${last}`:first}
 function eventCountryHTML(e){return e?.country?nationalityHTML(e.country,e.region):'<span class="muted">Not set</span>'}
 const EVENT_TYPE_OPTIONS={SMX:["Supercross","Motocross","SMX"],"Triple Crown Series":["Stage 1","Stage 2","Stage 3"],MXGP:["Grand Prix"],MotoGP:["Grand Prix"],F1:["Sprint","Grand Prix"]};
-function eventTypeLabel(event){const type=clean(event?.eventType),detail=clean(event?.eventTypeDetail);if(!type)return "—";return type==="Supercross"&&detail?`Supercross ${detail}`:type}
+function eventTypeLabel(event){let type=clean(event?.eventType),detail=clean(event?.eventTypeDetail);if(type==="East/West"){type="Supercross";detail="East/West"}if(!type)return "—";return type==="Supercross"&&detail?`Supercross ${detail}`:type}
 function updateEventTypeFields(series,selectedType="",selectedDetail=""){
  const typeField=$("eventSubTypeField"),typeSelect=$("eventSubType"),detailField=$("eventSubTypeDetailField"),detailSelect=$("eventSubTypeDetail");
  if(!typeField||!typeSelect||!detailField||!detailSelect)return;
+ if(series==="SMX"&&selectedType==="East/West"){selectedType="Supercross";selectedDetail="East/West"}
  const choices=EVENT_TYPE_OPTIONS[series]||[];
  typeSelect.replaceChildren(new Option("No secondary event type",""),...choices.map(value=>new Option(value,value)));
  typeField.hidden=!choices.length;typeSelect.value=choices.includes(selectedType)?selectedType:"";
  const needsEastWest=series==="SMX"&&typeSelect.value==="Supercross";
  detailField.hidden=!needsEastWest;detailSelect.required=needsEastWest;
- const detailLabel=$("eventSubTypeDetailLabel");if(detailLabel)detailLabel.textContent="Supercross East / West";
+ const detailLabel=$("eventSubTypeDetailLabel");if(detailLabel)detailLabel.textContent="Supercross Division";
  if(needsEastWest){
-  detailSelect.replaceChildren(new Option("Choose East or West…",""),new Option("East","East"),new Option("West","West"));
-  detailSelect.value=["East","West"].includes(selectedDetail)?selectedDetail:"";
+  detailSelect.replaceChildren(new Option("Choose East, West, or East/West…",""),new Option("East","East"),new Option("West","West"),new Option("East/West","East/West"));
+  detailSelect.value=["East","West","East/West"].includes(selectedDetail)?selectedDetail:"";
  }else{detailSelect.replaceChildren(new Option("Choose…",""));detailSelect.value=""}
 }
 function resetScheduleEditor(){
@@ -300,7 +301,7 @@ function saveScheduleEvent(e){
  if(end<start){msg.textContent="End date must be on or after the event start date.";return}
  const round=clean($("eventRound").value);if(!/^\d+$/.test(round)||Number(round)<1){msg.textContent="Round number must be a positive whole number.";return}
  const eventSeries=$("eventSeries").value,eventType=clean($("eventSubType")?.value),eventTypeDetail=clean($("eventSubTypeDetail")?.value);
- if(eventSeries==="SMX"&&eventType==="Supercross"&&!eventTypeDetail){msg.textContent="Choose East or West for a Supercross event.";return}
+ if(eventSeries==="SMX"&&eventType==="Supercross"&&!eventTypeDetail){msg.textContent="Choose East, West, or East/West for a Supercross event.";return}
  const list=read(K.CAL,[]),eventData={name:clean($("eventName").value),series:eventSeries,eventType,eventTypeDetail:eventType==="Supercross"?eventTypeDetail:"",round:Number(round),date:start,endDate:end,location:clean($("eventLocation").value),country,region};
  if(!eventData.name){msg.textContent="Event name is required.";return}
  if(eventId){const index=list.findIndex(item=>String(item.id)===eventId);if(index<0){msg.textContent="That event could not be found. Refresh and try again.";return}list[index]={...list[index],...eventData};write(K.CAL,list);msg.textContent=`Updated ${eventData.name}.`;}

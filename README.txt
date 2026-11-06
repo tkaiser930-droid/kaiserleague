@@ -70,7 +70,7 @@ COMMISSIONER DASHBOARD NAVIGATION
 - Schedule contains Add Schedule Event, Edit Scheduled Event controls, and Scheduled Events.
 
 SCHEDULE EVENT TYPES
-- SMX secondary event types: Supercross, Motocross, and SMX. When Supercross is selected, choose East or West in the additional Supercross East / West field. The schedule displays Supercross East or Supercross West.
+- SMX secondary event types: Supercross, Motocross, and SMX. When Supercross is selected, choose East, West, or East/West in the additional Supercross Division field. The schedule displays Supercross East, Supercross West, or Supercross East/West.
 - Triple Crown Series event types: Stage 1, Stage 2, and Stage 3.
 - MXGP, MotoGP, and F1 each support Grand Prix as a secondary event type.
 - F1 also supports Sprint as a secondary event type.
