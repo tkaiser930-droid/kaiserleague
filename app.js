@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const K={A:"kaiserFantasyAthletes",T:"kaiserFantasyTeams",S:"kaiserFantasyScores",TR:"kaiserFantasyTrades",D:"kaiserFantasyDraftState",DS:"kaiserFantasyDraftSettings",CAL:"kaiserFantasySchedule"};
-const REQ={"250":3,"450":3,MXGP:3,MX2:3,"CAN 250":2,"CAN 450":2,F1:3,MotoGP:3},SERIES=Object.keys(REQ),MXON_SUB_SERIES=["MXON MXGP","MXON MX2","MXON Open"],SECONDARY_SERIES_OPTIONS=[...SERIES,...MXON_SUB_SERIES],MAX_ROSTER_SIZE=Object.values(REQ).reduce((sum,n)=>sum+n,0),SERIES_GROUPS={SMX:["250","450"],"Triple Crown Series":["CAN 250","CAN 450"],MXGP:["MXGP","MX2"],MotoGP:["MotoGP"],F1:["F1"]},SECONDARY_SERIES_GROUPS={...SERIES_GROUPS,MXON:MXON_SUB_SERIES},DRAFT_ROOMS=Object.keys(SERIES_GROUPS),SCHEDULE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SCORE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],MXON_PRIMARY_CLASSES=["250","450","CAN 250","CAN 450","MXGP","MX2"],SERIES_REMAP={f2:"F1",f3:"F1",f1academy:"F1",moto2:"MotoGP",moto3:"MotoGP"},RETIRED_SERIES=new Set(["wmx","canwmx","usawmx","smxnext"]),$=id=>document.getElementById(id);
+const REQ={"250":3,"450":3,MXGP:3,MX2:3,"CAN 250":2,"CAN 450":2,F1:3,MotoGP:3},SERIES=Object.keys(REQ),MXON_SUB_SERIES=["MXON MXGP","MXON MX2","MXON Open"],SECONDARY_SERIES_OPTIONS=[...SERIES,...MXON_SUB_SERIES],MAX_ROSTER_SIZE=Object.values(REQ).reduce((sum,n)=>sum+n,0),SERIES_GROUPS={SMX:["250","450"],"Triple Crown Series":["CAN 250","CAN 450"],MXGP:["MXGP","MX2"],MotoGP:["MotoGP"],F1:["F1"]},SECONDARY_SERIES_GROUPS={...SERIES_GROUPS,MXON:MXON_SUB_SERIES},DRAFT_ROOMS=Object.keys(SERIES_GROUPS),SCHEDULE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SCORE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SERIES_REMAP={f2:"F1",f3:"F1",f1academy:"F1",moto2:"MotoGP",moto3:"MotoGP"},RETIRED_SERIES=new Set(["wmx","canwmx","usawmx","smxnext"]),$=id=>document.getElementById(id);
 const SMX_POSITION_POINTS=[25,22,20,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
 const SX_MX_POSITION_POINTS=[25,22,20,18,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
 const MOTOCROSS_POSITION_POINTS=[...SX_MX_POSITION_POINTS,...Array(20).fill(0)];
@@ -9,7 +9,7 @@ const MXGP_QUALIFYING_RACE_POINTS=Array.from({length:40},(_,i)=>i<10?10-i:0);
 const F1_SPRINT_POSITION_POINTS=Array.from({length:22},(_,i)=>i<8?8-i:0);
 const MOTOGP_SPRINT_POSITION_POINTS=[12,9,7,6,5,4,3,2,1,...Array(13).fill(0)];
 const GRAND_PRIX_BONUSES=[["fastestQualifier","Fastest qualifier",3],["fastestLap","Fastest lap",1]];
-const SCORE_BONUSES={SMX:[["fastestQualifier","Fastest qualifier",2],["heatWinner","Heat winner",2],["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["fastestLap","Fastest lap",1]],TripleCrown:[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]],MXGP:[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]],MotoGP:GRAND_PRIX_BONUSES,F1:GRAND_PRIX_BONUSES};
+const SCORE_BONUSES={SMX:[["fastestQualifier","Fastest qualifier",2],["heatWinner","Heat winner",2],["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["fastestLap","Fastest lap",1]],TripleCrown:[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]],MXGP:[["fastestLap","Fastest lap",1]],MotoGP:GRAND_PRIX_BONUSES,F1:GRAND_PRIX_BONUSES};
 let draftOrderEditorRoom="",draftOrderEditorKeys=[];
 const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},write=(k,v)=>{if(window.KFStorage&&typeof window.KFStorage.write==="function")window.KFStorage.write(k,v);else localStorage.setItem(k,JSON.stringify(v))};
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random();
@@ -324,11 +324,27 @@ function showManage(k){if(renderRosterLockNotice("manage"))return;const t=teams(
 function selectedScoreScheduleEvent(){const eventId=$("scoreScheduleEvent")?.value;return eventId?read(K.CAL,[]).find(event=>String(event.id)===String(eventId))||null:null}
 function scoreClasses(series){return series==="MXON"?["MXON"]:[...(SERIES_GROUPS[series]||[series])]}
 function scoreBonusConfig(series,division=""){
- if(series==="Triple Crown Series"||series==="MXGP")return scoringPhase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]];
+ if(series==="MXGP")return [["fastestLap","Fastest lap",1]];
+ if(series==="Triple Crown Series")return scoringPhase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]];
  if(series==="MotoGP"||series==="F1")return GRAND_PRIX_BONUSES;
  return SCORE_BONUSES.SMX;
 }
-function athleteEligibleForScoring(a,series,division){if(!a)return false;if(series==="MXON")return athleteSeries(a).some(item=>MXON_PRIMARY_CLASSES.includes(item));return hasAthleteSeries(a,division)}
+function athleteEligibleForScoring(a,series,division){
+ if(!a)return false;
+ if(series==="MXON"){
+  const affiliations=new Set(Array.isArray(a.secondarySeries)?a.secondarySeries:[]);
+  const allowedByPhase={
+   "MX2 Qualifying Race":["MXON MX2"],
+   "MXGP Qualifying Race":["MXON MXGP"],
+   "Open Qualifying Race":["MXON Open"],
+   "Moto 1":["MXON MXGP","MXON MX2"],
+   "Moto 2":["MXON MX2","MXON Open"],
+   "Moto 3":["MXON MXGP","MXON Open"]
+  }[scoringPhase]||[];
+  return allowedByPhase.some(item=>affiliations.has(item));
+ }
+ return hasAthleteSeries(a,division)
+}
 function scoreEventLabel(s){let base=esc(clean(s?.event)||"—");if(s?.round!==undefined&&s?.round!==null&&clean(s.round)!=="")base+=` · Round ${esc(s.round)}`;if(clean(s?.scoringPhase))base+=` · ${esc(s.scoringPhase)}`;return base}
 function bonusText(s){return Array.isArray(s?.bonuses)&&s.bonuses.length?s.bonuses.map(esc).join(", "):"—"}
 function currentSmxEventType(){const selected=clean($("scoreSmxEventType")?.value||"SMX");return selected==="East/West"?"Supercross":selected}
@@ -338,6 +354,7 @@ function scorePhaseOptions(){
  if(series==="SMX"&&currentSmxEventType()==="Motocross")return ["Moto 1","Moto 2"];
  if(series==="Triple Crown Series")return ["Moto 1","Moto 2"];
  if(series==="MXGP")return ["Qualifying Race","Moto 1","Moto 2"];
+ if(series==="MXON")return ["MX2 Qualifying Race","MXGP Qualifying Race","Open Qualifying Race","Moto 1","Moto 2","Moto 3"];
  if(series==="MotoGP")return ["Grand Prix","Sprint"];
  if(series==="F1"&&clean(scheduled?.eventType)==="Sprint")return ["Grand Prix","Sprint"];
  return [];
@@ -356,10 +373,18 @@ function scoreFormatConfig(){
   const round=Number(clean($("scoreRound")?.value)||scheduled?.round||0),multiplier=round===2?2:round===3?3:1;
   return {eventType:"SMX",phase:"",rowCount:20,positionPoints:SX_MX_POSITION_POINTS,multiplier,bonuses:[["fastestQualifier","Fastest qualifier",2],["moto1FastestLap","Moto 1 fastest lap",1],["moto2FastestLap","Moto 2 fastest lap",1],["moto1Winner","Moto 1 winner",3],["moto2Winner","Moto 2 winner",3]]};
  }
+ if(series==="MXON"){
+  const phase=scorePhaseOptions().includes(scoringPhase)?scoringPhase:scorePhaseOptions()[0];
+  const qualifying=phase.includes("Qualifying Race");
+  const bonuses=qualifying
+   ?[["fastestLap","Fastest lap",1],["nationFirstQualifying","Nation 1st Qualifying",3],["nationSecondQualifying","Nation 2nd Qualifying",2],["nationThirdQualifying","Nation 3rd Qualifying",1]]
+   :[["fastestLap","Fastest lap",1],["nationFirst","Nation 1st",10],["nationSecond","Nation 2nd",5],["nationThird","Nation 3rd",3]];
+  return {eventType:clean(scheduled?.eventType)||"MXON",phase,rowCount:40,positionPoints:MOTOCROSS_POSITION_POINTS,multiplier:1,bonuses};
+ }
  if(series==="Triple Crown Series"||series==="MXGP"){
   const phase=scorePhaseOptions().includes(scoringPhase)?scoringPhase:"Moto 1";
   if(series==="MXGP"&&phase==="Qualifying Race")return {eventType:clean(scheduled?.eventType)||"MXGP",phase,rowCount:40,positionPoints:MXGP_QUALIFYING_RACE_POINTS,multiplier:1,bonuses:[]};
-  const bonuses=phase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]];
+  const bonuses=series==="MXGP"?[["fastestLap","Fastest lap",1]]:phase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]];
   return {eventType:clean(scheduled?.eventType)||(series==="Triple Crown Series"?"Triple Crown Series":"MXGP"),phase,rowCount:40,positionPoints:MOTOCROSS_POSITION_POINTS,multiplier:1,bonuses};
  }
  if(series==="F1"||series==="MotoGP"){
@@ -383,7 +408,8 @@ function updateScoreModeControls(){
   else if(smx&&config.eventType==="Supercross")note.textContent="Supercross scoring: 20 rider slots; fastest qualifier +2, heat winner +3, fastest lap +1.";
   else if(smx&&config.eventType==="SMX")note.textContent="SMX scoring: 20 rider slots. Round 2 points are doubled and Round 3 points are tripled.";
   else if($("scoreSeries")?.value==="MXGP"&&scoringPhase==="Qualifying Race")note.textContent="MXGP Qualifying Race: 10 points for 1st, decreasing by 1 point per position through 10th; 0 points for 11th–40th. No bonus points are applied.";
-  else if(["Triple Crown Series","MXGP"].includes($("scoreSeries")?.value))note.textContent=`${scoringPhase} scoring: 40 rider slots. Positions 21–40 receive 0 finish points. Moto 1 bonuses: fastest qualifier +2 and fastest lap +1; Moto 2 bonus: fastest lap +1.`;
+  else if($("scoreSeries")?.value==="MXON")note.textContent=scoringPhase.includes("Qualifying Race")?"MXON qualifying race: 40 rider slots using MXGP moto finish points. Bonuses: fastest lap +1, Nation 1st Qualifying +3, Nation 2nd Qualifying +2, Nation 3rd Qualifying +1. Only athletes affiliated with the selected MXON class are available.":"MXON moto: 40 rider slots using MXGP moto finish points. Bonuses: fastest lap +1, Nation 1st +10, Nation 2nd +5, Nation 3rd +3. Only athletes affiliated with either selected MXON class are available.";
+  else if(["Triple Crown Series","MXGP"].includes($("scoreSeries")?.value))note.textContent=$("scoreSeries")?.value==="MXGP"?`${scoringPhase} scoring: 40 rider slots. Positions 21–40 receive 0 finish points. Fastest lap +1.`:`${scoringPhase} scoring: 40 rider slots. Positions 21–40 receive 0 finish points. Moto 1 bonuses: fastest qualifier +2 and fastest lap +1; Moto 2 bonus: fastest lap +1.`;
   else if($("scoreSeries")?.value==="F1")note.textContent=config.phase==="Sprint"?"F1 Sprint: 8 points for 1st through 1 point for 8th; 0 points for 9th–22nd. Fastest qualifier +3 and fastest lap +1.":"F1 Grand Prix: standard 22-position points. Fastest qualifier +3 and fastest lap +1.";
   else if($("scoreSeries")?.value==="MotoGP")note.textContent=config.phase==="Sprint"?"MotoGP Sprint: 12, 9, 7 points for the top three, then 1 point less per place through 9th; 0 points for 10th–22nd. Fastest qualifier +3 and fastest lap +1.":"MotoGP Grand Prix: standard 22-position points. Fastest qualifier +3 and fastest lap +1.";
   else note.textContent="Select riders by finish position. Bonus checkboxes are independent for each rider, so bonuses can be assigned to multiple riders or left unused.";

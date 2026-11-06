@@ -27,8 +27,14 @@ TRIPLE CROWN SERIES
 - Reigning Triple Crown Champion is available on Add Athlete and Edit Rider and receives gold numbers on a purple plate. Current Points Leader (white on red) remains the highest-priority number color.
 
 MXON
-- MXON remains a special schedule/scoring event.
-- Eligible athletes include riders with primary or secondary affiliation in 250, 450, CAN 250, CAN 450, MXGP, or MX2.
+- MXON remains a special schedule/scoring event and does not create a primary roster class or roster quota.
+- MXON MXGP, MXON MX2, and MXON Open are secondary-only athlete affiliations, selectable when adding or editing a rider.
+- Scoring has six tabs: MX2 Qualifying Race, MXGP Qualifying Race, Open Qualifying Race, Moto 1, Moto 2, and Moto 3.
+- MX2 Qualifying Race selects only MXON MX2 riders; MXGP Qualifying Race selects only MXON MXGP riders; Open Qualifying Race selects only MXON Open riders.
+- Moto 1 selects MXON MXGP and MXON MX2 riders; Moto 2 selects MXON MX2 and MXON Open riders; Moto 3 selects MXON MXGP and MXON Open riders.
+- All six tabs have 40 rider positions and use the MXGP moto finish-points table (1st 25, 2nd 22, 3rd 20, 4th 18, 5th 16, then decreasing by one through 20th; 21st–40th receive 0 finish points).
+- Qualifying Race bonuses: Fastest Lap (+1), Nation 1st Qualifying (+3), Nation 2nd Qualifying (+2), Nation 3rd Qualifying (+1).
+- Moto bonuses: Fastest Lap (+1), Nation 1st (+10), Nation 2nd (+5), Nation 3rd (+3).
 - MXON points are credited to the rider's primary-series standings bucket (SMX, TCS, or MXGP).
 
 SCHEDULE
@@ -77,7 +83,8 @@ SCHEDULE EVENT TYPES
 
 SCORING FORMATS
 - Supercross: one 20-rider table. Finish points: 1st 25, 2nd 22, 3rd 20, 4th 18, 5th 16, then decrease by one point per place through 20th (1 point). Bonuses: Fastest Qualifier (+2), Heat Winner (+3), Fastest Lap (+1).
-- Motocross (SMX event type), Triple Crown Series, and MXGP: separate Moto 1 and Moto 2 tabs, each with 40 rider slots. Places 1–20 use the 20-place Supercross points table; places 21–40 receive 0 finish points but remain selectable for bonuses. Moto 1 bonuses: Fastest Qualifier (+2), Fastest Lap (+1). Moto 2 bonus: Fastest Lap (+1). Triple Crown Series does not apply a Stage 1/2/3 multiplier.
+- Motocross (SMX event type) and Triple Crown Series: separate Moto 1 and Moto 2 tabs, each with 40 rider slots. Places 1–20 use the 20-place Supercross points table; places 21–40 receive 0 finish points but remain selectable for bonuses. Moto 1 bonuses: Fastest Qualifier (+2), Fastest Lap (+1). Moto 2 bonus: Fastest Lap (+1). Triple Crown Series does not apply a Stage 1/2/3 multiplier.
+- MXGP: Qualifying Race, Moto 1, and Moto 2 tabs. Qualifying Race awards 10–1 points for 1st–10th and 0 points for 11th–40th, with no bonuses. Both Moto tabs use MXGP moto points and Fastest Lap (+1) only; MXGP Moto 1 does not award Fastest Qualifier.
 - SMX event type: one 20-rider overall table using the Supercross points table. Round 1 uses normal points, Round 2 doubles the total score, and Round 3 triples the total score. The multiplier applies to placement points and selected bonuses. Bonuses: Fastest Qualifier (+2), Moto 1 Fastest Lap (+1), Moto 2 Fastest Lap (+1), Moto 1 Winner (+3), Moto 2 Winner (+3). Moto wins are bonuses only, not separate scoring tabs.
 - F1 Grand Prix: one 22-rider Grand Prix table using the standard 22-place points table. Bonuses: Fastest Qualifier (+3), Fastest Lap (+1).
 - F1 Sprint event: two scoring tabs, Grand Prix and Sprint. Grand Prix uses the standard F1 Grand Prix table. Sprint awards 8 points for 1st, then decreases by one point through 8th (1 point); 9th–22nd receive 0. Both tabs use Fastest Qualifier (+3) and Fastest Lap (+1).
