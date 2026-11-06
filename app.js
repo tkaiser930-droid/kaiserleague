@@ -1,10 +1,11 @@
 (() => {
 "use strict";
 const K={A:"kaiserFantasyAthletes",T:"kaiserFantasyTeams",S:"kaiserFantasyScores",TR:"kaiserFantasyTrades",D:"kaiserFantasyDraftState",DS:"kaiserFantasyDraftSettings",CAL:"kaiserFantasySchedule"};
-const REQ={"250":3,"450":3,MXGP:3,MX2:3,"CAN 250":2,"CAN 450":2,F1:3,MotoGP:3},SERIES=Object.keys(REQ),MAX_ROSTER_SIZE=Object.values(REQ).reduce((sum,n)=>sum+n,0),SERIES_GROUPS={SMX:["250","450"],"Triple Crown Series":["CAN 250","CAN 450"],MXGP:["MXGP","MX2"],MotoGP:["MotoGP"],F1:["F1"]},DRAFT_ROOMS=Object.keys(SERIES_GROUPS),SCHEDULE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SCORE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SECONDARY_SERIES_OPTIONS=[...SERIES],MXON_PRIMARY_CLASSES=["250","450","CAN 250","CAN 450","MXGP","MX2"],SERIES_REMAP={f2:"F1",f3:"F1",f1academy:"F1",moto2:"MotoGP",moto3:"MotoGP"},RETIRED_SERIES=new Set(["wmx","canwmx","usawmx","smxnext"]),$=id=>document.getElementById(id);
+const REQ={"250":3,"450":3,MXGP:3,MX2:3,"CAN 250":2,"CAN 450":2,F1:3,MotoGP:3},SERIES=Object.keys(REQ),MXON_SUB_SERIES=["MXON MXGP","MXON MX2","MXON Open"],SECONDARY_SERIES_OPTIONS=[...SERIES,...MXON_SUB_SERIES],MAX_ROSTER_SIZE=Object.values(REQ).reduce((sum,n)=>sum+n,0),SERIES_GROUPS={SMX:["250","450"],"Triple Crown Series":["CAN 250","CAN 450"],MXGP:["MXGP","MX2"],MotoGP:["MotoGP"],F1:["F1"]},SECONDARY_SERIES_GROUPS={...SERIES_GROUPS,MXON:MXON_SUB_SERIES},DRAFT_ROOMS=Object.keys(SERIES_GROUPS),SCHEDULE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SCORE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],MXON_PRIMARY_CLASSES=["250","450","CAN 250","CAN 450","MXGP","MX2"],SERIES_REMAP={f2:"F1",f3:"F1",f1academy:"F1",moto2:"MotoGP",moto3:"MotoGP"},RETIRED_SERIES=new Set(["wmx","canwmx","usawmx","smxnext"]),$=id=>document.getElementById(id);
 const SMX_POSITION_POINTS=[25,22,20,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
 const SX_MX_POSITION_POINTS=[25,22,20,18,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
 const MOTOCROSS_POSITION_POINTS=[...SX_MX_POSITION_POINTS,...Array(20).fill(0)];
+const MXGP_QUALIFYING_RACE_POINTS=Array.from({length:40},(_,i)=>i<10?10-i:0);
 const F1_SPRINT_POSITION_POINTS=Array.from({length:22},(_,i)=>i<8?8-i:0);
 const MOTOGP_SPRINT_POSITION_POINTS=[12,9,7,6,5,4,3,2,1,...Array(13).fill(0)];
 const GRAND_PRIX_BONUSES=[["fastestQualifier","Fastest qualifier",3],["fastestLap","Fastest lap",1]];
@@ -28,22 +29,22 @@ function normalizeAthleteSeries(a){
  const remap=value=>SERIES_REMAP[norm(value)]||clean(value);
  const raw=Array.isArray(a?.secondarySeries)?a.secondarySeries:(Array.isArray(a?.additionalSeries)?a.additionalSeries:[]);
  let primary=remap(oldPrimary);
- let secondary=[...new Set(raw.map(remap).filter(x=>SERIES.includes(x)&&x!==primary))];
+ let secondary=[...new Set(raw.map(remap).filter(x=>SECONDARY_SERIES_OPTIONS.includes(x)&&x!==primary))];
  if(!SERIES.includes(primary)){
-  const promoted=secondary[0];
+  const promoted=secondary.find(x=>SERIES.includes(x));
   if(promoted){primary=promoted;secondary=secondary.filter(x=>x!==primary);a={...a,legacyPrimarySeries:a?.legacyPrimarySeries||oldPrimary}}
   else return {...a,id:stableId,primarySeries:"Archived",class:"Archived",secondarySeries:[],seriesArchived:true,legacyPrimarySeries:a?.legacyPrimarySeries||oldPrimary};
  }
  return {...a,id:stableId,primarySeries:primary,class:primary,secondarySeries:secondary,seriesArchived:false};
 }
-function athleteSeries(a){return a?.seriesArchived||!SERIES.includes(cls(a))?[]:[cls(a),...(Array.isArray(a?.secondarySeries)?a.secondarySeries:[])].filter(x=>SERIES.includes(x))}
+function athleteSeries(a){return a?.seriesArchived||!SERIES.includes(cls(a))?[]:[cls(a),...(Array.isArray(a?.secondarySeries)?a.secondarySeries:[])].filter(x=>SECONDARY_SERIES_OPTIONS.includes(x))}
 function hasAthleteSeries(a,series){return athleteSeries(a).includes(series)}
 function seriesDisplayHTML(a){const primary=esc(cls(a)),secondary=(Array.isArray(a?.secondarySeries)?a.secondarySeries:[]).filter(x=>x&&x!==cls(a));return `<span class="series-primary">${primary}</span>${secondary.length?`<small class="series-secondary">Also: ${secondary.map(esc).join(", ")}</small>`:""}`}
 function seriesDisplayText(a){const secondary=(Array.isArray(a?.secondarySeries)?a.secondarySeries:[]).filter(x=>x&&x!==cls(a));return [cls(a),...secondary.map(x=>`+ ${x}`)].join(" · ")}
 function secondarySeriesChecked(containerId,primary){return [...($(containerId)?.querySelectorAll('[data-secondary-series]:checked')||[])].map(x=>x.value).filter(x=>x!==primary)}
 function renderSecondarySeriesChecks(containerId,selected=[],primary=""){
  const el=$(containerId);if(!el)return;const chosen=new Set(selected||[]);
- el.innerHTML=Object.entries(SERIES_GROUPS).map(([parent,classes])=>{const choices=classes.filter(x=>x!==primary);if(!choices.length)return "";return `<div class="series-check-group"><strong class="series-check-group-title">${esc(parent)}</strong><div class="series-check-group-options">${choices.map(x=>`<label class="series-check"><input type="checkbox" data-secondary-series value="${esc(x)}" ${chosen.has(x)?"checked":""}><span>${esc(x)}</span></label>`).join("")}</div></div>`}).join("")||'<span class="muted">No additional series available.</span>';
+ el.innerHTML=Object.entries(SECONDARY_SERIES_GROUPS).map(([parent,classes])=>{const choices=classes.filter(x=>x!==primary);if(!choices.length)return "";return `<div class="series-check-group"><strong class="series-check-group-title">${esc(parent)}</strong><div class="series-check-group-options">${choices.map(x=>`<label class="series-check"><input type="checkbox" data-secondary-series value="${esc(x)}" ${chosen.has(x)?"checked":""}><span>${esc(x)}</span></label>`).join("")}</div></div>`}).join("")||'<span class="muted">No additional series available.</span>';
 }
 function populatePrimarySeriesSelect(select,selected){
  if(!select)return;const prior=selected||select.value;select.replaceChildren(new Option("Choose primary series…",""));
@@ -158,7 +159,7 @@ function migrateLegacyCanadianDraftRoom(){
 }
 function migrateRemovedSeriesHistory(){
  const settings=read(K.DS,{});
- if(settings&&settings.seriesTrimVersion===3)return;
+ if(settings&&settings.seriesTrimVersion===4)return;
  const remap=value=>SERIES_REMAP[norm(value)]||clean(value);
  const isRetired=value=>RETIRED_SERIES.has(norm(value));
  let scoreChanged=false,picksChanged=false,calendarChanged=false;
@@ -177,7 +178,7 @@ function migrateRemovedSeriesHistory(){
    next.division="Archived";
   }
   const sec=Array.isArray(next.riderSecondarySeries)?next.riderSecondarySeries:[];
-  const cleanedSec=[...new Set(sec.map(remap).filter(x=>SERIES.includes(x)&&x!==mapped))];
+  const cleanedSec=[...new Set(sec.map(remap).filter(x=>SECONDARY_SERIES_OPTIONS.includes(x)&&x!==mapped))];
   if(JSON.stringify(cleanedSec)!==JSON.stringify(sec))next.riderSecondarySeries=cleanedSec;
   if(JSON.stringify(next)!==JSON.stringify(record))scoreChanged=true;
   return next;
@@ -189,7 +190,7 @@ function migrateRemovedSeriesHistory(){
    const oldClass=clean(p.athleteClass||"");let athleteClass=remap(oldClass);
    if(isRetired(oldClass))athleteClass="Archived";
    const oldSecondary=Array.isArray(p.athleteSecondarySeries)?p.athleteSecondarySeries:[];
-   const athleteSecondarySeries=[...new Set(oldSecondary.map(remap).filter(x=>SERIES.includes(x)&&x!==athleteClass))];
+   const athleteSecondarySeries=[...new Set(oldSecondary.map(remap).filter(x=>SECONDARY_SERIES_OPTIONS.includes(x)&&x!==athleteClass))];
    const next={...p,athleteClass,athleteSecondarySeries};
    if(JSON.stringify(next)!==JSON.stringify(p))picksChanged=true;
    return next;
@@ -208,7 +209,7 @@ function migrateRemovedSeriesHistory(){
   return next;
  });
  if(calendarChanged)write(K.CAL,nextCalendar);
- write(K.DS,{...(settings||{}),seriesTrimVersion:3});
+ write(K.DS,{...(settings||{}),seriesTrimVersion:4});
 }
 function canonicalScoreSeries(value){const s=clean(value);return s==="CAN"?"Triple Crown Series":s}
 function seed(){if(!Array.isArray(read(K.T,null)))saveTeams(["Team One","Team Two","Team Three","Team Four","Team Five"].map((name,i)=>({key:"team-"+(i+1),name,owner:"",passwordHash:"",roster:[]})));
@@ -335,7 +336,8 @@ function smxEventFormatFromSchedule(event){const type=clean(event?.eventType);re
 function scorePhaseOptions(){
  const series=$("scoreSeries")?.value||"SMX",scheduled=selectedScoreScheduleEvent();
  if(series==="SMX"&&currentSmxEventType()==="Motocross")return ["Moto 1","Moto 2"];
- if(series==="Triple Crown Series"||series==="MXGP")return ["Moto 1","Moto 2"];
+ if(series==="Triple Crown Series")return ["Moto 1","Moto 2"];
+ if(series==="MXGP")return ["Qualifying Race","Moto 1","Moto 2"];
  if(series==="MotoGP")return ["Grand Prix","Sprint"];
  if(series==="F1"&&clean(scheduled?.eventType)==="Sprint")return ["Grand Prix","Sprint"];
  return [];
@@ -356,6 +358,7 @@ function scoreFormatConfig(){
  }
  if(series==="Triple Crown Series"||series==="MXGP"){
   const phase=scorePhaseOptions().includes(scoringPhase)?scoringPhase:"Moto 1";
+  if(series==="MXGP"&&phase==="Qualifying Race")return {eventType:clean(scheduled?.eventType)||"MXGP",phase,rowCount:40,positionPoints:MXGP_QUALIFYING_RACE_POINTS,multiplier:1,bonuses:[]};
   const bonuses=phase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]];
   return {eventType:clean(scheduled?.eventType)||(series==="Triple Crown Series"?"Triple Crown Series":"MXGP"),phase,rowCount:40,positionPoints:MOTOCROSS_POSITION_POINTS,multiplier:1,bonuses};
  }
@@ -379,6 +382,7 @@ function updateScoreModeControls(){
   else if(smx&&config.eventType==="SMX"&&config.multiplier>1)note.textContent=`SMX Round ${clean($("scoreRound")?.value)||selectedScoreScheduleEvent()?.round}: finish and bonus points are multiplied by ${config.multiplier}.`;
   else if(smx&&config.eventType==="Supercross")note.textContent="Supercross scoring: 20 rider slots; fastest qualifier +2, heat winner +3, fastest lap +1.";
   else if(smx&&config.eventType==="SMX")note.textContent="SMX scoring: 20 rider slots. Round 2 points are doubled and Round 3 points are tripled.";
+  else if($("scoreSeries")?.value==="MXGP"&&scoringPhase==="Qualifying Race")note.textContent="MXGP Qualifying Race: 10 points for 1st, decreasing by 1 point per position through 10th; 0 points for 11th–40th. No bonus points are applied.";
   else if(["Triple Crown Series","MXGP"].includes($("scoreSeries")?.value))note.textContent=`${scoringPhase} scoring: 40 rider slots. Positions 21–40 receive 0 finish points. Moto 1 bonuses: fastest qualifier +2 and fastest lap +1; Moto 2 bonus: fastest lap +1.`;
   else if($("scoreSeries")?.value==="F1")note.textContent=config.phase==="Sprint"?"F1 Sprint: 8 points for 1st through 1 point for 8th; 0 points for 9th–22nd. Fastest qualifier +3 and fastest lap +1.":"F1 Grand Prix: standard 22-position points. Fastest qualifier +3 and fastest lap +1.";
   else if($("scoreSeries")?.value==="MotoGP")note.textContent=config.phase==="Sprint"?"MotoGP Sprint: 12, 9, 7 points for the top three, then 1 point less per place through 9th; 0 points for 10th–22nd. Fastest qualifier +3 and fastest lap +1.":"MotoGP Grand Prix: standard 22-position points. Fastest qualifier +3 and fastest lap +1.";
