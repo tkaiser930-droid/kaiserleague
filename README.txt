@@ -75,8 +75,11 @@ SCHEDULE EVENT TYPES
 - MXGP, MotoGP, and F1 each support Grand Prix as a secondary event type.
 - F1 also supports Sprint as a secondary event type.
 
-SCORING FORMATS FOR SMX EVENTS
+SCORING FORMATS
 - Supercross: one 20-rider table. Finish points: 1st 25, 2nd 22, 3rd 20, 4th 18, 5th 16, then decrease by one point per place through 20th (1 point). Bonuses: Fastest Qualifier (+2), Heat Winner (+3), Fastest Lap (+1).
-- Motocross: separate Moto 1 and Moto 2 scoring tabs, each with 40 rider slots. Places 1–20 use the Supercross points table; places 21–40 receive 0 finish points but can still receive applicable bonuses. Moto 1 bonuses: Fastest Qualifier (+2), Fastest Lap (+1). Moto 2 bonus: Fastest Lap (+1).
-- SMX: one 20-rider overall scoring table using the Supercross finish points table. Round 1 uses normal points, Round 2 doubles the total score, and Round 3 triples the total score. The round multiplier applies to placement points and selected bonuses. Bonuses: Fastest Qualifier (+2), Moto 1 Fastest Lap (+1), Moto 2 Fastest Lap (+1), Moto 1 Winner (+3), Moto 2 Winner (+3). Moto wins are bonus selections only; they do not use separate Moto scoring tables.
-- The scoring form reads the event format from the selected schedule event. When scoring without a scheduled event, the commissioner can choose Supercross, Motocross, or SMX manually.
+- Motocross (SMX event type), Triple Crown Series, and MXGP: separate Moto 1 and Moto 2 tabs, each with 40 rider slots. Places 1–20 use the 20-place Supercross points table; places 21–40 receive 0 finish points but remain selectable for bonuses. Moto 1 bonuses: Fastest Qualifier (+2), Fastest Lap (+1). Moto 2 bonus: Fastest Lap (+1). Triple Crown Series does not apply a Stage 1/2/3 multiplier.
+- SMX event type: one 20-rider overall table using the Supercross points table. Round 1 uses normal points, Round 2 doubles the total score, and Round 3 triples the total score. The multiplier applies to placement points and selected bonuses. Bonuses: Fastest Qualifier (+2), Moto 1 Fastest Lap (+1), Moto 2 Fastest Lap (+1), Moto 1 Winner (+3), Moto 2 Winner (+3). Moto wins are bonuses only, not separate scoring tabs.
+- F1 Grand Prix: one 22-rider Grand Prix table using the standard 22-place points table. Bonuses: Fastest Qualifier (+3), Fastest Lap (+1).
+- F1 Sprint event: two scoring tabs, Grand Prix and Sprint. Grand Prix uses the standard F1 Grand Prix table. Sprint awards 8 points for 1st, then decreases by one point through 8th (1 point); 9th–22nd receive 0. Both tabs use Fastest Qualifier (+3) and Fastest Lap (+1).
+- MotoGP: always has two scoring tabs, Grand Prix and Sprint. Grand Prix uses the standard 22-place points table. Sprint awards 12 points for 1st, 9 for 2nd, 7 for 3rd, then decreases by one point per place through 9th (1 point); 10th–22nd receive 0. Both tabs use Fastest Qualifier (+3) and Fastest Lap (+1).
+- The scoring form derives event type from the selected schedule event. MotoGP always displays both tabs; F1 displays separate tabs only for scheduled Sprint events.

@@ -5,7 +5,10 @@ const REQ={"250":3,"450":3,MXGP:3,MX2:3,"CAN 250":2,"CAN 450":2,F1:3,MotoGP:3},S
 const SMX_POSITION_POINTS=[25,22,20,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
 const SX_MX_POSITION_POINTS=[25,22,20,18,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
 const MOTOCROSS_POSITION_POINTS=[...SX_MX_POSITION_POINTS,...Array(20).fill(0)];
-const SCORE_BONUSES={SMX:[["fastestQualifier","Fastest qualifier",2],["heatWinner","Heat winner",2],["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["fastestLap","Fastest lap",1]],TripleCrown:[["fastestQualifier","Fastest qualifier",2],["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["fastestLap","Fastest lap",1]],MXGP:[["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["qualifyingRaceWinner","Qualifying race winner",2],["fastestLap","Fastest lap",1]],MotoGP:[["sprintWinner","Sprint winner",5],["fastestQualifier","Fastest qualifier",2],["sprintFastestQualifier","Sprint fastest qualifier",2],["fastestLap","Fastest lap",1]],F1:[["sprintWinner","Sprint winner",5],["fastestQualifier","Fastest qualifier",2],["sprintFastestQualifier","Sprint fastest qualifier",2],["fastestLap","Fastest lap",1]]};
+const F1_SPRINT_POSITION_POINTS=Array.from({length:22},(_,i)=>i<8?8-i:0);
+const MOTOGP_SPRINT_POSITION_POINTS=[12,9,7,6,5,4,3,2,1,...Array(13).fill(0)];
+const GRAND_PRIX_BONUSES=[["fastestQualifier","Fastest qualifier",3],["fastestLap","Fastest lap",1]];
+const SCORE_BONUSES={SMX:[["fastestQualifier","Fastest qualifier",2],["heatWinner","Heat winner",2],["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["fastestLap","Fastest lap",1]],TripleCrown:[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]],MXGP:[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]],MotoGP:GRAND_PRIX_BONUSES,F1:GRAND_PRIX_BONUSES};
 let draftOrderEditorRoom="",draftOrderEditorKeys=[];
 const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},write=(k,v)=>{if(window.KFStorage&&typeof window.KFStorage.write==="function")window.KFStorage.write(k,v);else localStorage.setItem(k,JSON.stringify(v))};
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random();
@@ -320,10 +323,8 @@ function showManage(k){if(renderRosterLockNotice("manage"))return;const t=teams(
 function selectedScoreScheduleEvent(){const eventId=$("scoreScheduleEvent")?.value;return eventId?read(K.CAL,[]).find(event=>String(event.id)===String(eventId))||null:null}
 function scoreClasses(series){return series==="MXON"?["MXON"]:[...(SERIES_GROUPS[series]||[series])]}
 function scoreBonusConfig(series,division=""){
- if(series==="Triple Crown Series")return SCORE_BONUSES.TripleCrown;
- if(series==="MXGP")return SCORE_BONUSES.MXGP;
- if(series==="MotoGP")return SCORE_BONUSES.MotoGP;
- if(series==="F1")return SCORE_BONUSES.F1;
+ if(series==="Triple Crown Series"||series==="MXGP")return scoringPhase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]];
+ if(series==="MotoGP"||series==="F1")return GRAND_PRIX_BONUSES;
  return SCORE_BONUSES.SMX;
 }
 function athleteEligibleForScoring(a,series,division){if(!a)return false;if(series==="MXON")return athleteSeries(a).some(item=>MXON_PRIMARY_CLASSES.includes(item));return hasAthleteSeries(a,division)}
@@ -331,28 +332,56 @@ function scoreEventLabel(s){let base=esc(clean(s?.event)||"—");if(s?.round!==u
 function bonusText(s){return Array.isArray(s?.bonuses)&&s.bonuses.length?s.bonuses.map(esc).join(", "):"—"}
 function currentSmxEventType(){const selected=clean($("scoreSmxEventType")?.value||"SMX");return selected==="East/West"?"Supercross":selected}
 function smxEventFormatFromSchedule(event){const type=clean(event?.eventType);return type==="East/West"?"Supercross":(["Supercross","Motocross","SMX"].includes(type)?type:"SMX")}
+function scorePhaseOptions(){
+ const series=$("scoreSeries")?.value||"SMX",scheduled=selectedScoreScheduleEvent();
+ if(series==="SMX"&&currentSmxEventType()==="Motocross")return ["Moto 1","Moto 2"];
+ if(series==="Triple Crown Series"||series==="MXGP")return ["Moto 1","Moto 2"];
+ if(series==="MotoGP")return ["Grand Prix","Sprint"];
+ if(series==="F1"&&clean(scheduled?.eventType)==="Sprint")return ["Grand Prix","Sprint"];
+ return [];
+}
+function normalizeScoringPhase(){
+ const series=$("scoreSeries")?.value||"SMX",phases=scorePhaseOptions();
+ if(phases.length){if(!phases.includes(scoringPhase))scoringPhase=phases[0]}
+ else scoringPhase=series==="F1"?"Grand Prix":"";
+}
 function scoreFormatConfig(){
- const series=$("scoreSeries")?.value||"SMX";
+ const series=$("scoreSeries")?.value||"SMX",scheduled=selectedScoreScheduleEvent();
  if(series==="SMX"){
   const eventType=currentSmxEventType();
   if(eventType==="Supercross")return {eventType,phase:"",rowCount:20,positionPoints:SX_MX_POSITION_POINTS,multiplier:1,bonuses:[["fastestQualifier","Fastest qualifier",2],["heatWinner","Heat winner",3],["fastestLap","Fastest lap",1]]};
   if(eventType==="Motocross")return {eventType,phase:scoringPhase,rowCount:40,positionPoints:MOTOCROSS_POSITION_POINTS,multiplier:1,bonuses:scoringPhase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]]};
-  const round=Number(clean($("scoreRound")?.value)||selectedScoreScheduleEvent()?.round||0);
-  const multiplier=round===2?2:round===3?3:1;
+  const round=Number(clean($("scoreRound")?.value)||scheduled?.round||0),multiplier=round===2?2:round===3?3:1;
   return {eventType:"SMX",phase:"",rowCount:20,positionPoints:SX_MX_POSITION_POINTS,multiplier,bonuses:[["fastestQualifier","Fastest qualifier",2],["moto1FastestLap","Moto 1 fastest lap",1],["moto2FastestLap","Moto 2 fastest lap",1],["moto1Winner","Moto 1 winner",3],["moto2Winner","Moto 2 winner",3]]};
  }
- return {eventType:"",phase:"",rowCount:22,positionPoints:SMX_POSITION_POINTS,multiplier:1,bonuses:scoreBonusConfig(series,$("scoreClass")?.value||"")};
+ if(series==="Triple Crown Series"||series==="MXGP"){
+  const phase=scorePhaseOptions().includes(scoringPhase)?scoringPhase:"Moto 1";
+  const bonuses=phase==="Moto 1"?[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]]:[["fastestLap","Fastest lap",1]];
+  return {eventType:clean(scheduled?.eventType)||(series==="Triple Crown Series"?"Triple Crown Series":"MXGP"),phase,rowCount:40,positionPoints:MOTOCROSS_POSITION_POINTS,multiplier:1,bonuses};
+ }
+ if(series==="F1"||series==="MotoGP"){
+  const phase=series==="F1"?(clean(scheduled?.eventType)==="Sprint"?(scorePhaseOptions().includes(scoringPhase)?scoringPhase:"Grand Prix"):"Grand Prix"):(scorePhaseOptions().includes(scoringPhase)?scoringPhase:"Grand Prix");
+  const sprint=phase==="Sprint";
+  const positionPoints=sprint?(series==="F1"?F1_SPRINT_POSITION_POINTS:MOTOGP_SPRINT_POSITION_POINTS):SMX_POSITION_POINTS;
+  return {eventType:clean(scheduled?.eventType)||(series==="F1"?"Grand Prix":"Grand Prix"),phase,rowCount:22,positionPoints,multiplier:1,bonuses:GRAND_PRIX_BONUSES};
+ }
+ return {eventType:clean(scheduled?.eventType)||series,phase:"",rowCount:22,positionPoints:SMX_POSITION_POINTS,multiplier:1,bonuses:scoreBonusConfig(series,$("scoreClass")?.value||"")};
 }
 function updateScoreModeControls(){
  const smx=$("scoreSeries")?.value==="SMX",wrap=$("scoreSmxEventTypeWrap"),tabs=$("scoreMotoTabs"),note=$("scoreFormatInfo");
  if(wrap)wrap.hidden=!smx;
+ normalizeScoringPhase();
+ const phases=scorePhaseOptions();
+ if(tabs){tabs.hidden=phases.length<2;tabs.innerHTML=phases.map(phase=>`<button aria-selected="${phase===scoringPhase?"true":"false"}" class="score-moto-tab ${phase===scoringPhase?"active":""}" data-score-phase="${esc(phase)}" role="tab" type="button">${esc(phase)}</button>`).join("");tabs.querySelectorAll("[data-score-phase]").forEach(button=>button.onclick=()=>{if(editingScoreGroupKey){$("scoreMessage").textContent="Finish or cancel the current scoring edit before switching scoring tabs.";return}scoringPhase=button.dataset.scorePhase;updateScoreModeControls();renderScoreEntryTable()})}
  const config=scoreFormatConfig();
- if(tabs)tabs.hidden=!(smx&&config.eventType==="Motocross");
  if(note){
   if(smx&&config.eventType==="Motocross")note.textContent=`${scoringPhase} scoring: 40 rider slots. Positions 21–40 receive 0 finish points but can still receive available bonuses.`;
   else if(smx&&config.eventType==="SMX"&&config.multiplier>1)note.textContent=`SMX Round ${clean($("scoreRound")?.value)||selectedScoreScheduleEvent()?.round}: finish and bonus points are multiplied by ${config.multiplier}.`;
-  else if(smx&&config.eventType==="Supercross")note.textContent="Supercross scoring: 20 rider slots with the Supercross points and bonus values.";
-  else if(smx&&config.eventType==="SMX")note.textContent="SMX scoring: 20 rider slots. All scoring points are multiplied for Round 2 and Round 3.";
+  else if(smx&&config.eventType==="Supercross")note.textContent="Supercross scoring: 20 rider slots; fastest qualifier +2, heat winner +3, fastest lap +1.";
+  else if(smx&&config.eventType==="SMX")note.textContent="SMX scoring: 20 rider slots. Round 2 points are doubled and Round 3 points are tripled.";
+  else if(["Triple Crown Series","MXGP"].includes($("scoreSeries")?.value))note.textContent=`${scoringPhase} scoring: 40 rider slots. Positions 21–40 receive 0 finish points. Moto 1 bonuses: fastest qualifier +2 and fastest lap +1; Moto 2 bonus: fastest lap +1.`;
+  else if($("scoreSeries")?.value==="F1")note.textContent=config.phase==="Sprint"?"F1 Sprint: 8 points for 1st through 1 point for 8th; 0 points for 9th–22nd. Fastest qualifier +3 and fastest lap +1.":"F1 Grand Prix: standard 22-position points. Fastest qualifier +3 and fastest lap +1.";
+  else if($("scoreSeries")?.value==="MotoGP")note.textContent=config.phase==="Sprint"?"MotoGP Sprint: 12, 9, 7 points for the top three, then 1 point less per place through 9th; 0 points for 10th–22nd. Fastest qualifier +3 and fastest lap +1.":"MotoGP Grand Prix: standard 22-position points. Fastest qualifier +3 and fastest lap +1.";
   else note.textContent="Select riders by finish position. Bonus checkboxes are independent for each rider, so bonuses can be assigned to multiple riders or left unused.";
  }
 }
@@ -366,25 +395,24 @@ function renderScoreEntryTable(){
  const rows=Array.from({length:config.rowCount},(_,i)=>{const place=i+1,base=(config.positionPoints[i]||0)*config.multiplier,checks=bonuses.map(([key,label,points=2])=>`<td class="score-bonus-cell"><label class="score-bonus"><input type="checkbox" data-bonus="${key}" data-points="${points}" aria-label="${esc(label)} (${points} points) bonus for position ${place}"><span>${esc(label)} (+${points})</span></label></td>`).join("");return `<tr data-score-row="${place}" data-base-points="${base}" data-multiplier="${config.multiplier}"><td class="score-place">${place}</td><td><select class="score-rider-select" data-place="${place}" aria-label="Athlete in position ${place}">${athleteOptions}</select></td><td class="points score-base">${base}</td>${checks}<td class="score-bonus-points">0</td><td class="points score-total">${base}</td></tr>`});
  const headers=['Place','Athlete','Finish pts',...bonuses.map(([,label,points=2])=>`${label} (+${points})`),'Bonus pts','Total'];
  el.innerHTML=table(headers,rows);el.querySelectorAll('[data-bonus],.score-rider-select').forEach(input=>input.addEventListener('change',()=>updateScoreRow(input.closest('tr'))));el.querySelectorAll('tr[data-score-row]').forEach(updateScoreRow);
- const title=$("scoreEntryHeading");if(title)title.textContent=series==="SMX"&&config.eventType==="Motocross"?`${scoringPhase} Results`:`${config.eventType||series} Results`;
+ const title=$("scoreEntryHeading");if(title)title.textContent=config.phase?`${config.phase} Results`:`${config.eventType||series} Results`;
 }
 function updateScoreRow(row){if(!row)return;const bonus=[...row.querySelectorAll('[data-bonus]:checked')].reduce((sum,input)=>sum+Number(input.dataset.points||2),0)*Number(row.dataset.multiplier||1),base=Number(row.dataset.basePoints||0);const bp=row.querySelector('.score-bonus-points'),total=row.querySelector('.score-total');if(bp)bp.textContent=String(bonus);if(total)total.textContent=String(base+bonus);row.classList.toggle('score-row-selected',!!row.querySelector('.score-rider-select')?.value)}
 function setupScoreGrid(){
  const series=$("scoreSeries");if(!series)return;
- series.addEventListener('change',()=>{if(series.value!=="SMX")scoringPhase="Moto 1";updateScoreClass()});
+ series.addEventListener('change',()=>{scoringPhase="";updateScoreClass()});
  $("scoreClass")?.addEventListener('change',renderScoreEntryTable);
  $("scoreSmxEventType")?.addEventListener('change',()=>{scoringPhase="Moto 1";updateScoreModeControls();renderScoreEntryTable()});
  $("scoreRound")?.addEventListener('input',()=>{updateScoreModeControls();renderScoreEntryTable()});
  $("scoreScheduleEvent")?.addEventListener('change',()=>{const selected=read(K.CAL,[]).find(e=>String(e.id)===$("scoreScheduleEvent").value);if(selected){$("scoreEvent").value=clean(selected.name);$("scoreRound").value=clean(selected.round);if(eventRoom(selected.series)==="SMX")$("scoreSmxEventType").value=smxEventFormatFromSchedule(selected);}updateScoreClass()});
- document.querySelectorAll('[data-score-phase]').forEach(button=>button.addEventListener('click',()=>{if(editingScoreGroupKey){$("scoreMessage").textContent="Finish or cancel the current scoring edit before switching Moto tabs.";return}scoringPhase=button.dataset.scorePhase;document.querySelectorAll('[data-score-phase]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-selected',b===button?'true':'false')});updateScoreModeControls();renderScoreEntryTable()}));
  updateScoreClass();
 }
-let editingScoreGroupKey=null,scoringPhase="Moto 1";
+let editingScoreGroupKey=null,scoringPhase="";
 function scoreGroupKey(s){return s?.resultGroupId?`id:${s.resultGroupId}`:`legacy:${norm(canonicalScoreSeries(s?.series))}|${norm(s?.division||s?.riderClass)}|${norm(s?.eventType||"")}|${norm(s?.scoringPhase||"")}|${norm(s?.event)}|${clean(s?.round)}`}
 function scoredGroups(){const map=new Map();scores().forEach(s=>{const gkey=scoreGroupKey(s);if(!map.has(gkey))map.set(gkey,{key:gkey,records:[],series:canonicalScoreSeries(s.series||eventRoom(s.riderClass||s.division||"")),division:s.division||s.riderClass||"",event:s.event||"",round:s.round??"",eventType:s.eventType||"",scoringPhase:s.scoringPhase||"",recordedAt:s.recordedAt||""});const g=map.get(gkey);g.records.push(s);if(String(s.recordedAt||"")>String(g.recordedAt||""))g.recordedAt=s.recordedAt||""});return [...map.values()]}
 function renderScoredEventHistory(){const el=$("scoredEventHistory");if(!el)return;const groups=scoredGroups().sort((a,b)=>String(b.recordedAt).localeCompare(String(a.recordedAt))||String(a.event).localeCompare(String(b.event)));el.innerHTML=table(["Series","Division","Event Type / Segment","Event / Round","Riders scored","Last updated","Action"],groups.map(g=>{const archived=g.division==="Archived",segment=[g.eventType,g.scoringPhase].filter(Boolean).join(" · ")||"—";return `<tr><td>${esc(g.series||"—")}</td><td>${archived?`Archived (${esc(g.records[0]?.legacyDivision||"retired division")})`:esc(g.division||"—")}</td><td>${esc(segment)}</td><td>${scoreEventLabel({event:g.event,round:g.round})}</td><td>${g.records.length}</td><td>${g.recordedAt?new Date(g.recordedAt).toLocaleString():"—"}</td><td>${archived?`<span class="muted">Historical only</span>`:`<button type="button" class="inline" data-edit-scoring="${esc(g.key)}">Edit Scoring</button>`}</td></tr>`}));el.querySelectorAll("[data-edit-scoring]").forEach(b=>b.onclick=()=>beginEditScoring(b.dataset.editScoring))}
 function beginEditScoring(groupKey){const group=scoredGroups().find(g=>g.key===groupKey);if(!group)return;editingScoreGroupKey=groupKey;const first=group.records[0];$("scoreSeries").value=group.series||"SMX";updateScoreClass();const division=group.division||first.riderClass||"";if([...$("scoreClass").options].some(o=>o.value===division))$("scoreClass").value=division;$("scoreEvent").value=group.event;$("scoreRound").value=clean(group.round);renderScoreScheduleOptions();const matchingEvent=read(K.CAL,[]).find(e=>eventRoom(e.series)===(group.series||"")&&String(e.round??"")===String(group.round??"")&&norm(e.name)===norm(group.event));$("scoreScheduleEvent").value=matchingEvent?String(matchingEvent.id):"";if(group.series==="SMX")$("scoreSmxEventType").value=["Supercross","Motocross","SMX"].includes(group.eventType)?group.eventType:smxEventFormatFromSchedule(matchingEvent);scoringPhase=group.scoringPhase||"Moto 1";document.querySelectorAll('[data-score-phase]').forEach(b=>{b.classList.toggle('active',b.dataset.scorePhase===scoringPhase);b.setAttribute('aria-selected',b.dataset.scorePhase===scoringPhase?'true':'false')});updateScoreClass();if([...$("scoreClass").options].some(o=>o.value===division))$("scoreClass").value=division;updateScoreModeControls();renderScoreEntryTable();for(const record of group.records){const place=Number(record.place),row=document.querySelector(`#scoreEntryTable tr[data-score-row="${place}"]`);if(!row)continue;const select=row.querySelector(".score-rider-select"),rid=String(record.riderId||"");if(select&&[...select.options].some(o=>o.value===rid))select.value=rid;const savedBonuses=Array.isArray(record.bonuses)?record.bonuses:[];row.querySelectorAll("[data-bonus]").forEach(check=>{const bonus=scoreFormatConfig().bonuses.find(([k])=>k===check.dataset.bonus);check.checked=!!bonus&&savedBonuses.includes(bonus[1])});updateScoreRow(row)}$("scoreSubmitButton").textContent="Save Scoring Changes";$("cancelScoreEdit").hidden=false;$("scoreMessage").textContent=`Editing ${group.event}${clean(group.round)?` · Round ${group.round}`:""} (${group.series} / ${division}${group.scoringPhase?` / ${group.scoringPhase}`:""}). Saving replaces these previously recorded results.`;$("scoreForm").scrollIntoView({behavior:"smooth",block:"start"})}
-function cancelScoreEdit(){editingScoreGroupKey=null;scoringPhase="Moto 1";$("scoreForm").reset();$("scoreSeries").value="SMX";$("scoreSmxEventType").value="SMX";document.querySelectorAll('[data-score-phase]').forEach(b=>{b.classList.toggle('active',b.dataset.scorePhase==="Moto 1");b.setAttribute('aria-selected',b.dataset.scorePhase==="Moto 1"?'true':'false')});updateScoreClass();$("scoreSubmitButton").textContent="Record Race Results";$("cancelScoreEdit").hidden=true;$("scoreMessage").textContent="Scoring edit cancelled."}
+function cancelScoreEdit(){editingScoreGroupKey=null;scoringPhase="";$("scoreForm").reset();$("scoreSeries").value="SMX";$("scoreSmxEventType").value="SMX";document.querySelectorAll('[data-score-phase]').forEach(b=>{b.classList.toggle('active',b.dataset.scorePhase==="Moto 1");b.setAttribute('aria-selected',b.dataset.scorePhase==="Moto 1"?'true':'false')});updateScoreClass();$("scoreSubmitButton").textContent="Record Race Results";$("cancelScoreEdit").hidden=true;$("scoreMessage").textContent="Scoring edit cancelled."}
 function submitRaceResults(e){
  e.preventDefault();const msg=$("scoreMessage"),series=$("scoreSeries").value,division=$("scoreClass").value,event=clean($("scoreEvent").value),round=clean($("scoreRound").value),scheduledEvent=selectedScoreScheduleEvent(),config=scoreFormatConfig(),rows=[...document.querySelectorAll('#scoreEntryTable tr[data-score-row]')],selected=[];
  if(!event){msg.textContent="Enter or choose an event name.";return}
