@@ -86,9 +86,9 @@
 .undrafted-section{margin-top:28px}
 .undrafted-section>h2{margin-bottom:8px}
 .undrafted-section>.muted{margin:0 0 12px}
-#homeStandings table{min-width:1040px}
+#homeStandings table{min-width:900px}
 #topUndraftedAthletes table{min-width:680px}
-@media(max-width:700px){#homeStandings table{min-width:1040px}.undrafted-section{margin-top:24px}}
+@media(max-width:700px){#homeStandings table{min-width:900px}.undrafted-section{margin-top:24px}}
 
 /* Country flag comes first, followed by country and optional state/province/region. */
 .nationality-flag{gap:5px;min-width:0}
@@ -113,6 +113,7 @@ td>.race-number{vertical-align:middle}
 /* GASGAS official stacked G + wordmark logo; retain the brand red. */
 .brand-badge img.brand-logo-gasgas{height:25px;max-width:38px;object-fit:contain}
 
+
 /* Expanded athlete primary/secondary series controls */
 .series-affiliations{grid-column:1/-1;border:1px solid #3b3d4b;border-radius:12px;padding:14px 16px;margin:4px 0 12px;min-width:0;background:#171923}
 .series-affiliations legend{padding:0 8px;font-weight:800;color:#e8e3f2}
@@ -125,9 +126,9 @@ td>.race-number{vertical-align:middle}
 .series-check input{accent-color:#9a76f2}
 .series-secondary{display:block;margin-top:3px;color:#a9a7b5;font-size:11px;line-height:1.35}
 .series-primary{font-weight:800}
-.schedule-series-can{color:#f3c7c7;border-color:#d84c53;background:#3a2026;box-shadow:0 0 0 1px #d84c5333}
 .schedule-series-mxon{color:#eaf4ff;border-color:#3187ed;background:#153b70;box-shadow:0 0 0 1px #3187ed55}
 .schedule-series-triple-crown{color:#c9f2d0;border-color:#228B22;background:#17351f;box-shadow:0 0 0 1px #228B2233}
+
 
 
 /* Enhanced motocross action photo used as the shared background on every page. */
@@ -183,3 +184,4 @@ body[data-page="home"] #topUndraftedAthletes {
     background: linear-gradient(180deg, rgba(8, 10, 15, .80), rgba(8, 10, 15, .60));
   }
 }
+
