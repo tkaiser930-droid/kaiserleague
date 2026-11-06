@@ -266,7 +266,7 @@ function localDateISO(){const d=new Date();return `${d.getFullYear()}-${String(d
 function formatScheduleDate(value){const raw=clean(value);if(!raw)return "—";const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);const date=match?new Date(Number(match[1]),Number(match[2])-1,Number(match[3]),12):new Date(raw);if(Number.isNaN(date.getTime()))return raw;return new Intl.DateTimeFormat("en-US",{month:"long",day:"numeric",year:"numeric"}).format(date)}
 function eventDateLabel(e){const start=clean(e?.date),end=clean(e?.endDate)||start;if(!start)return "—";const first=formatScheduleDate(start),last=formatScheduleDate(end);return end&&end!==start?`${first} – ${last}`:first}
 function eventCountryHTML(e){return e?.country?nationalityHTML(e.country,e.region):'<span class="muted">Not set</span>'}
-const EVENT_TYPE_OPTIONS={SMX:["Supercross","Motocross","SMX"],"Triple Crown Series":["Stage 1","Stage 2","Stage 3"],F1:["Sprint"]};
+const EVENT_TYPE_OPTIONS={SMX:["Supercross","Motocross","SMX"],"Triple Crown Series":["Stage 1","Stage 2","Stage 3"],MXGP:["Grand Prix"],MotoGP:["Grand Prix"],F1:["Sprint","Grand Prix"]};
 function eventTypeLabel(event){const type=clean(event?.eventType),detail=clean(event?.eventTypeDetail);if(!type)return "—";return type==="Supercross"&&detail?`Supercross ${detail}`:type}
 function updateEventTypeFields(series,selectedType="",selectedDetail=""){
  const typeField=$("eventSubTypeField"),typeSelect=$("eventSubType"),detailField=$("eventSubTypeDetailField"),detailSelect=$("eventSubTypeDetail");
@@ -274,10 +274,13 @@ function updateEventTypeFields(series,selectedType="",selectedDetail=""){
  const choices=EVENT_TYPE_OPTIONS[series]||[];
  typeSelect.replaceChildren(new Option("No secondary event type",""),...choices.map(value=>new Option(value,value)));
  typeField.hidden=!choices.length;typeSelect.value=choices.includes(selectedType)?selectedType:"";
- const needsRegion=series==="SMX"&&typeSelect.value==="Supercross";
- detailField.hidden=!needsRegion;detailSelect.required=needsRegion;
- if(needsRegion){detailSelect.replaceChildren(new Option("Choose East or West…",""),new Option("East","East"),new Option("West","West"));detailSelect.value=["East","West"].includes(selectedDetail)?selectedDetail:""}
- else{detailSelect.replaceChildren(new Option("Choose…",""));detailSelect.value=""}
+ const needsEastWest=series==="SMX"&&typeSelect.value==="Supercross";
+ detailField.hidden=!needsEastWest;detailSelect.required=needsEastWest;
+ const detailLabel=$("eventSubTypeDetailLabel");if(detailLabel)detailLabel.textContent="Supercross East / West";
+ if(needsEastWest){
+  detailSelect.replaceChildren(new Option("Choose East or West…",""),new Option("East","East"),new Option("West","West"));
+  detailSelect.value=["East","West"].includes(selectedDetail)?selectedDetail:"";
+ }else{detailSelect.replaceChildren(new Option("Choose…",""));detailSelect.value=""}
 }
 function resetScheduleEditor(){
  const form=$("scheduleForm");if(!form)return;
@@ -285,6 +288,7 @@ function resetScheduleEditor(){
  $("scheduleFormTitle").textContent="Add Schedule Event";$("scheduleSubmitButton").textContent="Add Event";$("cancelEditEvent").hidden=true;
 }
 function beginEditEvent(eventId){
+ activateCommissionerTab("schedule");
  const event=read(K.CAL,[]).find(item=>String(item.id)===String(eventId));if(!event)return;
  $("editEventId").value=String(event.id);if($("scheduledEventToEdit"))$("scheduledEventToEdit").value=String(event.id);if($("loadScheduledEventEdit"))$("loadScheduledEventEdit").disabled=false;$("eventName").value=clean(event.name);$("eventSeries").value=eventRoom(event.series);updateEventTypeFields($("eventSeries").value,clean(event.eventType),clean(event.eventTypeDetail));$("eventDate").value=clean(event.date);$("eventEndDate").value=clean(event.endDate)&&event.endDate!==event.date?clean(event.endDate):"";$("eventEndDate").min=clean(event.date);$("eventRound").value=clean(event.round);$("eventLocation").value=clean(event.location);$("eventCountry").value=normalizeNationality(event.country);populateRegionSelect($("eventRegion"),$("eventCountry"),event.region);
  $("scheduleFormTitle").textContent="Edit Schedule Event";$("scheduleSubmitButton").textContent="Save Event Changes";$("cancelEditEvent").hidden=false;$("scheduleMessage").textContent=`Editing ${clean(event.name)||"event"}. Saving updates this event rather than creating a duplicate.`;$("scheduleEditorPanel").scrollIntoView({behavior:"smooth",block:"start"});
@@ -341,6 +345,7 @@ function renderComm(){
  renderCommSchedule();
 }
 function beginEditAthlete(athleteId){
+ activateCommissionerTab("athletes");
  const a=athletes().find(x=>id(x)===String(athleteId));
  if(!a)return;
  $("editAthleteId").value=id(a);
@@ -390,7 +395,34 @@ function populateScheduleSeriesSelect(){fillOptions($("eventSeries"),SCHEDULE_SE
 function populateScoreSeriesSelect(){fillOptions($("scoreSeries"),SCORE_SERIES,$("scoreSeries")?.value||"SMX")}
 function populateDraftRoomSelects(){["draftSeries","draftRoom"].forEach(id=>fillOptions($(id),DRAFT_ROOMS,$(id)?.value||"SMX"))}
 function populateClassFilter(){const filter=$("classFilter");if(!filter)return;const prior=filter.value;filter.replaceChildren(new Option("All series",""),...SERIES.map(series=>new Option(series,series)));filter.value=prior}
+function activateCommissionerTab(tabKey){
+ const allowed=["athletes","scoring","draft","schedule"];
+ if(!allowed.includes(tabKey))return;
+ document.querySelectorAll("[data-comm-tab]").forEach(button=>{
+  const active=button.dataset.commTab===tabKey;
+  button.classList.toggle("active",active);
+  button.setAttribute("aria-selected",active?"true":"false");
+  button.tabIndex=active?0:-1;
+ });
+ allowed.forEach(key=>{const panel=$("commTabPanel-"+key);if(panel)panel.hidden=key!==tabKey});
+}
+function setupCommissionerTabs(){
+ const buttons=[...document.querySelectorAll("[data-comm-tab]")];
+ buttons.forEach((button,index)=>{
+  button.addEventListener("click",()=>activateCommissionerTab(button.dataset.commTab));
+  button.addEventListener("keydown",event=>{
+   if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;
+   event.preventDefault();let next=index;
+   if(event.key==="ArrowRight")next=(index+1)%buttons.length;
+   else if(event.key==="ArrowLeft")next=(index-1+buttons.length)%buttons.length;
+   else if(event.key==="Home")next=0;else next=buttons.length-1;
+   buttons[next].focus();activateCommissionerTab(buttons[next].dataset.commTab);
+  });
+ });
+ activateCommissionerTab("athletes");
+}
 function commInit(){
+ setupCommissionerTabs();
  populatePrimarySeriesSelect($("athClass"),"250");populatePrimarySeriesSelect($("editAthClass"),"250");populateNationalitySelect($("athNationality"));populateNationalitySelect($("editAthNationality"));populateNationalitySelect($("eventCountry"));populateRegionSelect($("athNationalityRegion"),$("athNationality"));populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));populateRegionSelect($("eventRegion"),$("eventCountry"));$("athNationality").onchange=()=>populateRegionSelect($("athNationalityRegion"),$("athNationality"));$("editAthNationality").onchange=()=>populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));$("eventCountry").onchange=()=>populateRegionSelect($("eventRegion"),$("eventCountry"));renderSecondarySeriesChecks("athSecondarySeries",[], $("athClass").value);$("athClass").onchange=()=>renderSecondarySeriesChecks("athSecondarySeries",secondarySeriesChecked("athSecondarySeries",$("athClass").value),$("athClass").value);$("editAthClass").onchange=()=>renderSecondarySeriesChecks("editAthSecondarySeries",secondarySeriesChecked("editAthSecondarySeries",$("editAthClass").value),$("editAthClass").value);populateScheduleSeriesSelect();populateScoreSeriesSelect();populateDraftRoomSelects();setupScoreGrid();$("scoreForm").onsubmit=submitRaceResults;$("cancelScoreEdit").onclick=cancelScoreEdit;
  $("editAthleteForm").onsubmit=saveEditedAthlete;
  const cancelEdit=()=>{$("editAthletePanel").hidden=true;$("editAthleteForm").reset();$("editAthleteMessage").textContent=""};

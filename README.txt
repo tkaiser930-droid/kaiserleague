@@ -61,3 +61,16 @@ BACKGROUND AND BRANDING
 
 SECURITY
 The existing login and data API were originally designed for a private family league prototype. Server-side role authorization should be added before allowing untrusted public users to modify league data.
+
+COMMISSIONER DASHBOARD NAVIGATION
+- The Commissioner page is organized into Athletes, Scoring, Draft, and Schedule tabs.
+- Athletes contains Add Athlete, Edit Rider, and All Athletes.
+- Scoring contains Score Race Results, Previously Scored Events, and Scoring History.
+- Draft contains Draft Management.
+- Schedule contains Add Schedule Event, Edit Scheduled Event controls, and Scheduled Events.
+
+SCHEDULE EVENT TYPES
+- SMX secondary event types: Supercross, Motocross, and SMX. When Supercross is selected, choose East or West in the additional Supercross East / West field. The schedule displays Supercross East or Supercross West.
+- Triple Crown Series event types: Stage 1, Stage 2, and Stage 3.
+- MXGP, MotoGP, and F1 each support Grand Prix as a secondary event type.
+- F1 also supports Sprint as a secondary event type.

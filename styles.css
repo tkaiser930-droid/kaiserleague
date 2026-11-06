@@ -194,3 +194,14 @@ body[data-page="home"] #topUndraftedAthletes {
 .scheduled-events-heading{margin:18px 0 10px;color:var(--gold);font:800 19px 'Barlow Condensed',Impact,sans-serif;text-transform:uppercase}
 #commSchedule .schedule-edit-button{font-size:11px;padding:8px 10px;white-space:nowrap}
 @media(max-width:650px){.scheduled-event-tools{align-items:stretch;flex-direction:column}.scheduled-event-tools .btn{align-self:flex-start}}
+
+
+/* Commissioner dashboard tabs */
+.commissioner-tabs{display:flex;flex-wrap:wrap;gap:9px;margin:20px 0 12px;padding:8px;border:1px solid var(--line);border-radius:12px;background:#10121a;position:sticky;top:88px;z-index:4;backdrop-filter:blur(12px)}
+.commissioner-tab{appearance:none;border:1px solid #3b3e4e;border-radius:8px;background:#222532;color:#d5d7e1;padding:11px 20px;font:800 13px Inter,Arial,sans-serif;cursor:pointer;min-width:112px;transition:background .15s,border-color .15s,transform .15s}
+.commissioner-tab:hover{border-color:var(--gold);transform:translateY(-1px)}
+.commissioner-tab.active{background:var(--gold);border-color:var(--gold);color:#18140b;box-shadow:0 4px 16px #0005}
+.commissioner-tab:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.commissioner-tab-panel{min-width:0}
+.commissioner-global-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:18px 0 6px;padding-top:14px;border-top:1px solid var(--line)}
+@media(max-width:700px){.commissioner-tabs{top:0}.commissioner-tab{flex:1;min-width:calc(50% - 9px);padding:10px 12px}.commissioner-global-actions{justify-content:flex-start;flex-wrap:wrap}}
