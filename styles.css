@@ -185,3 +185,12 @@ body[data-page="home"] #topUndraftedAthletes {
   }
 }
 
+
+/* Scheduled event editing controls */
+.scheduled-event-tools{display:flex;align-items:flex-end;gap:12px;max-width:820px;margin:14px 0 18px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#11131a}
+.scheduled-event-tools label{flex:1;margin:0}
+.scheduled-event-tools .btn{flex:0 0 auto;margin:0;min-height:39px}
+.scheduled-event-tools .btn:disabled{opacity:.4;cursor:not-allowed}
+.scheduled-events-heading{margin:18px 0 10px;color:var(--gold);font:800 19px 'Barlow Condensed',Impact,sans-serif;text-transform:uppercase}
+#commSchedule .schedule-edit-button{font-size:11px;padding:8px 10px;white-space:nowrap}
+@media(max-width:650px){.scheduled-event-tools{align-items:stretch;flex-direction:column}.scheduled-event-tools .btn{align-self:flex-start}}

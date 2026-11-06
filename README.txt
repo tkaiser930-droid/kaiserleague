@@ -34,6 +34,7 @@ MXON
 SCHEDULE
 - Event types: SMX, Triple Crown Series, MXGP, MotoGP, F1, and MXON.
 - Events support single-day and multi-day date ranges, round numbers, country, optional sub-region, and event editing.
+- Commissioner can select a scheduled event from a dedicated Edit Scheduled Event control or use the Edit Scheduled Event button in that event row. Editing loads the saved event details into the schedule form; saving updates the existing event instead of creating a duplicate.
 - Triple Crown Series schedule badge uses forest green. MXON uses blue.
 - Team Management and Trade Center lock during scheduled event dates.
 
