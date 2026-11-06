@@ -74,3 +74,9 @@ SCHEDULE EVENT TYPES
 - Triple Crown Series event types: Stage 1, Stage 2, and Stage 3.
 - MXGP, MotoGP, and F1 each support Grand Prix as a secondary event type.
 - F1 also supports Sprint as a secondary event type.
+
+SCORING FORMATS FOR SMX EVENTS
+- Supercross: one 20-rider table. Finish points: 1st 25, 2nd 22, 3rd 20, 4th 18, 5th 16, then decrease by one point per place through 20th (1 point). Bonuses: Fastest Qualifier (+2), Heat Winner (+3), Fastest Lap (+1).
+- Motocross: separate Moto 1 and Moto 2 scoring tabs, each with 40 rider slots. Places 1–20 use the Supercross points table; places 21–40 receive 0 finish points but can still receive applicable bonuses. Moto 1 bonuses: Fastest Qualifier (+2), Fastest Lap (+1). Moto 2 bonus: Fastest Lap (+1).
+- SMX: one 20-rider overall scoring table using the Supercross finish points table. Round 1 uses normal points, Round 2 doubles the total score, and Round 3 triples the total score. The round multiplier applies to placement points and selected bonuses. Bonuses: Fastest Qualifier (+2), Moto 1 Fastest Lap (+1), Moto 2 Fastest Lap (+1), Moto 1 Winner (+3), Moto 2 Winner (+3). Moto wins are bonus selections only; they do not use separate Moto scoring tables.
+- The scoring form reads the event format from the selected schedule event. When scoring without a scheduled event, the commissioner can choose Supercross, Motocross, or SMX manually.

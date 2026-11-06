@@ -205,3 +205,5 @@ body[data-page="home"] #topUndraftedAthletes {
 .commissioner-tab-panel{min-width:0}
 .commissioner-global-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin:18px 0 6px;padding-top:14px;border-top:1px solid var(--line)}
 @media(max-width:700px){.commissioner-tabs{top:0}.commissioner-tab{flex:1;min-width:calc(50% - 9px);padding:10px 12px}.commissioner-global-actions{justify-content:flex-start;flex-wrap:wrap}}
+
+.score-moto-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}.score-moto-tab{background:#171923;border:1px solid #6b7280;color:#f4f4f5;border-radius:8px;padding:9px 18px;font-weight:800;cursor:pointer}.score-moto-tab.active,.score-moto-tab[aria-selected="true"]{background:var(--gold,#d6b45c);border-color:var(--gold,#d6b45c);color:#171923}.score-format-info{margin:8px 0}.score-entry-table h3{margin:8px 0}
