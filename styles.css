@@ -207,3 +207,36 @@ body[data-page="home"] #topUndraftedAthletes {
 @media(max-width:700px){.commissioner-tabs{top:0}.commissioner-tab{flex:1;min-width:calc(50% - 9px);padding:10px 12px}.commissioner-global-actions{justify-content:flex-start;flex-wrap:wrap}}
 
 .score-moto-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}.score-moto-tab{background:#171923;border:1px solid #6b7280;color:#f4f4f5;border-radius:8px;padding:9px 18px;font-weight:800;cursor:pointer}.score-moto-tab.active,.score-moto-tab[aria-selected="true"]{background:var(--gold,#d6b45c);border-color:var(--gold,#d6b45c);color:#171923}.score-format-info{margin:8px 0}.score-entry-table h3{margin:8px 0}
+
+
+/* Rider profiles opened from the athlete lists and team rosters. */
+.athlete-detail-trigger{display:block;width:100%;margin:0;padding:3px 4px;border:0;border-radius:7px;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit}
+.athlete-detail-trigger:hover,.athlete-detail-trigger:focus-visible{background:#a78bfa18;outline:1px solid #9a76f2;outline-offset:1px}
+.athlete-detail-trigger .athlete-name b{text-decoration:underline;text-decoration-color:#9a76f277;text-underline-offset:3px}
+.team-roster-preview{margin:10px 0 14px;border-top:1px solid var(--line);padding-top:9px;text-align:left}
+.team-roster-preview summary{cursor:pointer;color:#d8c7ff;font-size:12px;font-weight:800;list-style-position:inside}
+.team-roster-preview-list{display:grid;gap:3px;max-height:220px;overflow:auto;margin-top:8px;padding:6px;border:1px solid #343746;border-radius:8px;background:#10121a}
+.team-roster-preview-row{min-width:0;border-bottom:1px solid #ffffff10;padding-bottom:3px}
+.team-roster-preview-row:last-child{border-bottom:0}
+.team-roster-preview .athlete-detail-trigger{padding:2px}
+.athlete-detail-dialog{width:min(1100px,calc(100vw - 28px));max-width:none;max-height:min(88vh,920px);padding:0;border:1px solid #625b78;border-radius:16px;background:#11131a;color:#f4f4f5;box-shadow:0 24px 90px #000c;overflow:auto}
+.athlete-detail-dialog::backdrop{background:#05060bd9;backdrop-filter:blur(5px)}
+.athlete-detail-shell{padding:22px}
+.athlete-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.athlete-detail-header h2{margin:3px 0 5px;font-size:clamp(22px,3vw,32px)}
+.athlete-detail-header .athlete-name{max-width:700px}
+.athlete-detail-affiliations{margin:0;color:#bfb4e7}
+.athlete-detail-close{flex:0 0 auto;border:1px solid #5b566b;border-radius:8px;background:#242431;color:#fff;padding:9px 12px;font-weight:800;cursor:pointer}
+.athlete-detail-close:hover{background:#383448}
+.athlete-detail-meta{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0;color:#c4c5d0;font-size:12px}
+.athlete-detail-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0 22px}
+.athlete-detail-stats>div{min-width:0;padding:13px 15px;border:1px solid #393b4b;border-radius:10px;background:#1a1d29}
+.athlete-detail-stats strong{display:block;color:var(--gold);font:900 25px 'Barlow Condensed',Impact,sans-serif;font-variant-numeric:tabular-nums}
+.athlete-detail-stats span{display:block;margin-top:2px;color:#b8bac7;font-size:11px;font-weight:700}
+.athlete-detail-results-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.athlete-detail-results-heading h3{margin:0 0 10px;color:var(--gold);font:800 20px 'Barlow Condensed',Impact,sans-serif;text-transform:uppercase}
+.athlete-detail-results-heading span{color:#a9a7b5;font-size:11px}
+.athlete-detail-results .table{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:9px}
+.athlete-detail-results table{min-width:900px}
+.athlete-detail-footnote{margin:10px 0 0;color:#999baa;font-size:11px;line-height:1.45}
+@media(max-width:680px){.athlete-detail-shell{padding:14px}.athlete-detail-header{gap:8px}.athlete-detail-close{padding:8px;font-size:11px}.athlete-detail-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.athlete-detail-header .athlete-name{grid-template-columns:24px 42px minmax(100px,max-content) minmax(70px,1fr)}.athlete-detail-meta{align-items:flex-start;flex-direction:column;gap:7px}}
