@@ -101,6 +101,9 @@
    the rider-name or number-plate columns from row to row. */
 .athlete-name{display:grid;grid-template-columns:24px 42px minmax(125px,max-content) minmax(110px,1fr);align-items:center;column-gap:7px;row-gap:2px;min-height:32px;width:100%}
 .athlete-name.no-number{grid-template-columns:24px minmax(125px,max-content) minmax(110px,1fr)}
+/* Team-page View Roster shows the flag only; region text is hidden there. */
+.athlete-name.flag-only{grid-template-columns:24px 42px minmax(125px,max-content)}
+.athlete-name.flag-only.no-number{grid-template-columns:24px minmax(125px,max-content)}
 .athlete-name .nationality-flag{display:inline-flex;align-items:center;justify-content:center;width:24px;min-width:24px;height:24px;margin:0;font-size:16px;line-height:1;white-space:nowrap}
 .athlete-name .race-number,.race-number{display:inline-flex;flex:0 0 42px;align-items:center;justify-content:center;width:42px;min-width:42px;max-width:42px;margin:0;padding:0;text-align:center;box-sizing:border-box}
 .race-number-slot{display:inline-flex;flex:0 0 42px;align-items:center;justify-content:center;width:42px;min-width:42px;max-width:42px;height:29px}
