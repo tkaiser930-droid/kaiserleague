@@ -240,3 +240,16 @@ body[data-page="home"] #topUndraftedAthletes {
 .athlete-detail-results table{min-width:900px}
 .athlete-detail-footnote{margin:10px 0 0;color:#999baa;font-size:11px;line-height:1.45}
 @media(max-width:680px){.athlete-detail-shell{padding:14px}.athlete-detail-header{gap:8px}.athlete-detail-close{padding:8px;font-size:11px}.athlete-detail-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.athlete-detail-header .athlete-name{grid-template-columns:24px 42px minmax(100px,max-content) minmax(70px,1fr)}.athlete-detail-meta{align-items:flex-start;flex-direction:column;gap:7px}}
+
+
+/* Athlete profile manufacturer banner */
+.athlete-manufacturer-banner{display:flex;align-items:center;justify-content:flex-start;min-height:112px;margin:-22px -22px 20px;padding:18px 28px;background:linear-gradient(110deg,color-mix(in srgb,var(--athlete-mfr-color,#6B7280) 94%,#000 6%),var(--athlete-mfr-color,#6B7280));color:var(--athlete-mfr-ink,#fff);border-bottom:1px solid #ffffff30;border-radius:15px 15px 0 0;box-shadow:inset 0 -1px 0 #0002}
+.athlete-manufacturer-banner-brand{display:flex;align-items:center;gap:20px;min-width:0}
+.athlete-manufacturer-logo{display:block;width:auto;height:66px;max-width:190px;object-fit:contain;padding:8px 12px;background:#fff;border:1px solid #0002;border-radius:10px;box-shadow:0 3px 12px #0003}
+.athlete-manufacturer-logo.wide{max-width:230px;height:70px}
+.athlete-manufacturer-logo.square{width:76px;height:76px;max-width:76px;padding:7px}
+.athlete-manufacturer-banner-copy{display:flex;flex-direction:column;gap:1px;min-width:0}
+.athlete-manufacturer-banner-copy span{font-size:10px;letter-spacing:.2em;font-weight:900;opacity:.8}
+.athlete-manufacturer-banner-copy strong{font:900 clamp(25px,4vw,42px)/1 'Barlow Condensed',Impact,sans-serif;text-transform:uppercase;overflow-wrap:anywhere}
+.athlete-manufacturer-logo[hidden]{display:none}
+@media(max-width:680px){.athlete-manufacturer-banner{min-height:92px;margin:-14px -14px 16px;padding:13px 15px}.athlete-manufacturer-banner-brand{gap:12px}.athlete-manufacturer-logo{height:52px;max-width:130px;padding:6px 8px}.athlete-manufacturer-logo.wide{height:56px;max-width:150px}.athlete-manufacturer-logo.square{width:58px;height:58px;max-width:58px}.athlete-manufacturer-banner-copy span{font-size:9px}.athlete-manufacturer-banner-copy strong{font-size:clamp(22px,6vw,32px)}}
