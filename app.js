@@ -172,7 +172,7 @@ Cadillac:{color:"#C7A96B",logo:"cadillac"},
 "Aston Martin":{color:"#004225",logo:"astonmartin",image:"https://cdn.simpleicons.org/astonmartin/004225"},
 Audi:{color:"#444444",logo:"audi",image:"https://cdn.simpleicons.org/audi/444444"},
 Haas:{color:"#FFFFFF",logo:"haas",image:"https://f1store4.formula1.com/content/ws/all/686828d2-e6e4-4e2f-9056-412cd5fffbaf__1179X1179.jpg",fit:"square"},
-Williams:{color:"#00AEEF",logo:"williamsf1",image:"https://brandlogo.org/wp-content/uploads/2025/02/Williams-Racing-Icon-2020.png",fit:"square"},
+Williams:{color:"#00AEEF",image:"assets/logos/williams-w.svg",fit:"square"},
 Alpine:{color:"#F08ACB",logo:"alpine",image:"assets/logos/alpine-pink-a.png",fit:"wide"}
 };
 const MANUFACTURER_PURPLE="#8E67F2";

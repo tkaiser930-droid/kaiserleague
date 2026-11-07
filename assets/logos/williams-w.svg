@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 104" role="img" aria-labelledby="title desc">
+  <title id="title">Williams W</title>
+  <desc id="desc">Light blue angular W mark.</desc>
+  <path d="M13 19 L34 85 L64 43 L94 85 L115 19"
+        fill="none" stroke="#00AEEF" stroke-width="17"
+        stroke-linecap="square" stroke-linejoin="bevel" />
+</svg>
