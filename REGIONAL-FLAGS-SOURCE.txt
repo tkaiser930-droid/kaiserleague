@@ -34,3 +34,24 @@ The Commons file pages contain the applicable attribution and license details. T
 images are loaded from Wikimedia's image host. The app maps the save's non-ISO aliases
 to corresponding subdivision assets where possible (including Buenos Aires, Baku,
 and Budapest).
+
+
+MANUAL FLAG OVERRIDES ADDED 2026-11-08
+
+The following nine regions use direct Wikimedia Commons SVG file redirects instead
+of the upstream generated CSS flag classes. The existing ISO subdivision codes and
+country/sub-region display order are unchanged.
+
+- US-FL Florida: https://commons.wikimedia.org/wiki/File:Flag_of_Florida.svg (public domain; Florida government work)
+- ES-CT Catalonia: https://commons.wikimedia.org/wiki/File:Flag_of_Catalonia.svg (public domain; simple traditional Senyera design)
+- DE-TH Thuringia: https://commons.wikimedia.org/wiki/File:Flag_of_Thuringia_(state).svg (public domain official state flag)
+- AU-VIC Victoria: https://commons.wikimedia.org/wiki/File:Flag_of_Victoria_(Australia).svg (public domain original design)
+- US-OR Oregon: https://commons.wikimedia.org/wiki/File:Flag_of_Oregon.svg (public domain)
+- US-MI Michigan: https://commons.wikimedia.org/wiki/File:Flag_of_Michigan.svg (public domain in the United States)
+- MX-JAL Jalisco: https://commons.wikimedia.org/wiki/File:Flag_of_Jalisco.svg (public domain under Mexican federal copyright law; official state flag)
+- BE-VLI Limburg (Belgium): https://commons.wikimedia.org/wiki/File:Flag_of_Limburg_(Belgium).svg (public domain provincial flag; note Commons file page's warning against advertising use)
+- US-TN Tennessee: https://commons.wikimedia.org/wiki/File:Flag_of_Tennessee.svg (CC0 / public domain dedication)
+
+The image files are requested from Wikimedia Commons at runtime; an internet connection
+is required for these nine overrides to display. All other subdivision flags continue
+to use the ISO 3166-2 flag CSS collection.

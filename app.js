@@ -109,6 +109,20 @@ function countryRegionLabel(country,region){const c=countryName(country);if(!c)r
 // Region codes in saved data are normalized to the ISO 3166-2 flag asset codes.
 // Some existing dropdown values use local short forms rather than ISO identifiers.
 const SUBDIVISION_FLAG_ALIASES={"AR-BA":"AR-B","AR-CABA":"AR-C","AR-RNE":"AR-R","AZ-BAK":"AZ-BA","HU-01":"HU-BU"};
+// Use direct Wikimedia Commons flag files for these nine regions. This avoids
+// relying on generated CSS selectors for flags that have appeared incorrectly
+// in the regional flag font. The codes remain ISO 3166-2 identifiers.
+const SUBDIVISION_FLAG_IMAGE_URLS={
+ "US-FL":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Florida.svg",
+ "ES-CT":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Catalonia.svg",
+ "DE-TH":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Thuringia_%28state%29.svg",
+ "AU-VIC":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Victoria_%28Australia%29.svg",
+ "US-OR":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Oregon.svg",
+ "US-MI":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Michigan.svg",
+ "MX-JAL":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Jalisco.svg",
+ "BE-VLI":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Limburg_%28Belgium%29.svg",
+ "US-TN":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Tennessee.svg"
+};
 // These saved sub-regions do not have a distinct subdivision flag in the selected
 // ISO flag collection. Leave the regional slot empty rather than inventing a flag.
 const SUBDIVISION_FLAGS_UNAVAILABLE=new Set(["CN-SH","IT-EMR","MC-MC","NZ-HKB","QA-ZA","SA-02","SG-01","TR-03","TR-07","TR-34"]);
@@ -122,6 +136,10 @@ function subdivisionFlagCode(country,region=""){
 function subdivisionFlagHTML(country,region=""){
  const flagCode=subdivisionFlagCode(country,region);if(!flagCode||SUBDIVISION_FLAGS_UNAVAILABLE.has(flagCode))return "";
  const label=regionName(country,region)||`Sub-region ${flagCode.slice(flagCode.indexOf("-")+1)}`;
+ const imageUrl=SUBDIVISION_FLAG_IMAGE_URLS[flagCode];
+ if(imageUrl){
+  return `<span class="subdivision-flag fi subdivision-flag-custom" style="background-image:url('${esc(imageUrl)}')" role="img" aria-label="${esc(label)} flag" title="${esc(label)}" data-subdivision-code="${esc(flagCode)}"></span>`;
+ }
  return `<span class="subdivision-flag fi fi-${esc(flagCode.toLowerCase())}" role="img" aria-label="${esc(label)} flag" title="${esc(label)}" data-subdivision-code="${esc(flagCode)}"></span>`;
 }
 function athleteFlagPairHTML(country,region="",detail=""){
