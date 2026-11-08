@@ -1,0 +1,36 @@
+REGIONAL / SUBDIVISION FLAG SOURCE
+
+Regional subdivision flag images are rendered using the ISO 3166-2 Flags project by amckenna41.
+Project: https://github.com/amckenna41/iso3166-flags
+Stylesheet: https://cdn.jsdelivr.net/gh/amckenna41/iso3166-flags@main/css/iso3166-2.min.css
+License: MIT (see the upstream project repository for the license text).
+
+The stylesheet is loaded online from jsDelivr. An internet connection is required for
+regional flag images to appear. Country flags continue to use the site's existing emoji
+flag rendering. The regional flag is placed beside the country flag and before the race
+number in athlete tables; scheduled-event country cells show it beside the country flag.
+
+The November 8, 2026 save contains ten codes for which this build does not include a
+reliable, standalone regional flag asset. The country flag is retained for these codes
+rather than substituting an unrelated symbol:
+CN-SH (Shanghai), IT-EMR (Emilia-Romagna; a de-facto design exists, but no official
+regional flag regulation was identified), MC-MC (Monaco), NZ-HKB (Hawke's Bay),
+QA-ZA (Al Daayen), SA-02 (Riyadh), SG-01 (Central Singapore), TR-03 (Afyonkarahisar),
+TR-07 (Antalya), and TR-34 (Istanbul). Some provincial flags are documented in
+third-party reports, but no stable, reuse-clear standalone artwork was included here.
+The following Italian regional flags and the flag of Beltinci (SI-02) are supplied by
+Wikimedia Commons because they are not in the ISO 3166-2 CSS collection:
+- Lazio: https://commons.wikimedia.org/wiki/File:Flag_of_Lazio.svg (public domain)
+- Lombardy: https://commons.wikimedia.org/wiki/File:Flag_of_Lombardy.svg
+- Marche: https://commons.wikimedia.org/wiki/File:Flag_of_Marche.svg
+- Piedmont: https://commons.wikimedia.org/wiki/File:Flag_of_Piedmont.svg (public domain)
+- Sardinia: https://commons.wikimedia.org/wiki/File:Flag_of_Sardinia.svg (GFDL)
+- Sicily: https://commons.wikimedia.org/wiki/File:Flag_of_Sicily.svg
+- Trentino-South Tyrol: https://commons.wikimedia.org/wiki/File:Flag_of_Trentino-South_Tyrol.svg
+- Tuscany: https://commons.wikimedia.org/wiki/File:Flag_of_Tuscany.svg
+- Beltinci: https://commons.wikimedia.org/wiki/File:Flag_of_Beltinci.svg (public domain)
+
+The Commons file pages contain the applicable attribution and license details. These
+images are loaded from Wikimedia's image host. The app maps the save's non-ISO aliases
+to corresponding subdivision assets where possible (including Buenos Aires, Baku,
+and Budapest).

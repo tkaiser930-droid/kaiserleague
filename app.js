@@ -106,11 +106,33 @@ function countryName(value){const code=normalizeNationality(value);return code?C
 function normalizeRegion(country,value){const code=normalizeNationality(country),raw=clean(value);if(!code||!raw)return "";const items=REGION_OPTIONS[code]||[];const match=items.find(([regionCode,label])=>raw.toUpperCase()===`${code}-${regionCode}`||raw.toUpperCase()===regionCode||norm(raw)===norm(label));return match?`${code}-${match[0]}`:""}
 function regionName(country,value){const code=normalizeNationality(country),region=normalizeRegion(code,value);if(!region)return "";const suffix=region.slice(code.length+1);return (REGION_OPTIONS[code]||[]).find(([regionCode])=>regionCode===suffix)?.[1]||""}
 function countryRegionLabel(country,region){const c=countryName(country);if(!c)return "";const r=regionName(country,region);return r?`${c} · ${r}`:c}
-function nationalityHTML(value,region=""){const code=normalizeNationality(value),country=countryName(code),flag=flagEmoji(code);if(!flag)return "";const detail=countryRegionLabel(code,region);return `<span class="nationality-flag" title="${esc(detail)}" aria-label="${esc(detail)}">${flag}<span class="nationality-location">${esc(detail)}</span></span>`}
+// Region codes in saved data are normalized to the ISO 3166-2 flag asset codes.
+// Some existing dropdown values use local short forms rather than ISO identifiers.
+const SUBDIVISION_FLAG_ALIASES={"AR-BA":"AR-B","AR-CABA":"AR-C","AR-RNE":"AR-R","AZ-BAK":"AZ-BA","HU-01":"HU-BU"};
+// These saved sub-regions do not have a distinct subdivision flag in the selected
+// ISO flag collection. Leave the regional slot empty rather than inventing a flag.
+const SUBDIVISION_FLAGS_UNAVAILABLE=new Set(["CN-SH","IT-EMR","MC-MC","NZ-HKB","QA-ZA","SA-02","SG-01","TR-03","TR-07","TR-34"]);
+function subdivisionFlagCode(country,region=""){
+ const parent=normalizeNationality(country),raw=clean(region).toUpperCase().replace(/\s+/g,"");
+ if(!parent||!raw)return "";
+ const full=raw.startsWith(`${parent}-`)?raw:`${parent}-${raw}`;
+ if(!full.startsWith(`${parent}-`))return "";
+ return SUBDIVISION_FLAG_ALIASES[full]||full;
+}
+function subdivisionFlagHTML(country,region=""){
+ const flagCode=subdivisionFlagCode(country,region);if(!flagCode||SUBDIVISION_FLAGS_UNAVAILABLE.has(flagCode))return "";
+ const label=regionName(country,region)||`Sub-region ${flagCode.slice(flagCode.indexOf("-")+1)}`;
+ return `<span class="subdivision-flag fi fi-${esc(flagCode.toLowerCase())}" role="img" aria-label="${esc(label)} flag" title="${esc(label)}" data-subdivision-code="${esc(flagCode)}"></span>`;
+}
+function athleteFlagPairHTML(country,region="",detail=""){
+ const flag=flagEmoji(country),subdivision=subdivisionFlagHTML(country,region);
+ return `<span class="athlete-flag-pair" title="${esc(detail||countryRegionLabel(country,region)||"Nationality not set")}" aria-label="${esc(detail||countryRegionLabel(country,region)||"Nationality not set")}"><span class="country-flag-symbol">${flag||""}</span>${subdivision}</span>`;
+}
+function nationalityHTML(value,region=""){const code=normalizeNationality(value),country=countryName(code),flag=flagEmoji(code);if(!flag)return "";const detail=countryRegionLabel(code,region);return `<span class="nationality-flag" title="${esc(detail)}" aria-label="${esc(detail)}"><span class="country-flag-symbol">${flag}</span>${subdivisionFlagHTML(code,region)}<span class="nationality-location">${esc(detail)}</span></span>`}
 function nationalityText(value,region=""){const detail=countryRegionLabel(value,region);return detail?`${flagEmoji(value)} ${detail}`:"Nationality not set"}
 function populateNationalitySelect(select){if(!select)return;const current=normalizeNationality(select.value);select.replaceChildren(new Option("Select country…",""));COUNTRIES.forEach(([code,country])=>select.add(new Option(`${flagEmoji(code)} ${country}`,code)));select.value=current}
 function populateRegionSelect(select,countrySelect,value=""){if(!select)return;const country=normalizeNationality(countrySelect?.value),items=REGION_OPTIONS[country]||[];select.replaceChildren(new Option(items.length?"Select state / province / region…":"No sub-region options",""));items.forEach(([code,label])=>select.add(new Option(label,`${country}-${code}`)));select.disabled=!items.length;const normalized=normalizeRegion(country,value);select.value=normalized}
-function athleteNameHTML(a,withNumber=true,showNationalityDetail=true){const detail=countryRegionLabel(a?.nationality,a?.nationalityRegion),flag=flagEmoji(a?.nationality);const flagSlot=`<span class="nationality-flag" title="${esc(detail||"Nationality not set")}" aria-label="${esc(detail||"Nationality not set")}">${flag||""}</span>`;const number=withNumber?(numberHTML(a?.number,a?.manufacturer,a)||'<span class="race-number-slot" aria-hidden="true"></span>'):"";const layoutClass=showNationalityDetail?"":" flag-only";return `<div class="athlete-name${withNumber?" has-number":" no-number"}${layoutClass}">${flagSlot}${number}<b>${esc(name(a))}</b>${showNationalityDetail&&detail?`<span class="athlete-nationality-detail">${esc(detail)}</span>`:""}</div>`}
+function athleteNameHTML(a,withNumber=true,showNationalityDetail=true){const detail=countryRegionLabel(a?.nationality,a?.nationalityRegion),flagSlot=athleteFlagPairHTML(a?.nationality,a?.nationalityRegion,detail);const number=withNumber?(numberHTML(a?.number,a?.manufacturer,a)||'<span class="race-number-slot" aria-hidden="true"></span>'):"";const layoutClass=showNationalityDetail?"":" flag-only";return `<div class="athlete-name${withNumber?" has-number":" no-number"}${layoutClass}">${flagSlot}${number}<b>${esc(name(a))}</b>${showNationalityDetail&&detail?`<span class="athlete-nationality-detail">${esc(detail)}</span>`:""}</div>`}
 function athleteDetailButtonHTML(a,withNumber=true,showNationalityDetail=true){return `<button type="button" class="athlete-detail-trigger" data-athlete-detail="${esc(id(a))}" aria-label="View scoring history for ${esc(name(a))}">${athleteNameHTML(a,withNumber,showNationalityDetail)}</button>`}
 function scoreRoundKey(record){
  const series=norm(canonicalScoreSeries(record?.series||eventRoom(record?.riderClass||record?.division||"")));
