@@ -685,26 +685,31 @@ async function runYearlyRosterReset(){
   return;
  }
  const currentTeams=teams();
+ const currentScores=scores();
  const assignmentCount=currentTeams.reduce((sum,team)=>sum+roster(team).length,0);
- if(!assignmentCount){
-  if(message)message.textContent="All team rosters are already empty. No changes were made.";
+ const teamPoints=currentTeams.reduce((sum,team)=>sum+currentScores.filter(record=>String(record.teamKey)===key(team)).reduce((points,record)=>points+Number(record.points||0),0),0);
+ const riderPoints=currentScores.reduce((sum,record)=>sum+Number(record.points||0),0);
+ const riderCount=new Set(currentScores.map(record=>String(record.riderId||norm(record.riderName||record.athleteName))).filter(Boolean)).size;
+ if(!assignmentCount&&!currentScores.length){
+  if(message)message.textContent="The yearly reset is already complete. All team rosters are empty and no rider or team scoring points remain.";
   return;
  }
- const confirmed=confirm(`YEARLY RESET\n\nThis will remove ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}.\n\nAthlete records, scoring history, team owners and passwords, draft settings, and the schedule will be preserved.\n\nContinue?`);
+ const confirmed=confirm(`YEARLY RESET\n\nThis will permanently:\n• Remove ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}.\n• Reset ${teamPoints.toLocaleString()} accumulated team points.\n• Reset ${riderPoints.toLocaleString()} accumulated rider points across ${riderCount} scored athlete${riderCount===1?"":"s"} and ${currentScores.length} result record${currentScores.length===1?"":"s"}.\n\nAll scoring records will be deleted. This also clears athlete profile results, averages, scoring history, and top-undrafted scoring totals.\n\nAthlete records, team names, owners and passwords, draft settings, trades, and the event schedule will be preserved.\n\nContinue?`);
  if(!confirmed)return;
- const phrase=prompt('To confirm the yearly reset, type CLEAR ROSTERS:');
+ const phrase=prompt('To confirm the yearly reset, type RESET SEASON:');
  if(phrase===null)return;
- if(clean(phrase).toUpperCase()!=="CLEAR ROSTERS"){
-  if(message)message.textContent='Reset cancelled. The confirmation phrase did not match "CLEAR ROSTERS".';
+ if(clean(phrase).toUpperCase()!=="RESET SEASON"){
+  if(message)message.textContent='Reset cancelled. The confirmation phrase did not match "RESET SEASON".';
   return;
  }
  saveTeams(currentTeams.map(team=>({...team,roster:[]})));
+ write(K.S,[]);
  refresh();
  try{
   if(window.KFStorage&&typeof window.KFStorage.flush==="function")await window.KFStorage.flush();
-  if(message)message.textContent=`Yearly reset complete. Removed ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}. All athlete records and historical scoring remain intact.`;
+  if(message)message.textContent=`Yearly reset complete. Removed ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"}; reset ${teamPoints.toLocaleString()} team points and ${riderPoints.toLocaleString()} rider points; cleared ${currentScores.length} scoring result record${currentScores.length===1?"":"s"}. Athlete records, team ownership and passwords, draft settings, trades, and the event schedule remain intact.`;
  }catch(error){
-  if(message)message.textContent=`The rosters were cleared in this browser, but the project database did not confirm the save: ${error.message||"Unknown storage error"}. Check the storage status and retry using Data & Backup if needed.`;
+  if(message)message.textContent=`The rosters and scoring points were cleared in this browser, but the project database did not confirm the save: ${error.message||"Unknown storage error"}. Check the storage status and retry using Data & Backup if needed.`;
  }
 }
 function commInit(){
