@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40" role="img" aria-labelledby="title desc">
+  <title id="title">Hawke's Bay regional colours and gold hawk</title>
+  <desc id="desc">A black flag with two white horizontal bars and a gold hawk rising across the centre.</desc>
+  <rect width="60" height="40" fill="#111111"/>
+  <rect x="0" y="7" width="60" height="7" fill="#ffffff" stroke="#111111" stroke-width="0.7"/>
+  <rect x="0" y="26" width="60" height="7" fill="#ffffff" stroke="#111111" stroke-width="0.7"/>
+  <!-- Original simplified heraldic hawk silhouette; not a reproduction of the Council's full coat of arms. -->
+  <path fill="#d5a329" stroke="#8b6517" stroke-width="0.65" stroke-linejoin="round" d="
+    M29.8 8.1
+    C26.5 9.3 23.2 11.4 19.9 13.2
+    L4.2 5.2 L9.1 15.1 L4.9 14.3
+    L17.1 22.4 L22.2 20.7
+    L26.7 27.4 L29.0 23.9
+    L30.0 35.1 L31.0 23.9
+    L33.3 27.4 L37.8 20.7
+    L42.9 22.4 L55.1 14.3 L50.9 15.1
+    L55.8 5.2 L40.1 13.2
+    C36.8 11.4 33.5 9.3 30.2 8.1 Z"/>
+  <path fill="#d5a329" stroke="#8b6517" stroke-width="0.55" stroke-linejoin="round" d="
+    M28.1 9.1 C28.7 6.7 30.4 5.5 32.0 6.1
+    C33.2 6.5 33.8 7.6 33.4 8.7
+    L37.0 9.8 L33.7 11.1
+    C32.4 12.0 30.3 11.8 29.0 10.7 Z"/>
+  <path fill="#8b6517" d="M32.8 10.0 L37.3 10.1 L33.2 11.3 Z"/>
+</svg>

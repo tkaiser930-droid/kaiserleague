@@ -10,14 +10,10 @@ regional flag images to appear. Country flags continue to use the site's existin
 flag rendering. The regional flag is placed beside the country flag and before the race
 number in athlete tables; scheduled-event country cells show it beside the country flag.
 
-The November 8, 2026 save contains ten codes for which this build does not include a
-reliable, standalone regional flag asset. The country flag is retained for these codes
-rather than substituting an unrelated symbol:
-CN-SH (Shanghai), IT-EMR (Emilia-Romagna; a de-facto design exists, but no official
-regional flag regulation was identified), MC-MC (Monaco), NZ-HKB (Hawke's Bay),
-QA-ZA (Al Daayen), SA-02 (Riyadh), SG-01 (Central Singapore), TR-03 (Afyonkarahisar),
-TR-07 (Antalya), and TR-34 (Istanbul). Some provincial flags are documented in
-third-party reports, but no stable, reuse-clear standalone artwork was included here.
+The save contains several region codes for which the chosen ISO flag collection does not provide a sufficiently reliable standalone regional flag. The country flag is retained for these codes rather than substituting unrelated artwork:
+MC-MC (Monaco), NZ-HKB (Hawke's Bay), QA-ZA (Al Daayen), SG-01 (Central Singapore), and TR-03 (Afyonkarahisar).
+Hawke's Bay Regional Council branding is not treated as a regional flag. Available vexillology references identify other district/civic flags in the area but do not establish a Hawke's Bay regional flag. The Council's logo is protected organizational branding, not a regional flag.
+
 The following Italian regional flags and the flag of Beltinci (SI-02) are supplied by
 Wikimedia Commons because they are not in the ISO 3166-2 CSS collection:
 - Lazio: https://commons.wikimedia.org/wiki/File:Flag_of_Lazio.svg (public domain)
@@ -55,3 +51,24 @@ country/sub-region display order are unchanged.
 The image files are requested from Wikimedia Commons at runtime; an internet connection
 is required for these nine overrides to display. All other subdivision flags continue
 to use the ISO 3166-2 flag CSS collection.
+
+
+ADDITIONAL REGIONAL SYMBOLS AND ESTONIA COUNTIES ADDED 2026-11-08
+
+The following entries use direct image URLs. Their labels distinguish flags from emblems where the source does not identify a standalone flag:
+
+- IT-EMR Emilia-Romagna: https://commons.wikimedia.org/wiki/File:Flag_of_Emilia-Romagna_(de_facto).svg. This is a de-facto/readapted regional flag, not a formally legislated flag. Commons records CC BY-SA 4.0; attribution and share-alike terms apply.
+- SA-02 Makkah al-Mukarramah: https://commons.wikimedia.org/wiki/File:Flag_of_Mecca.svg. This is an earlier documented flag design for the city of Mecca, based on CRW Flags; Commons describes the simple geometry as public domain. FOTW records newer province-flag variations in 2026, but the reference page does not provide a stable direct standalone artwork URL for those variations: https://crwflags.com/FOTW/FLAGS/sa-mecca.html. The app therefore uses the earlier documented flag and identifies it as such in its accessible label.
+- CN-SH Shanghai: https://english.shanghai.gov.cn/en-Overview/20231207/01cbe27be70842f1877b061df3f7eed3.html. The graphic is the Shanghai municipal emblem. It is an official city symbol and can appear on flags at major events, but it is not presented here as a permanent standalone city flag.
+- TR-07 Antalya: https://crwflags.com/Fotw/flags/tr-07.html documents the provincial flag as white with the governorate emblem. The emblem image is from https://www.anfasfoodproduct.com/assets/img/destekleyenler/antalya_valilik_logo_2024.png.
+- TR-34 Istanbul: https://crwflags.com/Fotw/flags/tr-34.html documents the provincial flag as white with the governorate emblem. The mark used in the app represents the T.C. Istanbul Valiliği / Governorate emblem.
+- NZ-HKB Hawke's Bay: added a local, original simplified flag illustration using the black-and-white provincial colours and gold rising hawk described in the Hastings District Council's official heraldic page. The Council describes the gold hawk as an emblem from Lord Hawke's arms, whose name the province bears. This is a stylized implementation of that heraldic description, not a reproduction of the Council's full Achievement of Arms or a claim that Hawke's Bay has a separately adopted modern regional flag. Source: https://www.hastingsdc.govt.nz/our-council/about/coat-of-arms/
+
+Estonia (EE) now has all 15 traditional/reference counties in the region selector: Harju, Hiiu, Ida-Viru, Jõgeva, Järva, Lääne, Lääne-Viru, Põlva, Pärnu, Rapla, Saare, Tartu, Valga, Viljandi, and Võru. These use the county reference codes EE-37, EE-39, EE-45, EE-50, EE-52, EE-56, EE-60, EE-64, EE-68, EE-71, EE-74, EE-79, EE-81, EE-84, and EE-87. Note that Estonia's first-order administrative divisions following the 2016 reform are 79 municipalities; counties remain widely used for reference and are included here as requested. Source: UK PCGN Estonia Toponymic Factfile (January 2024), https://assets.publishing.service.gov.uk/media/65c23aac688c390013334c51/Estonia_Factfile_Jan_2024.pdf.
+
+The new emblems/flags are rendered in the existing regional flag slot beside the country flag. Image hosting remains external, so an internet connection is required.
+
+
+HAWKE'S BAY REGIONAL DESIGN UPDATE
+
+The NZ-HKB region now uses the local asset assets/flags/nz-hkb-gold-hawk.svg. It depicts a black field, two white horizontal bars, and a simplified original gold hawk silhouette, reflecting the provincial colours and heraldic hawk described by Hastings District Council. The artwork is a simplified interpretation created for this site, not a copy of the Council's copyrighted full Achievement of Arms. Country flag remains first, followed by this regional design, followed by the athlete/event number where applicable.

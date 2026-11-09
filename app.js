@@ -57,6 +57,7 @@ const COUNTRY_NAMES=Object.fromEntries(COUNTRIES.map(([code,country])=>[code,cou
 // Region values are stored as country-prefixed codes (for example, US-CA and CA-BC).
 const REGION_DATA={
  CN:"AH~Anhui;BJ~Beijing;CQ~Chongqing;FJ~Fujian;GS~Gansu;GD~Guangdong;GX~Guangxi Zhuang Autonomous Region;GZ~Guizhou;HI~Hainan;HE~Hebei;HL~Heilongjiang;HA~Henan;HB~Hubei;HN~Hunan;JS~Jiangsu;JX~Jiangxi;JL~Jilin;LN~Liaoning;NM~Inner Mongolia Autonomous Region;NX~Ningxia Hui Autonomous Region;QH~Qinghai;SN~Shaanxi;SD~Shandong;SH~Shanghai;SX~Shanxi;SC~Sichuan;TJ~Tianjin;XJ~Xinjiang Uyghur Autonomous Region;XZ~Xizang (Tibet) Autonomous Region;YN~Yunnan;ZJ~Zhejiang",
+ EE:"37~Harju County;39~Hiiu County;45~Ida-Viru County;50~Jõgeva County;52~Järva County;56~Lääne County;60~Lääne-Viru County;64~Põlva County;68~Pärnu County;71~Rapla County;74~Saare County;79~Tartu County;81~Valga County;84~Viljandi County;87~Võru County",
  AZ:"ABS~Absheron;AGC~Aghjabadi;AGM~Aghdam;AGS~Aghdash;AGA~Aghstafa;AGU~Agsu;AST~Astara;BAB~Babek;BAL~Balakan;BAR~Barda;BEY~Beylagan;BIL~Bilasuvar;CAB~Jabrayil;CAL~Jalilabad;CUL~Julfa;DAS~Dashkasan;FUZ~Fuzuli;GAD~Gadabay;GOR~Goranboy;GOY~Goychay;GYG~Goygol;HAC~Hajigabul;IMI~Imishli;ISM~Ismayilli;KAL~Kalbajar;KAN~Kangarli;KUR~Kurdamir;LAC~Lachin;LAN~Lankaran;LER~Lerik;MAS~Masalli;NEF~Neftchala;OGU~Oguz;ORD~Ordubad;QAB~Gabala;QAX~Gakh;QAZ~Gazakh;QOB~Gobustan;QUB~Guba;QBD~Gubadli;QUS~Gusar;SAA~Saatli;SAB~Sabirabad;SHB~Shabran;SAD~Sadarak;SAH~Shahbuz;SAK~Shaki;SAL~Salyan;SHA~Shamakhi;SHM~Shamkir;SAM~Samukh;SAR~Sharur;SIY~Siyazan;SHU~Shusha;TAR~Tartar;TOV~Tovuz;UJA~Ujar;KHA~Khachmaz;KHI~Khizi;KHO~Khojaly;KHV~Khojavend;YAR~Yardimli;YEV~Yevlakh;ZAN~Zangilan;ZAQ~Zaqatala;ZAR~Zardab;AGD~Aghdara;NXA~Nakhchivan Autonomous Republic;BAK~Baku;GAN~Ganja;KHK~Khankendi;LNC~Lankaran City;MNG~Mingachevir;NTL~Naftalan;NXC~Nakhchivan City;SHK~Shaki City;SHR~Shirvan;SUM~Sumqayit;YLC~Yevlakh City",
  HU:"01~Budapest;03~Bács-Kiskun;02~Baranya;04~Békés;05~Borsod-Abaúj-Zemplén;06~Csongrád-Csanád;07~Fejér;08~Győr-Moson-Sopron;09~Hajdú-Bihar;10~Heves;16~Jász-Nagykun-Szolnok;11~Komárom-Esztergom;12~Nógrád;13~Pest;14~Somogy;15~Szabolcs-Szatmár-Bereg;17~Tolna;18~Vas;19~Veszprém;20~Zala",
  SE:"K~Blekinge County;W~Dalarna County;X~Gävleborg County;I~Gotland County;N~Halland County;Z~Jämtland County;F~Jönköping County;H~Kalmar County;G~Kronoberg County;BD~Norrbotten County;T~Örebro County;E~Östergötland County;M~Skåne County;D~Södermanland County;AB~Stockholm County;C~Uppsala County;S~Värmland County;AC~Västerbotten County;Y~Västernorrland County;U~Västmanland County;O~Västra Götaland County",
@@ -109,9 +110,9 @@ function countryRegionLabel(country,region){const c=countryName(country);if(!c)r
 // Region codes in saved data are normalized to the ISO 3166-2 flag asset codes.
 // Some existing dropdown values use local short forms rather than ISO identifiers.
 const SUBDIVISION_FLAG_ALIASES={"AR-BA":"AR-B","AR-CABA":"AR-C","AR-RNE":"AR-R","AZ-BAK":"AZ-BA","HU-01":"HU-BU"};
-// Use direct Wikimedia Commons flag files for these nine regions. This avoids
-// relying on generated CSS selectors for flags that have appeared incorrectly
-// in the regional flag font. The codes remain ISO 3166-2 identifiers.
+// Use direct image references for regions where generated CSS selectors were unreliable
+// or where an official/de-facto regional emblem is the best documented visual.
+// The saved country and sub-region codes remain unchanged.
 const SUBDIVISION_FLAG_IMAGE_URLS={
  "US-FL":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Florida.svg",
  "ES-CT":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Catalonia.svg",
@@ -121,11 +122,30 @@ const SUBDIVISION_FLAG_IMAGE_URLS={
  "US-MI":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Michigan.svg",
  "MX-JAL":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Jalisco.svg",
  "BE-VLI":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Limburg_%28Belgium%29.svg",
- "US-TN":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Tennessee.svg"
+ "US-TN":"https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Tennessee.svg",
+ // Emilia-Romagna's commonly used de-facto regional flag; the region has no flag regulation.
+ "IT-EMR":"https://upload.wikimedia.org/wikipedia/commons/7/77/Flag_of_Emilia-Romagna_%28de_facto%29.svg",
+ // Hawke's Bay: original, simplified heraldic flag interpretation based on the black-and-white provincial colours and gold hawk described by Hastings District Council.
+ "NZ-HKB":"assets/flags/nz-hkb-gold-hawk.svg",
+ // Earlier documented flag design for Mecca; newer province variations are reported but lack a stable direct flag file.
+ "SA-02":"https://upload.wikimedia.org/wikipedia/commons/9/92/Flag_of_Mecca.svg",
+ // Shanghai's officially recognized city emblem, shown on white (rather than mislabelled as an official flag).
+ "CN-SH":"https://english.shanghai.gov.cn/cmsres/38/38634fda91364cdeaa9d6c1cc4e68442/01b2fa883e6f876c2f372fb261c5d86e.jpg",
+ // FOTW documents the Antalya provincial flag as white with the Governorate emblem.
+ "TR-07":"https://www.anfasfoodproduct.com/assets/img/destekleyenler/antalya_valilik_logo_2024.png",
+ // FOTW documents the Istanbul provincial flag as white with the Governorate emblem.
+ "TR-34":"https://images.seeklogo.com/logo-png/44/1/t-c-istanbul-valiligi-logo-png_seeklogo-449973.png"
 };
-// These saved sub-regions do not have a distinct subdivision flag in the selected
-// ISO flag collection. Leave the regional slot empty rather than inventing a flag.
-const SUBDIVISION_FLAGS_UNAVAILABLE=new Set(["CN-SH","IT-EMR","MC-MC","NZ-HKB","QA-ZA","SA-02","SG-01","TR-03","TR-07","TR-34"]);
+const SUBDIVISION_FLAG_LABEL_OVERRIDES={
+ "NZ-HKB":"Hawke's Bay black-and-white flag with gold hawk (stylized regional design)",
+ "IT-EMR":"Emilia-Romagna de-facto regional flag",
+ "SA-02":"Earlier documented flag of Mecca (city design)",
+ "CN-SH":"Shanghai official city emblem (not a permanent city flag)",
+ "TR-07":"Antalya Governorate emblem used on its provincial flag",
+ "TR-34":"Istanbul Governorate emblem used on its provincial flag"
+};
+// These saved sub-regions do not have a sufficiently reliable standalone flag or emblem asset.
+const SUBDIVISION_FLAGS_UNAVAILABLE=new Set(["MC-MC","QA-ZA","SG-01","TR-03"]);
 function subdivisionFlagCode(country,region=""){
  const parent=normalizeNationality(country),raw=clean(region).toUpperCase().replace(/\s+/g,"");
  if(!parent||!raw)return "";
@@ -136,11 +156,12 @@ function subdivisionFlagCode(country,region=""){
 function subdivisionFlagHTML(country,region=""){
  const flagCode=subdivisionFlagCode(country,region);if(!flagCode||SUBDIVISION_FLAGS_UNAVAILABLE.has(flagCode))return "";
  const label=regionName(country,region)||`Sub-region ${flagCode.slice(flagCode.indexOf("-")+1)}`;
+ const flagLabel=SUBDIVISION_FLAG_LABEL_OVERRIDES[flagCode]||`${label} flag`;
  const imageUrl=SUBDIVISION_FLAG_IMAGE_URLS[flagCode];
  if(imageUrl){
-  return `<span class="subdivision-flag fi subdivision-flag-custom" style="background-image:url('${esc(imageUrl)}')" role="img" aria-label="${esc(label)} flag" title="${esc(label)}" data-subdivision-code="${esc(flagCode)}"></span>`;
+  return `<span class="subdivision-flag fi subdivision-flag-custom" style="background-image:url('${esc(imageUrl)}')" role="img" aria-label="${esc(flagLabel)}" title="${esc(flagLabel)}" data-subdivision-code="${esc(flagCode)}"></span>`;
  }
- return `<span class="subdivision-flag fi fi-${esc(flagCode.toLowerCase())}" role="img" aria-label="${esc(label)} flag" title="${esc(label)}" data-subdivision-code="${esc(flagCode)}"></span>`;
+ return `<span class="subdivision-flag fi fi-${esc(flagCode.toLowerCase())}" role="img" aria-label="${esc(flagLabel)}" title="${esc(flagLabel)}" data-subdivision-code="${esc(flagCode)}"></span>`;
 }
 function athleteFlagPairHTML(country,region="",detail=""){
  const flag=flagEmoji(country),subdivision=subdivisionFlagHTML(country,region);
@@ -655,6 +676,35 @@ function setupCommissionerTabs(){
  });
  activateCommissionerTab("athletes");
 }
+async function runYearlyRosterReset(){
+ const message=$("yearlyResetMessage");
+ if(sessionStorage.getItem("commAuthV2")!=="yes"){
+  if(message)message.textContent="Sign in as commissioner to use the yearly reset.";
+  return;
+ }
+ const currentTeams=teams();
+ const assignmentCount=currentTeams.reduce((sum,team)=>sum+roster(team).length,0);
+ if(!assignmentCount){
+  if(message)message.textContent="All team rosters are already empty. No changes were made.";
+  return;
+ }
+ const confirmed=confirm(`YEARLY RESET\n\nThis will remove ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}.\n\nAthlete records, scoring history, team owners and passwords, draft settings, and the schedule will be preserved.\n\nContinue?`);
+ if(!confirmed)return;
+ const phrase=prompt('To confirm the yearly reset, type CLEAR ROSTERS:');
+ if(phrase===null)return;
+ if(clean(phrase).toUpperCase()!=="CLEAR ROSTERS"){
+  if(message)message.textContent='Reset cancelled. The confirmation phrase did not match "CLEAR ROSTERS".';
+  return;
+ }
+ saveTeams(currentTeams.map(team=>({...team,roster:[]})));
+ refresh();
+ try{
+  if(window.KFStorage&&typeof window.KFStorage.flush==="function")await window.KFStorage.flush();
+  if(message)message.textContent=`Yearly reset complete. Removed ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}. All athlete records and historical scoring remain intact.`;
+ }catch(error){
+  if(message)message.textContent=`The rosters were cleared in this browser, but the project database did not confirm the save: ${error.message||"Unknown storage error"}. Check the storage status and retry using Data & Backup if needed.`;
+ }
+}
 function commInit(){
  setupCommissionerTabs();
  populatePrimarySeriesSelect($("athClass"),"250");populatePrimarySeriesSelect($("editAthClass"),"250");populateNationalitySelect($("athNationality"));populateNationalitySelect($("editAthNationality"));populateNationalitySelect($("eventCountry"));populateRegionSelect($("athNationalityRegion"),$("athNationality"));populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));populateRegionSelect($("eventRegion"),$("eventCountry"));$("athNationality").onchange=()=>populateRegionSelect($("athNationalityRegion"),$("athNationality"));$("editAthNationality").onchange=()=>populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));$("eventCountry").onchange=()=>populateRegionSelect($("eventRegion"),$("eventCountry"));renderSecondarySeriesChecks("athSecondarySeries",[], $("athClass").value);$("athClass").onchange=()=>renderSecondarySeriesChecks("athSecondarySeries",secondarySeriesChecked("athSecondarySeries",$("athClass").value),$("athClass").value);$("editAthClass").onchange=()=>renderSecondarySeriesChecks("editAthSecondarySeries",secondarySeriesChecked("editAthSecondarySeries",$("editAthClass").value),$("editAthClass").value);populateScheduleSeriesSelect();populateScoreSeriesSelect();populateDraftRoomSelects();setupScoreGrid();$("scoreForm").onsubmit=submitRaceResults;$("cancelScoreEdit").onclick=cancelScoreEdit;
@@ -668,6 +718,7 @@ function commInit(){
  $("startDraftNow").onclick=()=>{const d=read(K.DS,{}),s=$("draftSeries").value,current=d[s]||{},list=teams();if(list.length!==5||list.some(t=>!t.passwordHash)){$("draftSettingsMessage").textContent="All five teams must be claimed and have a team password before starting. Each team signs in to make its own pick.";return}const savedOrder=Array.isArray(current.orderTeamKeys)?current.orderTeamKeys.map(String):[];if(!draftOrderKeysValid(savedOrder,list)){$("draftSettingsMessage").textContent="Set and save the draft order above before starting this draft.";return}if(current.status==="Open"){$("draftSettingsMessage").textContent=`${s} draft is already open. Existing picks and the saved snake order are unchanged.`;return}current.status="Open";current.start=current.start||new Date().toISOString();current.orderTeamKeys=savedOrder;current.scheduledStart=$("draftStart").value||current.scheduledStart||"";d[s]=current;write(K.DS,d);$("draftSettingsMessage").textContent=`${s} draft started. Round 1: ${savedOrder.map(k=>tname(list.find(t=>key(t)===k))).join(" → ")}. Round 2 will reverse the order. Teams can now sign in on the Draft page.`;loadDraftAdminSettings()};
  $("pauseDraft").onclick=()=>setDraftAdminStatus("Paused");$("completeDraft").onclick=()=>setDraftAdminStatus("Complete");
  $("eventDate").addEventListener("change",()=>{$("eventEndDate").min=$("eventDate").value});$("eventSeries").addEventListener("change",()=>updateEventTypeFields($("eventSeries").value));$("eventSubType").addEventListener("change",()=>updateEventTypeFields($("eventSeries").value,$("eventSubType").value));updateEventTypeFields($("eventSeries").value||"SMX");$("scheduleForm").onsubmit=saveScheduleEvent;$("scheduledEventToEdit").onchange=()=>{$("loadScheduledEventEdit").disabled=!$("scheduledEventToEdit").value};$("loadScheduledEventEdit").onclick=()=>{const eventId=$("scheduledEventToEdit").value;if(eventId)beginEditEvent(eventId)};$("cancelEditEvent").onclick=()=>{resetScheduleEditor();$("scheduleMessage").textContent="Event edit cancelled."};
+ $("yearlyReset").onclick=runYearlyRosterReset;
  $("resetData").onclick=()=>{if(confirm("Delete all league data from the local project database and this browser? This cannot be undone.")){const finish=()=>{sessionStorage.clear();location.reload()};if(window.KFStorage&&typeof window.KFStorage.clearAll==="function")window.KFStorage.clearAll().then(finish).catch(err=>alert("Could not clear saved data: "+err.message));else{Object.values(K).forEach(k=>localStorage.removeItem(k));sessionStorage.clear();location.reload()}}}
 }
 function renderCommSchedule(){
