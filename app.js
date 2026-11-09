@@ -132,7 +132,8 @@ const SUBDIVISION_FLAG_IMAGE_URLS={
  // Shanghai's officially recognized city emblem, shown on white (rather than mislabelled as an official flag).
  "CN-SH":"https://english.shanghai.gov.cn/cmsres/38/38634fda91364cdeaa9d6c1cc4e68442/01b2fa883e6f876c2f372fb261c5d86e.jpg",
  // FOTW documents the Antalya provincial flag as white with the Governorate emblem.
- "TR-07":"https://www.anfasfoodproduct.com/assets/img/destekleyenler/antalya_valilik_logo_2024.png",
+ "TR-03":"assets/flags/tr-03-afyonkarahisar-governorate.svg",
+ "TR-07":"assets/flags/tr-07-antalya-governorate.svg",
  // FOTW documents the Istanbul provincial flag as white with the Governorate emblem.
  "TR-34":"https://images.seeklogo.com/logo-png/44/1/t-c-istanbul-valiligi-logo-png_seeklogo-449973.png"
 };
@@ -141,11 +142,12 @@ const SUBDIVISION_FLAG_LABEL_OVERRIDES={
  "IT-EMR":"Emilia-Romagna de-facto regional flag",
  "SA-02":"Earlier documented flag of Mecca (city design)",
  "CN-SH":"Shanghai official city emblem (not a permanent city flag)",
- "TR-07":"Antalya Governorate emblem used on its provincial flag",
+ "TR-03":"Afyonkarahisar provincial flag with Governorate emblem",
+ "TR-07":"Antalya provincial flag with Governorate emblem",
  "TR-34":"Istanbul Governorate emblem used on its provincial flag"
 };
 // These saved sub-regions do not have a sufficiently reliable standalone flag or emblem asset.
-const SUBDIVISION_FLAGS_UNAVAILABLE=new Set(["MC-MC","QA-ZA","SG-01","TR-03"]);
+const SUBDIVISION_FLAGS_UNAVAILABLE=new Set(["MC-MC","QA-ZA","SG-01"]);
 function subdivisionFlagCode(country,region=""){
  const parent=normalizeNationality(country),raw=clean(region).toUpperCase().replace(/\s+/g,"");
  if(!parent||!raw)return "";

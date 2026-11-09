@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="title desc">
+<title id="title">Afyonkarahisar provincial governorate flag</title>
+<desc id="desc">White flag field with a simplified rendering of the Afyonkarahisar Governorate emblem: a rocky castle hill with a Turkish flag, a gold-lined public building and the governorate name.</desc>
+<rect width="600" height="400" fill="#fff"/>
+<g transform="translate(70 42)">
+  <!-- rocky fortress ridge -->
+  <path d="M91 190 L110 151 L127 155 L145 119 L166 130 L184 101 L205 117 L225 78 L246 109 L264 111 L283 136 L301 124 L325 159 L340 164 L360 190" fill="none" stroke="#747779" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M114 179 L131 162 L144 166 L162 140 L179 150 L198 126 L214 139 L231 104 L248 137 L267 137 L286 159 L302 150 L324 178" fill="none" stroke="#9b9d9e" stroke-width="4" stroke-linecap="round"/>
+  <!-- Turkish flag at the summit -->
+  <path d="M225 79 V34" stroke="#666" stroke-width="4"/>
+  <path d="M228 36 H266 V61 H228 Z" fill="#e30a17"/>
+  <circle cx="242" cy="48.5" r="7.4" fill="#fff"/>
+  <circle cx="245" cy="46.5" r="6" fill="#e30a17"/>
+  <path d="M252 42 L254 47 L259 47 L255 50 L257 55 L252 52 L248 55 L249 50 L245 47 L250 47 Z" fill="#fff"/>
+  <!-- golden sweep and public building -->
+  <path d="M42 211 Q205 163 378 211" fill="none" stroke="#b08b28" stroke-width="5"/>
+  <g fill="none" stroke="#b08b28" stroke-width="5" stroke-linejoin="round">
+    <path d="M28 222 H392 V309 H28 Z"/>
+    <path d="M24 222 L210 198 L396 222 Z" fill="#fff"/>
+    <path d="M28 246 H392 M28 293 H392"/>
+    <path d="M45 246 V293 M75 246 V293 M105 246 V293 M135 246 V293 M285 246 V293 M315 246 V293 M345 246 V293 M375 246 V293"/>
+    <path d="M160 222 V309 M260 222 V309 M160 222 L210 208 L260 222"/>
+    <path d="M183 240 H237 V309 H183 Z"/>
+    <path d="M195 252 H225 V278 H195 Z"/>
+  </g>
+  <!-- central victory monument silhouette -->
+  <g fill="#707476" transform="translate(201 263)">
+    <path d="M-17 37 H17 L13 31 H-13 Z M-12 29 H12 L8 22 H-8 Z"/>
+    <path d="M-4 21 L-2 6 L-9 -1 L-5 -5 L0 0 L5 -7 L10 -3 L5 7 L5 21 Z"/>
+    <circle cx="1" cy="-10" r="5"/>
+  </g>
+</g>
+<g text-anchor="middle" fill="#202020">
+  <text x="300" y="365" font-family="Georgia,serif" font-size="13" letter-spacing="4">TÜRKİYE CUMHURİYETİ</text>
+  <text x="300" y="385" font-family="Georgia,serif" font-size="18" letter-spacing="2">AFYONKARAHİSAR VALİLİĞİ</text>
+</g>
+</svg>

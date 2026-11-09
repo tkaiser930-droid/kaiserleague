@@ -72,3 +72,10 @@ The new emblems/flags are rendered in the existing regional flag slot beside the
 HAWKE'S BAY REGIONAL DESIGN UPDATE
 
 The NZ-HKB region now uses the local asset assets/flags/nz-hkb-gold-hawk.svg. It depicts a black field, two white horizontal bars, and a simplified original gold hawk silhouette, reflecting the provincial colours and heraldic hawk described by Hastings District Council. The artwork is a simplified interpretation created for this site, not a copy of the Council's copyrighted full Achievement of Arms. Country flag remains first, followed by this regional design, followed by the athlete/event number where applicable.
+
+Afyonkarahisar (TR-03) and Antalya (TR-07) provincial flags
+- Both are shown as white flags with the respective provincial Governorate emblem centred. Flags of the World documents this form for Afyonkarahisar and Antalya.
+- Local SVG assets `assets/flags/tr-03-afyonkarahisar-governorate.svg` and `assets/flags/tr-07-antalya-governorate.svg` are simplified vector interpretations of the current Governorate emblems on the documented white flag field. They are local, so rendering does not depend on third-party image hosts.
+- Afyonkarahisar flag description and emblem explanation: Flags of the World, https://www.crwflags.com/fotw/flags/tr-03.html (flag described as white with province emblem; image by Tomislav Šipek, 1 Jan 2018). Current Governorate logo visual reference: https://mersem.org.tr/uploads/logo_3807-470251586.png.
+- Antalya flag description: Flags of the World, https://crwflags.com/fotw/flags/tr-07.html (flag described as white with provincial emblem; image by Jens Pattke, 16 Oct 2012). Current Governorate seal visual reference: https://www.anfasfoodproduct.com/assets/img/destekleyenler/antalya_valilik_logo_2024.png.
+- These SVGs are simplified redraws for small-flag display and are not photographic reproductions of the historic flag images.
