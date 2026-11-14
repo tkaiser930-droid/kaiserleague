@@ -16,11 +16,11 @@ services:
       - key: GITHUB_TOKEN
         sync: false
       - key: GITHUB_REPOSITORY
-        sync: false
+        value: tkaiser930-droid/LeagueSave
       - key: GITHUB_BACKUP_PASSWORD
         sync: false
       - key: GITHUB_BRANCH
-        value: main
+        value: ""
       - key: GITHUB_DATA_PATH
         value: league-data/league-data.json
       - key: GITHUB_AUTO_BACKUP
