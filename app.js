@@ -218,7 +218,7 @@ const athletes=()=>read(K.A,[]),saveAthletes=a=>write(K.A,a),scores=()=>read(K.S
 const BRAND={
 Honda:{color:"#E60012",logo:"honda",image:"https://global.honda/en/wingmark/assets/img/2dlogo/7.webp",fit:"wide"},
 Yamaha:{color:"#003399",logo:"yamaha",image:"https://3.bp.blogspot.com/-Y_Pw6SK7wM8/VtbvwDNlfwI/AAAAAAAAOhY/n99f-418EnE/s1600/logo-yamaha-tuning_forks.jpg",fit:"square"},
-Kawasaki:{color:"#69BE28",logo:"kawasaki",image:"https://servicehomologation.com/cdn/shop/files/KAWASAKI_LOGO.png?v=1744300377&width=2000",fit:"square"},KTM:{color:"#FF6600",logo:"ktm"},
+Kawasaki:{color:"#006B3F",logo:"kawasaki",image:"https://servicehomologation.com/cdn/shop/files/KAWASAKI_LOGO.png?v=1744300377&width=2000",fit:"square"},KTM:{color:"#FF6600",logo:"ktm"},
 Kove:{color:"#22A7A7",logo:"kove",image:"https://static.wixstatic.com/media/2280eb_e897db89dbf44cb481126b5750fd8e18~mv2.png",fit:"square"},
 Fantic:{color:"#FFFFFF",logo:"fantic",image:"https://fantic.com/Content/img/logo.svg",fit:"wide"},
 ZXMoto:{color:"#477DBB",logo:"zxmoto",image:"https://pbs.twimg.com/profile_images/2038585392216113152/R3eIOSVy.jpg",fit:"square"},
@@ -227,11 +227,13 @@ Husqvarna:{color:"#FFFFFF",logo:"husqvarna",image:"https://cdn.simpleicons.org/h
 Triumph:{color:"#111111",logo:"triumph",image:"https://lirp.cdn-website.com/072a18a0/dms3rep/multi/opt/triumph-logo-640w.jpg",fit:"square"},
 Beta:{color:"#D71920",logo:"beta",image:"https://media.cdnws.com/_i/46016/6385/1693/88/stickers-beta-ref8beta-autocollant-beta-moto-sticker-pour-moto-sport.jpeg",fit:"square"},Ducati:{color:"#800020",logo:"ducati"},
 Aprilia:{color:"#5D3A9B",logo:"aprilia",image:"https://poptuning.fr/8726-large_default/aprilia-lion-sticker-autocollant.jpg",fit:"square"},
+Ford:{color:"#00095B",logo:"ford",fit:"wide"},
+"Honda Engines":{color:"#CC0000",logo:"honda",fit:"square"},
 "Red Bull Racing":{color:"#001E62",logo:"redbull",image:"https://cdn.simpleicons.org/redbull/001E62"},
 "Racing Bulls":{color:"#65C7F7",logo:"redbull",image:"https://cdn.simpleicons.org/redbull/001E62"},
-McLaren:{color:"#FF8000",logo:"mclaren"},Ferrari:{color:"#DC0000",logo:"ferrari"},
+McLaren:{color:"#D95B00",logo:"mclaren"},Ferrari:{color:"#DC0000",logo:"ferrari"},
 Mercedes:{color:"#00A19B",logo:"mercedes",image:"https://upload.wikimedia.org/wikipedia/commons/9/98/Mercedes-Benz_Star_%281969-1986%2C_2025-%29.svg",fit:"square"},
-Cadillac:{color:"#C7A96B",logo:"cadillac"},
+Cadillac:{color:"#C7A96B",logo:"cadillac",image:"https://cdn.simpleicons.org/cadillac/C7A96B",fit:"square"},
 "Aston Martin":{color:"#004225",logo:"astonmartin",image:"https://cdn.simpleicons.org/astonmartin/004225"},
 Audi:{color:"#444444",logo:"audi",image:"https://cdn.simpleicons.org/audi/444444"},
 Haas:{color:"#FFFFFF",logo:"haas",image:"https://f1store4.formula1.com/content/ws/all/686828d2-e6e4-4e2f-9056-412cd5fffbaf__1179X1179.jpg",fit:"square"},
@@ -243,20 +245,20 @@ const RACE_TEAM_BRANDS={
  "Alpine":{"color":"#F08ACB","accent":"#F08ACB","number":"#F08ACB","image":"assets/logos/alpine-pink-a.png","fit":"wide"},
  "Aston Martin":{"color":"#004225","accent":"#004225","number":"#004225","image":"https://cdn.simpleicons.org/astonmartin/004225","fit":"square"},
  "Audi":{"color":"#444444","accent":"#444444","number":"#444444","image":"https://cdn.simpleicons.org/audi/444444","fit":"square"},
- "Cadillac":{"color":"#17191D","accent":"#C7A96B","number":"#C7A96B","image":"assets/logos/race-teams/cadillac.svg","fit":"wide"},
+ "Cadillac":{"color":"#C7A96B","accent":"#C7A96B","number":"#C7A96B","image":"https://cdn.simpleicons.org/cadillac/C7A96B","fit":"square"},
  "Ferrari":{"color":"#DC0000","accent":"#DC0000","number":"#DC0000","image":"https://cdn.simpleicons.org/ferrari/DC0000","fit":"square"},
  "Haas":{"color":"#FFFFFF","accent":"#FFFFFF","number":"#FFFFFF","image":"https://f1store4.formula1.com/content/ws/all/686828d2-e6e4-4e2f-9056-412cd5fffbaf__1179X1179.jpg","fit":"square"},
- "McLaren":{"color":"#FF8000","accent":"#111318","number":"#FFB36B","image":"assets/logos/race-teams/mclaren.svg","fit":"wide"},
+ "McLaren":{"color":"#D95B00","accent":"#D95B00","number":"#D95B00","image":"https://cdn.simpleicons.org/mclaren/D95B00","fit":"square"},
  "Mercedes AMG Petronas":{"color":"#00A19B","accent":"#D7FFF9","number":"#00E5D5","image":"assets/logos/race-teams/mercedes-amg-petronas.svg","fit":"wide"},
- "Racing Bulls":{"color":"#65C7F7","accent":"#E7F5FF","number":"#65C7F7","image":"assets/logos/race-teams/racing-bulls.svg","fit":"wide"},
- "Red Bull Racing":{"color":"#001E62","accent":"#DB0A40","number":"#DB0A40","image":"assets/logos/race-teams/red-bull-racing.svg","fit":"wide"},
- "Williams":{"color":"#00AEEF","accent":"#7CB9FF","number":"#4EA2FF","image":"assets/logos/race-teams/williams.svg","fit":"wide"},
+ "Racing Bulls":{"color":"#65C7F7","accent":"#65C7F7","number":"#65C7F7","image":"https://cdn.simpleicons.org/redbull/001E62","fit":"square"},
+ "Red Bull Racing":{"color":"#001E62","accent":"#001E62","number":"#001E62","image":"https://cdn.simpleicons.org/redbull/001E62","fit":"square"},
+ "Williams":{"color":"#00AEEF","accent":"#00AEEF","number":"#00AEEF","image":"assets/logos/williams-w.svg","fit":"square"},
  "Aprilia Racing":{"color":"#5D3A9B","accent":"#5D3A9B","number":"#5D3A9B","image":"https://poptuning.fr/8726-large_default/aprilia-lion-sticker-autocollant.jpg","fit":"square"},
  "BK8 Gresini Racing MotoGP":{"color":"#0066A6","accent":"#F28C28","number":"#4BB8FF","image":"assets/logos/race-teams/bk8-gresini-racing-motogp.svg","fit":"wide"},
  "Ducati Lenovo Team":{"color":"#800020","accent":"#800020","number":"#800020","image":"https://cdn.simpleicons.org/ducati/800020","fit":"square"},
- "Honda HRC Castrol":{"color":"#E60012","accent":"#00529B","number":"#FF424F","image":"assets/logos/race-teams/honda-hrc-castrol.svg","fit":"wide"},
+ "Honda HRC Castrol":{"color":"#E60012","accent":"#00529B","number":"#FF424F","image":"https://global.honda/en/wingmark/assets/img/2dlogo/7.webp","fit":"wide"},
  "Castrol Honda LCR":{"color":"#006B45","accent":"#00A6D6","number":"#00D18B","image":"assets/logos/race-teams/castrol-honda-lcr.svg","fit":"wide"},
- "Monster Energy Yamaha MotoGP":{"color":"#063A78","accent":"#8DC63F","number":"#00A8E0","image":"assets/logos/race-teams/monster-energy-yamaha-motogp.svg","fit":"wide"},
+ "Monster Energy Yamaha MotoGP":{"color":"#003399","accent":"#003399","number":"#003399","image":"https://3.bp.blogspot.com/-Y_Pw6SK7wM8/VtbvwDNlfwI/AAAAAAAAOhY/n99f-418EnE/s1600/logo-yamaha-tuning_forks.jpg","fit":"square"},
  "Pertamina Enduro VR46 Racing Team":{"color":"#F2E500","accent":"#151515","number":"#F2E500","image":"assets/logos/race-teams/pertamina-enduro-vr46-racing-team.svg","fit":"wide"},
  "Prima Pramac Yamaha MotoGP":{"color":"#293B87","accent":"#D71938","number":"#7F91FF","image":"assets/logos/race-teams/prima-pramac-yamaha-motogp.svg","fit":"wide"},
  "Red Bull KTM Factory Racing":{"color":"#F36C21","accent":"#111318","number":"#FF8A3D","image":"assets/logos/race-teams/red-bull-ktm-factory-racing.svg","fit":"wide"},
@@ -278,6 +280,7 @@ function brandKey(value){
  const m=clean(value).toLowerCase();
  // Check Racing Bulls before Red Bull Racing so the teams keep separate colors.
  if(m.includes("racing bulls")||m.includes("visa cash app rb")||m==="rb") return "Racing Bulls";
+ if(m.includes("honda engines")) return "Honda Engines";
  if(m.replace(/[^a-z]/g,"").includes("gasgas")) return "GasGas";
  if(m.includes("aston martin")) return "Aston Martin";
  if(m.includes("williams")) return "Williams";

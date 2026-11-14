@@ -9,3 +9,18 @@ The current mappings cover the F1 and MotoGP race-team names in the site's Novem
 Manufacturer-matched team branding refinements
 
 Aprilia and Aprilia Racing now use a darker purple (#5D3A9B). Alpine, Aston Martin, Audi, Ducati Lenovo Team, Ferrari, and Haas now reuse their corresponding manufacturer logo artwork in the Race Teams directory and Athlete Profile banners. Their team banner colours match the corresponding manufacturer colours: Alpine pink, Aston Martin forest green, Audi dark grey, Ducati maroon, Ferrari red, and Haas white. Number text colours for these matched teams use the same brand colour.
+
+
+Manufacturer and team branding additions
+
+- Ford has been added as a manufacturer with Ford Blue (#00095B) and a Ford mark supplied through the Simple Icons Ford asset endpoint. Ford's official identity reference describes the Blue Oval as its primary mark; Ford Blue is #00095B (Ford brand reference).
+- Honda Engines is a separate manufacturer entry using the automobile H mark icon and Honda Red (#CC0000). The existing Honda manufacturer remains the motorcycle wingmark. Honda's official brand playbook identifies Honda Red as #CC0000 and distinguishes the motorcycle and automobile business identities.
+- Kawasaki manufacturer green is now dark green (#006B3F).
+- McLaren manufacturer and McLaren race team now use dark orange (#D95B00) and the same McLaren mark.
+- Cadillac race team now exactly matches the Cadillac manufacturer logo and champagne-gold color (#C7A96B).
+- Honda HRC Castrol now uses the Honda motorcycle wingmark used by the Honda manufacturer.
+- Red Bull Racing uses the Red Bull mark and dark blue (#001E62). Racing Bulls uses the same Red Bull mark with blue (#65C7F7).
+- Monster Energy Yamaha MotoGP now shares Yamaha's manufacturer logo and blue (#003399).
+- Williams now shares the Williams manufacturer logo and light blue (#00AEEF).
+
+Selected external logo assets are loaded over HTTPS from the brand icon source or the manufacturers' published logo resource. An internet connection is required for those external assets.
