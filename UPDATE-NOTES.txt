@@ -1,0 +1,15 @@
+Kaiser Family Fantasy SMX - Update Notes
+
+Teams & Manufacturers
+- Restored the original branded banner-card directory layout inside the consolidated page.
+- The Browse dropdown switches between Race Teams and Manufacturers; only the selected category is displayed.
+- Selecting a banner opens that one team's/manufacturer's banner and its athlete table.
+- Series filtering and text search continue to work in both the banner list and selected detail view.
+
+Team management
+- Added a visible Manage a Team entry point on the Teams page.
+- Restored access to the pre-consolidation team management workflow: password unlock, add free agents, drop roster athletes, roster quota view, season scoring view, and lock/logout.
+- Preserved each team's Manage / Sign In action.
+- Kept the old team-manage.html address working by redirecting it to the Teams page with the management panel open.
+
+The consolidated site was used as the base. Existing league data, server setup, assets, scoring, draft, schedule, and other site pages were retained.
