@@ -260,16 +260,16 @@ function brandBadge(value){
  const isJHL=k==="JHL";
  return `<span class="brand-badge${isJHL?" brand-badge-jhl":""}" style="--brand-color:${mcolor(value)}" title="${label}">${image?`<img class="${b?.fit==="wide"?"brand-logo-wide":b?.fit==="square"?"brand-logo-square":"brand-logo"}${isJHL?" brand-logo-wordmark":""}${k==="GasGas"?" brand-logo-gasgas":""}" src="${image}" alt="${isJHL?"JHL wordmark":`${label} logo`}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`:""}<span class="brand-label">${label}</span></span>`
 }
-function manufacturerBannerHTML(value){
+function manufacturerBannerHTML(value,displayValue=value,kicker="MANUFACTURER",variant="profile"){
  const raw=clean(value)||"Unknown Manufacturer",k=brandKey(raw),b=BRAND[k];
- const color=mcolor(raw),label=esc(raw);
+ const color=mcolor(raw),label=esc(clean(displayValue)||raw),bannerLabel=esc(kicker);
  const image=b?.image||(b?.logo?`https://cdn.simpleicons.org/${b.logo}/${(b.color||MANUFACTURER_PURPLE).slice(1)}`:"");
  const hex=color.replace("#","");
  const rgb=hex.length===6?[parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)]:[107,114,128];
  const brightness=(rgb[0]*299+rgb[1]*587+rgb[2]*114)/1000;
  const ink=brightness>160?"#111318":"#FFFFFF";
  const logoClass=b?.fit==="wide"?"wide":b?.fit==="square"?"square":"standard";
- return `<div class="athlete-manufacturer-banner" style="--athlete-mfr-color:${color};--athlete-mfr-ink:${ink}" aria-label="Manufacturer: ${label}"><div class="athlete-manufacturer-banner-brand">${image?`<img class="athlete-manufacturer-logo ${logoClass}" src="${image}" alt="${label} logo" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`:""}<div class="athlete-manufacturer-banner-copy"><span>MANUFACTURER</span><strong>${label}</strong></div></div></div>`;
+ return `<div class="athlete-manufacturer-banner${variant==="directory"?" directory-brand-banner":""}" style="--athlete-mfr-color:${color};--athlete-mfr-ink:${ink}" aria-label="${bannerLabel}: ${label}"><div class="athlete-manufacturer-banner-brand">${image?`<img class="athlete-manufacturer-logo ${logoClass}" src="${image}" alt="${esc(raw)} logo" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`:""}<div class="athlete-manufacturer-banner-copy"><span>${bannerLabel}</span><strong>${label}</strong></div></div></div>`;
 }
 function numberHTML(value,manufacturer,athlete={}){
  const n=clean(value).replace(/^#+/,"").trim();if(!n)return "";
@@ -404,6 +404,48 @@ function standings(){
 async function claim(k){const t=teams().find(t=>key(t)===k),msg=$("teamMessage");if(!t||t.owner){msg.textContent="That team is already claimed or unavailable.";return}const o=prompt("Enter the team owner's name:");if(o===null)return;if(!clean(o)){msg.textContent="Owner name is required.";return}const p=prompt("Create a team password (at least 6 characters):");if(p===null)return;if(p.length<6){msg.textContent="Password must be at least 6 characters.";return}t.owner=clean(o);t.passwordHash=await hash(p);saveTeams(teams().map(x=>key(x)===k?t:x));msg.textContent=`${tname(t)} claimed. Save the password somewhere safe.`;renderTeams()}
 function renderTeams(){const el=$("teamsGrid");if(!el)return;el.innerHTML=teams().map(t=>{const riders=sortRiders(roster(t));const rosterPreview=`<details class="team-roster-preview"><summary>View Roster (${riders.length})</summary><div class="team-roster-preview-list">${riders.length?riders.map(a=>`<div class="team-roster-preview-row">${athleteDetailButtonHTML(a,true,false)}</div>`).join(""):'<p class="muted">No riders on this roster yet.</p>'}</div></details>`;return `<article class="team-card"><h2>${esc(tname(t))}</h2><p class="team-owner">${t.owner?"Owned by "+esc(t.owner):"Available to claim"}</p><div class="team-points">${total(t).toLocaleString()}</div><span class="muted">Season points</span><p class="team-meta">${riders.length}/${MAX_ROSTER_SIZE} athletes</p>${rosterPreview}${t.owner?`<a class="btn alt" href="team-manage.html?team=${encodeURIComponent(key(t))}">Manage / Sign In</a>`:`<button class="btn" data-claim="${esc(key(t))}">Claim Team</button>`}</article>`}).join("");el.querySelectorAll("[data-claim]").forEach(b=>b.onclick=()=>claim(b.dataset.claim));if($("requirements"))$("requirements").innerHTML=Object.entries(REQ).map(([s,n])=>`<div><strong>${n}</strong>${s} athletes</div>`).join("")}
 function renderAthletes(){const target=$("athleteTable");if(!target)return;const page=document.body.dataset.page,search=clean($("search")?.value).toLowerCase(),c=$("classFilter")?.value||"",of=$("ownerFilter")?.value||"";const list=athletes().filter(a=>!a.seriesArchived&&SERIES.includes(cls(a))).filter(a=>{const o=owner(a),free=!o;return [name(a),a.number,a.raceTeam,a.manufacturer,cls(a),...(a.secondarySeries||[]),countryRegionLabel(a.nationality,a.nationalityRegion),o?tname(o):"free agent"].join(" ").toLowerCase().includes(search)&&(!c||cls(a)===c)&&(page!=="available"||free)&&(!of||(of==="free"?free:!free))}).sort(compareRiderNumbers);target.innerHTML=table(["Athlete","Series","Race Team","Manufacturer","Season Points","Fantasy Team"],list.map(a=>{const o=owner(a),pts=athleteSeasonPoints(a),badges=[a.pointsLeader?"Points Leader":"",a.reigningTripleCrownChampion?"Triple Crown Champion":"",a.reigningSMXChampion?"SMX Champion":"",a.reigningWorldChampion?"World Champion":""].filter(Boolean).map(x=>`<span class="badge">${x}</span>`).join(" ");return `<tr><td><div class="manufacturer" style="--mfr:${mcolor(a.manufacturer)}">${athleteDetailButtonHTML(a)}<div>${badges}</div></div></td><td class="series">${seriesDisplayHTML(a)}</td><td>${esc(a.raceTeam||"—")}</td><td>${brandBadge(a.manufacturer||"—")}</td><td class="points">${pts.toLocaleString()}</td><td>${esc(o?tname(o):"Free Agent")}</td></tr>`}))}
+let activeDirectoryPage="",activeDirectoryKey="";
+function directoryGroups(page){
+ const field=page==="race-teams"?"raceTeam":"manufacturer",groups=new Map();
+ athletes().filter(a=>!a.seriesArchived).forEach(a=>{
+  const raw=clean(a[field]);if(!raw)return;
+  const canonical=field==="manufacturer"?(brandKey(raw)||raw):raw;
+  const groupKey=norm(canonical);if(!groupKey)return;
+  if(!groups.has(groupKey))groups.set(groupKey,{key:groupKey,label:canonical,athletes:[],brands:new Map()});
+  const group=groups.get(groupKey);group.athletes.push(a);
+  if(field==="raceTeam"&&clean(a.manufacturer)){const brand=brandKey(a.manufacturer)||clean(a.manufacturer),brandKeyValue=norm(brand);const entry=group.brands.get(brandKeyValue)||{label:brand,count:0};entry.count++;group.brands.set(brandKeyValue,entry)}
+ });
+ return [...groups.values()].map(group=>{
+  let bannerBrand=group.label;
+  if(field==="raceTeam")bannerBrand=[...group.brands.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label))[0]?.label||group.label;
+  return {...group,bannerBrand,athletes:sortRiders(group.athletes)};
+ }).sort((a,b)=>a.label.localeCompare(b.label,undefined,{sensitivity:"base"}));
+}
+function renderDirectoryMenu(){
+ const menu=$("directoryMenu");if(!menu)return;
+ const groups=directoryGroups(activeDirectoryPage),search=clean($("directorySearch")?.value).toLowerCase();
+ const filtered=groups.filter(group=>group.label.toLowerCase().includes(search)||group.athletes.some(a=>name(a).toLowerCase().includes(search)));
+ const kicker=activeDirectoryPage==="race-teams"?"RACE TEAM":"MANUFACTURER";
+ menu.innerHTML=filtered.map(group=>`<button type="button" class="directory-choice" data-directory-key="${esc(group.key)}" aria-label="View ${esc(group.label)} athletes">${manufacturerBannerHTML(group.bannerBrand,group.label,kicker,"directory")}<span class="directory-choice-count">${group.athletes.length} athlete${group.athletes.length===1?"":"s"}</span></button>`).join("")||'<p class="muted">No matching entries found.</p>';
+}
+function renderDirectorySelection(){
+ const group=directoryGroups(activeDirectoryPage).find(item=>item.key===activeDirectoryKey),detail=$("directoryDetail"),menu=$("directoryMenu");
+ if(!detail||!menu)return;
+ if(!group){activeDirectoryKey="";detail.hidden=true;menu.hidden=false;return}
+ const kicker=activeDirectoryPage==="race-teams"?"RACE TEAM":"MANUFACTURER";
+ const bannerBrand=group.bannerBrand||group.label;
+ $("directoryBanner").innerHTML=manufacturerBannerHTML(bannerBrand,group.label,kicker);
+ $("directoryCount").textContent=`${group.athletes.length} athlete${group.athletes.length===1?"":"s"} associated with ${group.label}.`;
+ $("directoryRiders").innerHTML=table(["Athlete","Series","Race Team","Manufacturer","Fantasy Team","Season Points"],group.athletes.map(a=>{const o=owner(a);return `<tr><td><div class="manufacturer" style="--mfr:${mcolor(a.manufacturer)}">${athleteDetailButtonHTML(a)}</div></td><td>${seriesDisplayHTML(a)}</td><td>${esc(a.raceTeam||"—")}</td><td>${brandBadge(a.manufacturer||"—")}</td><td>${esc(o?tname(o):"Free Agent")}</td><td class="points">${athleteSeasonPoints(a).toLocaleString()}</td></tr>`}));
+ menu.hidden=true;detail.hidden=false;
+}
+function directoryInit(page){
+ activeDirectoryPage=page;activeDirectoryKey="";
+ $("directorySearch")?.addEventListener("input",renderDirectoryMenu);
+ $("directoryMenu")?.addEventListener("click",event=>{const button=event.target.closest("[data-directory-key]");if(!button)return;activeDirectoryKey=button.dataset.directoryKey;renderDirectorySelection()});
+ $("directoryBack")?.addEventListener("click",()=>{activeDirectoryKey="";$("directorySearch").value="";$("directoryDetail").hidden=true;$("directoryMenu").hidden=false;renderDirectoryMenu()});
+ renderDirectoryMenu();
+}
 function localDateISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
 function formatScheduleDate(value){const raw=clean(value);if(!raw)return "—";const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);const date=match?new Date(Number(match[1]),Number(match[2])-1,Number(match[3]),12):new Date(raw);if(Number.isNaN(date.getTime()))return raw;return new Intl.DateTimeFormat("en-US",{month:"long",day:"numeric",year:"numeric"}).format(date)}
 function eventDateLabel(e){const start=clean(e?.date),end=clean(e?.endDate)||start;if(!start)return "—";const first=formatScheduleDate(start),last=formatScheduleDate(end);return end&&end!==start?`${first} – ${last}`:first}
@@ -769,7 +811,7 @@ function renderDraft(){if(!$("draftStatusCard"))return;const room=$("draftRoom")
 let draftSyncTimer=null;function startDraftSync(){if(draftSyncTimer)clearInterval(draftSyncTimer);if(!window.KFStorage||window.KFStorage.mode!=="server")return;const sync=async()=>{try{const changed=await window.KFStorage.refreshFromServer();if(changed)renderDraft()}catch(err){console.warn("Draft room sync failed:",err)}};draftSyncTimer=setInterval(sync,2500);window.addEventListener("focus",sync)}
 function eventRoom(series){const value=clean(series);if(["CAN","CAN 250","CAN 450"].includes(value))return "Triple Crown Series";for(const [room,classes] of Object.entries(SERIES_GROUPS)){if(classes.includes(value))return room}return value} 
 function renderSchedule(){if(!$("scheduleTable"))return;const selected=[...document.querySelectorAll("#seriesFilters input:checked")].map(x=>x.value),list=read(K.CAL,[]).filter(e=>selected.includes(eventRoom(e.series))).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));$("scheduleTable").innerHTML=table(["Date(s)","Round","Series","Event Type","Event","Country / Region","Location"],list.map(e=>`<tr><td>${esc(eventDateLabel(e))}</td><td>${clean(e.round)?esc(e.round):"—"}</td><td>${scheduleSeriesBadge(e.series)}</td><td>${esc(eventTypeLabel(e))}</td><td>${esc(e.name)}</td><td>${eventCountryHTML(e)}</td><td>${esc(e.location||"—")}</td></tr>`))}
-function refresh(){standings();renderTeams();renderAthletes();if($("commBody")&&!$("commBody").hidden)renderComm();if($("manageLogin")){if(!renderRosterLockNotice("manage")){const k=sessionStorage.getItem("managedTeam");if(k&&teams().some(t=>key(t)===k))showManage(k);else{$("manageLogin").hidden=false;$("manageBody").hidden=true}}}if($("tradeLogin")){if(!renderRosterLockNotice("trades")){const k=sessionStorage.getItem("tradeTeam");if(k)showTrades(k);else{$("tradeLogin").hidden=false;$("tradeBody").hidden=true}}}if($("draftStatusCard"))renderDraft();renderSchedule()}
+function refresh(){standings();renderTeams();renderAthletes();if(activeDirectoryPage){if(activeDirectoryKey)renderDirectorySelection();else renderDirectoryMenu();}if($("commBody")&&!$("commBody").hidden)renderComm();if($("manageLogin")){if(!renderRosterLockNotice("manage")){const k=sessionStorage.getItem("managedTeam");if(k&&teams().some(t=>key(t)===k))showManage(k);else{$("manageLogin").hidden=false;$("manageBody").hidden=true}}}if($("tradeLogin")){if(!renderRosterLockNotice("trades")){const k=sessionStorage.getItem("tradeTeam");if(k)showTrades(k);else{$("tradeLogin").hidden=false;$("tradeBody").hidden=true}}}if($("draftStatusCard"))renderDraft();renderSchedule()}
 function scheduleDailyRosterLockRefresh(){const page=document.body.dataset.page;if(page!=="manage"&&page!=="trades")return;const now=new Date(),next=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,1);setTimeout(()=>{refresh();scheduleDailyRosterLockRefresh()},Math.max(500,next-now))}
 function dataInit(){
  const status=$("dataModeDetail"),message=$("dataMessage");
@@ -780,6 +822,6 @@ function dataInit(){
  $("exportData")?.addEventListener("click",async()=>{try{const state=await window.KFStorage.exportState();const backup={format:"kaiser-family-fantasy-smx-backup-v1",exportedAt:new Date().toISOString(),state};const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`kaiser-fantasy-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);message.textContent="Backup downloaded."}catch(err){message.textContent="Could not create backup: "+err.message}});
  $("importData")?.addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;try{const parsed=JSON.parse(await file.text()),state=parsed.state||parsed;if(!state||typeof state!=="object"||Array.isArray(state))throw new Error("This file is not a valid league backup.");if(!confirm("Replace the current league data with this backup? The current data will be overwritten.")){e.target.value="";return}await window.KFStorage.replaceState(state);message.textContent="Backup restored. Reloading the website…";setTimeout(()=>location.reload(),250)}catch(err){message.textContent="Import failed: "+err.message}finally{e.target.value=""}});
 }
-function init(){seed();document.addEventListener("click",event=>{const trigger=event.target.closest("[data-athlete-detail]");if(trigger){event.preventDefault();openAthleteDetail(trigger.dataset.athleteDetail)}});const p=document.body.dataset.page;if(p==="home")standings();if(p==="teams")renderTeams();if(p==="available"||p==="all"){populateClassFilter();["search","classFilter","ownerFilter"].forEach(i=>$(i)?.addEventListener("input",renderAthletes));renderAthletes()}if(p==="manage")setupManage();if(p==="commissioner")commInit();if(p==="trades")tradeInit();if(p==="draft")draftInit();if(p==="data")dataInit();if(p==="schedule"){const f=$("seriesFilters");f.innerHTML=SCHEDULE_SERIES.map(s=>`<label><input type="checkbox" value="${s}" checked> ${s}</label>`).join("");f.querySelectorAll("input").forEach(x=>x.onchange=renderSchedule);renderSchedule()}if(p==="manage"||p==="trades")scheduleDailyRosterLockRefresh()}
+function init(){seed();document.addEventListener("click",event=>{const trigger=event.target.closest("[data-athlete-detail]");if(trigger){event.preventDefault();openAthleteDetail(trigger.dataset.athleteDetail)}});const p=document.body.dataset.page;if(p==="home")standings();if(p==="teams")renderTeams();if(p==="available"||p==="all"){populateClassFilter();["search","classFilter","ownerFilter"].forEach(i=>$(i)?.addEventListener("input",renderAthletes));renderAthletes()}if(p==="race-teams"||p==="manufacturers")directoryInit(p);if(p==="manage")setupManage();if(p==="commissioner")commInit();if(p==="trades")tradeInit();if(p==="draft")draftInit();if(p==="data")dataInit();if(p==="schedule"){const f=$("seriesFilters");f.innerHTML=SCHEDULE_SERIES.map(s=>`<label><input type="checkbox" value="${s}" checked> ${s}</label>`).join("");f.querySelectorAll("input").forEach(x=>x.onchange=renderSchedule);renderSchedule()}if(p==="manage"||p==="trades")scheduleDailyRosterLockRefresh()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();window.addEventListener("storage",refresh);
 })();

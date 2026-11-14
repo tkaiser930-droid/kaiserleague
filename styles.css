@@ -274,3 +274,21 @@ body[data-page="home"] #topUndraftedAthletes {
 .athlete-manufacturer-banner-copy strong{font:900 clamp(25px,4vw,42px)/1 'Barlow Condensed',Impact,sans-serif;text-transform:uppercase;overflow-wrap:anywhere}
 .athlete-manufacturer-logo[hidden]{display:none}
 @media(max-width:680px){.athlete-manufacturer-banner{min-height:92px;margin:-14px -14px 16px;padding:13px 15px}.athlete-manufacturer-banner-brand{gap:12px}.athlete-manufacturer-logo{height:52px;max-width:130px;padding:6px 8px}.athlete-manufacturer-logo.wide{height:56px;max-width:150px}.athlete-manufacturer-logo.square{width:58px;height:58px;max-width:58px}.athlete-manufacturer-banner-copy span{font-size:9px}.athlete-manufacturer-banner-copy strong{font-size:clamp(22px,6vw,32px)}}
+
+/* Race team and manufacturer directories use the same banner treatment as Athlete Profiles. */
+.directory-filters{max-width:720px}
+.directory-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:20px 0 8px}
+.directory-choice{display:flex;flex-direction:column;align-items:stretch;min-width:0;padding:0;overflow:hidden;border:1px solid #ffffff20;border-radius:12px;background:#151720;color:var(--text);text-align:left;cursor:pointer;transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease}
+.directory-choice:hover,.directory-choice:focus-visible{border-color:#b99aff;box-shadow:0 0 0 2px #8e67f255;transform:translateY(-2px);outline:none}
+.directory-choice .athlete-manufacturer-banner.directory-brand-banner{min-height:94px;margin:0;padding:12px 15px;border:0;border-radius:0;box-shadow:none}
+.directory-choice .athlete-manufacturer-banner-brand{gap:12px}
+.directory-choice .athlete-manufacturer-logo{height:54px;max-width:142px;padding:6px 8px}
+.directory-choice .athlete-manufacturer-logo.wide{height:56px;max-width:160px}
+.directory-choice .athlete-manufacturer-logo.square{width:58px;height:58px;max-width:58px}
+.directory-choice .athlete-manufacturer-banner-copy span{font-size:9px}
+.directory-choice .athlete-manufacturer-banner-copy strong{font-size:clamp(19px,2vw,27px)}
+.directory-choice-count{display:block;padding:9px 13px;color:#b9bac7;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-top:1px solid #ffffff12;background:#11131a}
+.directory-detail{margin-top:20px}
+.directory-selected-banner .athlete-manufacturer-banner{margin:0 0 14px;border-radius:12px}
+.directory-detail>.muted{margin:0 0 12px}
+@media(max-width:700px){.directory-menu{grid-template-columns:1fr}.directory-choice .athlete-manufacturer-banner.directory-brand-banner{min-height:82px}.directory-choice .athlete-manufacturer-logo{height:48px;max-width:125px}}
