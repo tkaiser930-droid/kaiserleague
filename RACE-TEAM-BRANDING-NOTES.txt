@@ -5,3 +5,7 @@ F1 and MotoGP athletes now use their race team for the Athlete Profile banner an
 The bundled SVG race-team marks are original, locally stored wordmark/monogram lockups created for this fantasy site. They are not official reproduction files or endorsements by the teams. Team colours are based on the 2026 visual palettes and the team's public identity.
 
 The current mappings cover the F1 and MotoGP race-team names in the site's November 8, 2026 backup. Unknown F1/MotoGP race-team names receive a neutral team banner rather than incorrectly substituting manufacturer branding.
+
+Manufacturer-matched team branding refinements
+
+Aprilia and Aprilia Racing now use a darker purple (#5D3A9B). Alpine, Aston Martin, Audi, Ducati Lenovo Team, Ferrari, and Haas now reuse their corresponding manufacturer logo artwork in the Race Teams directory and Athlete Profile banners. Their team banner colours match the corresponding manufacturer colours: Alpine pink, Aston Martin forest green, Audi dark grey, Ducati maroon, Ferrari red, and Haas white. Number text colours for these matched teams use the same brand colour.
