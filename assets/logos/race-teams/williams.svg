@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 170" role="img" aria-label="Williams team mark">
+<g transform="translate(0 0)"><path d="M22 36 L58 36 L81 91 L104 36 L140 36 L108 113 L78 113 Z" fill="#00AEEF"/><path d="M48 28 L78 28 L94 66 L110 28 L137 28" stroke="#7CB9FF" stroke-width="7" fill="none"/></g>
+<path d="M205 24 V146" stroke="#7CB9FF" stroke-width="5" opacity=".95"/>
+<text x="235" y="82" font-family="Arial,Helvetica,sans-serif" font-size="38" font-weight="900" letter-spacing="1.2" fill="#171A21">WILLIAMS</text>
+<text x="237" y="116" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#00AEEF">RACING TEAM</text>
+</svg>

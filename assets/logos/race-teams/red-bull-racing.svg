@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 170" role="img" aria-label="Red Bull Racing team mark">
+<g transform="translate(0 0)"><circle cx="88" cy="68" r="30" fill="#DB0A40"/><path d="M20 40 Q52 14 78 43 Q54 40 50 64 Q36 60 20 40 Z M156 40 Q124 14 98 43 Q122 40 126 64 Q140 60 156 40 Z" fill="#001E62" stroke="#DB0A40" stroke-width="4"/><path d="M34 93 Q85 120 138 93" stroke="#001E62" stroke-width="10" fill="none"/></g>
+<path d="M205 24 V146" stroke="#DB0A40" stroke-width="5" opacity=".95"/>
+<text x="235" y="82" font-family="Arial,Helvetica,sans-serif" font-size="28" font-weight="900" letter-spacing="1.2" fill="#171A21">ORACLE RED BULL RACING</text>
+<text x="237" y="116" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#001E62">RACING TEAM</text>
+</svg>

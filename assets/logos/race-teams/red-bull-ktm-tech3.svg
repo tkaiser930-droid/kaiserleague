@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 170" role="img" aria-label="Red Bull KTM Tech3 team mark">
+<g transform="translate(0 0)"><path d="M26 38 L143 38 L143 58 L99 58 L99 111 L70 111 L70 58 L26 58 Z" fill="#E84B25"/><path d="M116 77 L150 77 L150 111 L116 111 Z" fill="#111318"/></g>
+<path d="M205 24 V146" stroke="#111318" stroke-width="5" opacity=".95"/>
+<text x="235" y="82" font-family="Arial,Helvetica,sans-serif" font-size="38" font-weight="900" letter-spacing="1.2" fill="#171A21">RED BULL KTM TECH3</text>
+<text x="237" y="116" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#E84B25">RACING TEAM</text>
+</svg>

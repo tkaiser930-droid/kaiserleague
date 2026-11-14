@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 170" role="img" aria-label="Honda HRC Castrol team mark">
+<g transform="translate(0 0)"><path d="M28 28 L65 28 L65 91 L101 91 L101 28 L138 28 L138 112 L101 112 L101 51 L65 51 L65 112 L28 112 Z" fill="#E60012"/><path d="M146 28 L186 28 L186 48 L165 48 L165 62 L184 62 L184 82 L165 82 L165 112 L146 112 Z" fill="#00529B"/></g>
+<path d="M205 24 V146" stroke="#00529B" stroke-width="5" opacity=".95"/>
+<text x="235" y="82" font-family="Arial,Helvetica,sans-serif" font-size="38" font-weight="900" letter-spacing="1.2" fill="#171A21">HONDA HRC</text>
+<text x="237" y="116" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#E60012">RACING TEAM</text>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 170" role="img" aria-label="Mercedes AMG Petronas team mark">
+<g transform="translate(0 0)"><path d="M85 20 L98 58 L138 58 L106 81 L118 121 L85 96 L52 121 L64 81 L32 58 L72 58 Z" fill="#D7FFF9" stroke="#00A19B" stroke-width="5"/></g>
+<path d="M205 24 V146" stroke="#D7FFF9" stroke-width="5" opacity=".95"/>
+<text x="235" y="82" font-family="Arial,Helvetica,sans-serif" font-size="28" font-weight="900" letter-spacing="1.2" fill="#171A21">MERCEDES-AMG PETRONAS</text>
+<text x="237" y="116" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#00A19B">RACING TEAM</text>
+</svg>

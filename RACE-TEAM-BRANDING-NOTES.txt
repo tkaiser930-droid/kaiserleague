@@ -1,0 +1,7 @@
+F1 and MotoGP team branding update
+
+F1 and MotoGP athletes now use their race team for the Athlete Profile banner and race-number text colour. The Race Teams directory uses team-specific branding for F1/MotoGP race teams; the Manufacturers directory remains manufacturer-based. Other racing series continue to use manufacturer branding.
+
+The bundled SVG race-team marks are original, locally stored wordmark/monogram lockups created for this fantasy site. They are not official reproduction files or endorsements by the teams. Team colours are based on the 2026 visual palettes and the team's public identity.
+
+The current mappings cover the F1 and MotoGP race-team names in the site's November 8, 2026 backup. Unknown F1/MotoGP race-team names receive a neutral team banner rather than incorrectly substituting manufacturer branding.

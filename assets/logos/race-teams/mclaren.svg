@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 170" role="img" aria-label="McLaren team mark">
+<g transform="translate(0 0)"><path d="M30 48 L133 24 L117 48 L68 61 L133 61 L112 84 L42 84 L26 105 L11 105 L38 65 L80 52 L36 66 Z" fill="#FF8000"/><path d="M48 116 L130 94" stroke="#111318" stroke-width="8"/></g>
+<path d="M205 24 V146" stroke="#111318" stroke-width="5" opacity=".95"/>
+<text x="235" y="82" font-family="Arial,Helvetica,sans-serif" font-size="38" font-weight="900" letter-spacing="1.2" fill="#171A21">McLAREN</text>
+<text x="237" y="116" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#FF8000">RACING TEAM</text>
+</svg>

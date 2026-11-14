@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 170" role="img" aria-label="Audi team mark">
+<g transform="translate(0 0)"><g fill="none" stroke="#444444" stroke-width="8"><circle cx="38" cy="68" r="24"/><circle cx="82" cy="68" r="24"/><circle cx="126" cy="68" r="24"/><circle cx="170" cy="68" r="24"/></g></g>
+<path d="M205 24 V146" stroke="#C7CDD3" stroke-width="5" opacity=".95"/>
+<text x="235" y="82" font-family="Arial,Helvetica,sans-serif" font-size="38" font-weight="900" letter-spacing="1.2" fill="#171A21">AUDI</text>
+<text x="237" y="116" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#444444">RACING TEAM</text>
+</svg>

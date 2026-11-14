@@ -205,7 +205,7 @@ function openAthleteDetail(athleteId){
   return `<tr><td>${esc(series||"—")}</td><td>${esc(segment)}</td><td>${scoreEventLabel(record)}</td><td>${esc(ordinalPlace(record.place))}</td><td>${bonusText(record)}</td><td class="points">${Number(record.points||0).toLocaleString()}</td><td>${esc(record.teamName||"Unrostered / Free Agent")}</td><td>${esc(recorded)}</td></tr>`;
  });
  const currentOwner=owner(a);
- dialog.innerHTML=`<div class="athlete-detail-shell">${manufacturerBannerHTML(a.manufacturer)}<header class="athlete-detail-header"><div><p class="eyebrow">ATHLETE PROFILE</p><h2>${athleteNameHTML(a)}</h2><p class="athlete-detail-affiliations">${seriesDisplayHTML(a)}</p></div><button type="button" class="athlete-detail-close" data-close-athlete-detail aria-label="Close athlete profile">Close ✕</button></header><div class="athlete-detail-meta"><span>${esc(currentOwner?`Current fantasy team: ${tname(currentOwner)}`:"Currently a free agent")}</span></div><div class="athlete-detail-stats"><div><strong>${total.toLocaleString()}</strong><span>Total scored points</span></div><div><strong>${average.toFixed(2)}</strong><span>Average points per round</span></div><div><strong>${rounds}</strong><span>Rounds with results</span></div><div><strong>${records.length}</strong><span>Scored segments</span></div></div><section class="athlete-detail-results"><div class="athlete-detail-results-heading"><h3>Previously Scored Results</h3><span>${records.length} result${records.length===1?"":"s"}</span></div>${records.length?`<div class="table">${table(["Series","Division / Segment","Event / Round","Finish","Bonuses","Points","Team at Scoring","Recorded"],resultRows)}</div>`:`<p class="muted">No race results have been recorded for this rider yet.</p>`}<p class="athlete-detail-footnote">Average points per round = total recorded points divided by unique event rounds with results. Qualifying races and multiple motos at the same event count as one round.</p></section></div>`;
+ dialog.innerHTML=`<div class="athlete-detail-shell">${athleteBannerHTML(a)}<header class="athlete-detail-header"><div><p class="eyebrow">ATHLETE PROFILE</p><h2>${athleteNameHTML(a)}</h2><p class="athlete-detail-affiliations">${seriesDisplayHTML(a)}</p></div><button type="button" class="athlete-detail-close" data-close-athlete-detail aria-label="Close athlete profile">Close ✕</button></header><div class="athlete-detail-meta"><span>${esc(currentOwner?`Current fantasy team: ${tname(currentOwner)}`:"Currently a free agent")}</span></div><div class="athlete-detail-stats"><div><strong>${total.toLocaleString()}</strong><span>Total scored points</span></div><div><strong>${average.toFixed(2)}</strong><span>Average points per round</span></div><div><strong>${rounds}</strong><span>Rounds with results</span></div><div><strong>${records.length}</strong><span>Scored segments</span></div></div><section class="athlete-detail-results"><div class="athlete-detail-results-heading"><h3>Previously Scored Results</h3><span>${records.length} result${records.length===1?"":"s"}</span></div>${records.length?`<div class="table">${table(["Series","Division / Segment","Event / Round","Finish","Bonuses","Points","Team at Scoring","Recorded"],resultRows)}</div>`:`<p class="muted">No race results have been recorded for this rider yet.</p>`}<p class="athlete-detail-footnote">Average points per round = total recorded points divided by unique event rounds with results. Qualifying races and multiple motos at the same event count as one round.</p></section></div>`;
  const close=dialog.querySelector("[data-close-athlete-detail]");if(close)close.onclick=()=>dialog.close();
  if(typeof dialog.showModal==="function"){if(!dialog.open)dialog.showModal()}else dialog.setAttribute("open","");
 }
@@ -239,6 +239,41 @@ Williams:{color:"#00AEEF",image:"assets/logos/williams-w.svg",fit:"square"},
 Alpine:{color:"#F08ACB",logo:"alpine",image:"assets/logos/alpine-pink-a.png",fit:"wide"}
 };
 const MANUFACTURER_PURPLE="#8E67F2";
+const RACE_TEAM_BRANDS={
+ "Alpine":{"color":"#00A1E8","accent":"#FF88BD","number":"#FF88BD","image":"assets/logos/race-teams/alpine.svg","fit":"wide"},
+ "Aston Martin":{"color":"#004225","accent":"#B9C600","number":"#B9C600","image":"assets/logos/race-teams/aston-martin.svg","fit":"wide"},
+ "Audi":{"color":"#444444","accent":"#C7CDD3","number":"#E4E7EA","image":"assets/logos/race-teams/audi.svg","fit":"wide"},
+ "Cadillac":{"color":"#17191D","accent":"#C7A96B","number":"#C7A96B","image":"assets/logos/race-teams/cadillac.svg","fit":"wide"},
+ "Ferrari":{"color":"#DC0000","accent":"#F4F4F4","number":"#F4F4F4","image":"assets/logos/race-teams/ferrari.svg","fit":"wide"},
+ "Haas":{"color":"#C9CDD2","accent":"#E6002D","number":"#E6002D","image":"assets/logos/race-teams/haas.svg","fit":"wide"},
+ "McLaren":{"color":"#FF8000","accent":"#111318","number":"#FFB36B","image":"assets/logos/race-teams/mclaren.svg","fit":"wide"},
+ "Mercedes AMG Petronas":{"color":"#00A19B","accent":"#D7FFF9","number":"#00E5D5","image":"assets/logos/race-teams/mercedes-amg-petronas.svg","fit":"wide"},
+ "Racing Bulls":{"color":"#65C7F7","accent":"#E7F5FF","number":"#65C7F7","image":"assets/logos/race-teams/racing-bulls.svg","fit":"wide"},
+ "Red Bull Racing":{"color":"#001E62","accent":"#DB0A40","number":"#DB0A40","image":"assets/logos/race-teams/red-bull-racing.svg","fit":"wide"},
+ "Williams":{"color":"#00AEEF","accent":"#7CB9FF","number":"#4EA2FF","image":"assets/logos/race-teams/williams.svg","fit":"wide"},
+ "Aprilia Racing":{"color":"#D71920","accent":"#111318","number":"#FF4B55","image":"assets/logos/race-teams/aprilia-racing.svg","fit":"wide"},
+ "BK8 Gresini Racing MotoGP":{"color":"#0066A6","accent":"#F28C28","number":"#4BB8FF","image":"assets/logos/race-teams/bk8-gresini-racing-motogp.svg","fit":"wide"},
+ "Ducati Lenovo Team":{"color":"#CE1126","accent":"#111318","number":"#FF4C5F","image":"assets/logos/race-teams/ducati-lenovo-team.svg","fit":"wide"},
+ "Honda HRC Castrol":{"color":"#E60012","accent":"#00529B","number":"#FF424F","image":"assets/logos/race-teams/honda-hrc-castrol.svg","fit":"wide"},
+ "Castrol Honda LCR":{"color":"#006B45","accent":"#00A6D6","number":"#00D18B","image":"assets/logos/race-teams/castrol-honda-lcr.svg","fit":"wide"},
+ "Monster Energy Yamaha MotoGP":{"color":"#063A78","accent":"#8DC63F","number":"#00A8E0","image":"assets/logos/race-teams/monster-energy-yamaha-motogp.svg","fit":"wide"},
+ "Pertamina Enduro VR46 Racing Team":{"color":"#F2E500","accent":"#151515","number":"#F2E500","image":"assets/logos/race-teams/pertamina-enduro-vr46-racing-team.svg","fit":"wide"},
+ "Prima Pramac Yamaha MotoGP":{"color":"#293B87","accent":"#D71938","number":"#7F91FF","image":"assets/logos/race-teams/prima-pramac-yamaha-motogp.svg","fit":"wide"},
+ "Red Bull KTM Factory Racing":{"color":"#F36C21","accent":"#111318","number":"#FF8A3D","image":"assets/logos/race-teams/red-bull-ktm-factory-racing.svg","fit":"wide"},
+ "Red Bull KTM Tech3":{"color":"#E84B25","accent":"#111318","number":"#FF8056","image":"assets/logos/race-teams/red-bull-ktm-tech3.svg","fit":"wide"},
+ "Superfile Trackhouse MotoGP Team":{"color":"#168BCB","accent":"#F0B323","number":"#42B8F6","image":"assets/logos/race-teams/superfile-trackhouse-motogp-team.svg","fit":"wide"}
+};
+function raceTeamBrand(value){const key=norm(value);for(const [label,config] of Object.entries(RACE_TEAM_BRANDS)){if(norm(label)===key)return config;}return null;}
+function isTeamColorSeries(athlete){return ["F1","MOTOGP"].includes(cls(athlete).toUpperCase());}
+function raceTeamBannerHTML(value,displayValue=value,kicker="RACE TEAM",variant="profile"){
+ const raw=clean(value)||"Unknown Race Team",config=raceTeamBrand(raw)||{color:"#344054",accent:"#CBD5E1",image:"",fit:"wide"};
+ const color=config.color||"#344054",label=esc(clean(displayValue)||raw),bannerLabel=esc(kicker);
+ const image=config.image||"",hex=color.replace("#",""),rgb=hex.length===6?[parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)]:[52,64,84];
+ const brightness=(rgb[0]*299+rgb[1]*587+rgb[2]*114)/1000,ink=config.ink||(brightness>160?"#111318":"#FFFFFF");
+ return `<div class="athlete-manufacturer-banner${variant==="directory"?" directory-brand-banner":""}" style="--athlete-mfr-color:${color};--athlete-mfr-ink:${ink}" aria-label="${bannerLabel}: ${label}"><div class="athlete-manufacturer-banner-brand">${image?`<img class="athlete-manufacturer-logo wide" src="${image}" alt="${esc(raw)} race team logo" loading="lazy" onerror="this.onerror=null;this.hidden=true">`:""}<div class="athlete-manufacturer-banner-copy"><span>${bannerLabel}</span><strong>${label}</strong></div></div></div>`;
+}
+function athleteBannerHTML(athlete){return isTeamColorSeries(athlete)&&clean(athlete?.raceTeam)?raceTeamBannerHTML(athlete.raceTeam):manufacturerBannerHTML(athlete?.manufacturer||"Unknown Manufacturer");}
+
 function brandKey(value){
  const m=clean(value).toLowerCase();
  // Check Racing Bulls before Red Bull Racing so the teams keep separate colors.
@@ -277,7 +312,7 @@ function numberHTML(value,manufacturer,athlete={}){
  let colors;
  if(["250","MX2","CAN 250"].includes(series)) colors=["#000000","#FFFFFF"];
  else if(["450","MXGP","CAN 450"].includes(series)) colors=["#FFFFFF","#000000"];
- else if(["MOTOGP","F1"].includes(series)) colors=["#000000",mcolor(manufacturer)];
+ else if(["MOTOGP","F1"].includes(series)){const teamColors=raceTeamBrand(athlete.raceTeam);colors=["#000000",teamColors?.number||teamColors?.accent||mcolor(manufacturer)];}
  else colors=[mcolor(manufacturer),"#FFFFFF"];
  if(athlete.pointsLeader) colors=["#E60012","#FFFFFF"];
  else if(athlete.reigningTripleCrownChampion) colors=["#6B2FB9","#F2D16B"];
@@ -416,9 +451,11 @@ function directoryGroups(page){
   if(field==="raceTeam"&&clean(a.manufacturer)){const brand=brandKey(a.manufacturer)||clean(a.manufacturer),brandKeyValue=norm(brand);const entry=group.brands.get(brandKeyValue)||{label:brand,count:0};entry.count++;group.brands.set(brandKeyValue,entry)}
  });
  return [...groups.values()].map(group=>{
+  const groupAthletes=sortRiders(group.athletes);
+  const useRaceTeamBrand=field==="raceTeam"&&groupAthletes.length>0&&groupAthletes.every(isTeamColorSeries)&&!!raceTeamBrand(group.label);
   let bannerBrand=group.label;
-  if(field==="raceTeam")bannerBrand=[...group.brands.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label))[0]?.label||group.label;
-  return {...group,bannerBrand,athletes:sortRiders(group.athletes)};
+  if(field==="raceTeam"&&!useRaceTeamBrand)bannerBrand=[...group.brands.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label))[0]?.label||group.label;
+  return {...group,bannerBrand,useRaceTeamBrand,athletes:groupAthletes};
  }).sort((a,b)=>a.label.localeCompare(b.label,undefined,{sensitivity:"base"}));
 }
 function renderDirectoryMenu(){
@@ -426,7 +463,7 @@ function renderDirectoryMenu(){
  const groups=directoryGroups(activeDirectoryPage),search=clean($("directorySearch")?.value).toLowerCase();
  const filtered=groups.filter(group=>group.label.toLowerCase().includes(search)||group.athletes.some(a=>name(a).toLowerCase().includes(search)));
  const kicker=activeDirectoryPage==="race-teams"?"RACE TEAM":"MANUFACTURER";
- menu.innerHTML=filtered.map(group=>`<button type="button" class="directory-choice" data-directory-key="${esc(group.key)}" aria-label="View ${esc(group.label)} athletes">${manufacturerBannerHTML(group.bannerBrand,group.label,kicker,"directory")}<span class="directory-choice-count">${group.athletes.length} athlete${group.athletes.length===1?"":"s"}</span></button>`).join("")||'<p class="muted">No matching entries found.</p>';
+ menu.innerHTML=filtered.map(group=>{const banner=group.useRaceTeamBrand?raceTeamBannerHTML(group.label,group.label,kicker,"directory"):manufacturerBannerHTML(group.bannerBrand,group.label,kicker,"directory");return `<button type="button" class="directory-choice" data-directory-key="${esc(group.key)}" aria-label="View ${esc(group.label)} athletes">${banner}<span class="directory-choice-count">${group.athletes.length} athlete${group.athletes.length===1?"":"s"}</span></button>`}).join("")||'<p class="muted">No matching entries found.</p>';
 }
 function renderDirectorySelection(){
  const group=directoryGroups(activeDirectoryPage).find(item=>item.key===activeDirectoryKey),detail=$("directoryDetail"),menu=$("directoryMenu");
@@ -434,7 +471,7 @@ function renderDirectorySelection(){
  if(!group){activeDirectoryKey="";detail.hidden=true;menu.hidden=false;return}
  const kicker=activeDirectoryPage==="race-teams"?"RACE TEAM":"MANUFACTURER";
  const bannerBrand=group.bannerBrand||group.label;
- $("directoryBanner").innerHTML=manufacturerBannerHTML(bannerBrand,group.label,kicker);
+ $("directoryBanner").innerHTML=group.useRaceTeamBrand?raceTeamBannerHTML(group.label,group.label,kicker):manufacturerBannerHTML(bannerBrand,group.label,kicker);
  $("directoryCount").textContent=`${group.athletes.length} athlete${group.athletes.length===1?"":"s"} associated with ${group.label}.`;
  $("directoryRiders").innerHTML=table(["Athlete","Series","Race Team","Manufacturer","Fantasy Team","Season Points"],group.athletes.map(a=>{const o=owner(a);return `<tr><td><div class="manufacturer" style="--mfr:${mcolor(a.manufacturer)}">${athleteDetailButtonHTML(a)}</div></td><td>${seriesDisplayHTML(a)}</td><td>${esc(a.raceTeam||"—")}</td><td>${brandBadge(a.manufacturer||"—")}</td><td>${esc(o?tname(o):"Free Agent")}</td><td class="points">${athleteSeasonPoints(a).toLocaleString()}</td></tr>`}));
  menu.hidden=true;detail.hidden=false;
