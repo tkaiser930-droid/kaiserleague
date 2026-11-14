@@ -254,16 +254,16 @@ const RACE_TEAM_BRANDS={
  "Red Bull Racing":{"color":"#001E62","accent":"#001E62","number":"#001E62","image":"https://cdn.simpleicons.org/redbull/001E62","fit":"square"},
  "Williams":{"color":"#00AEEF","accent":"#00AEEF","number":"#00AEEF","image":"assets/logos/williams-w.svg","fit":"square"},
  "Aprilia Racing":{"color":"#5D3A9B","accent":"#5D3A9B","number":"#5D3A9B","image":"https://poptuning.fr/8726-large_default/aprilia-lion-sticker-autocollant.jpg","fit":"square"},
- "BK8 Gresini Racing MotoGP":{"color":"#66BCE6","accent":"#173F78","number":"#77C9F1","image":"https://www.gresiniracing.com/wp-content/uploads/2025/02/motogp-gresini-2025-new.png.webp","fallbackImage":"assets/logos/race-teams/bk8-gresini-racing-motogp.svg","fit":"square"},
+ "BK8 Gresini Racing MotoGP":{"color":"#66BCE6","accent":"#173F78","number":"#77C9F1","image":"assets/logos/race-teams/bk8-gresini-racing-motogp-user.png","fit":"wide"},
  "Ducati Lenovo Team":{"color":"#800020","accent":"#800020","number":"#800020","image":"https://cdn.simpleicons.org/ducati/800020","fit":"square"},
  "Honda HRC Castrol":{"color":"#E60012","accent":"#00529B","number":"#FF424F","image":"https://global.honda/en/wingmark/assets/img/2dlogo/7.webp","fit":"wide"},
- "Castrol Honda LCR":{"color":"#006B45","accent":"#D71920","number":"#19B56A","image":"https://file.namu.moe/file/a0182488ca9f41e3d8303265d7d16c735761b108af03cc434cd6cf22011020c9bda48c3432546c25d5c0eb1a44a8d198","fallbackImage":"assets/logos/race-teams/castrol-honda-lcr.svg","fit":"square"},
+ "Castrol Honda LCR":{"color":"#006B45","accent":"#D71920","number":"#19B56A","image":"assets/logos/race-teams/castrol-honda-lcr-user.png","fit":"wide"},
  "Monster Energy Yamaha MotoGP":{"color":"#003399","accent":"#003399","number":"#003399","image":"https://3.bp.blogspot.com/-Y_Pw6SK7wM8/VtbvwDNlfwI/AAAAAAAAOhY/n99f-418EnE/s1600/logo-yamaha-tuning_forks.jpg","fit":"square"},
  "Pertamina Enduro VR46 Racing Team":{"color":"#111111","accent":"#EFFF00","number":"#EFFF00","image":"https://upload.wikimedia.org/wikipedia/commons/a/ab/Pertamina_Enduro_VR46_Racing_Team_-_logo_2024_updated.jpg","fallbackImage":"assets/logos/race-teams/pertamina-enduro-vr46-racing-team.svg","fit":"square"},
  "Prima Pramac Yamaha MotoGP":{"color":"#573B8A","accent":"#D7193F","number":"#B59AE7","image":"https://www.yamahamotogp.com/assets/img/team/ppym-logo.png","fallbackImage":"assets/logos/race-teams/prima-pramac-yamaha-motogp.svg","fit":"square"},
  "Red Bull KTM Factory Racing":{"color":"#F36C21","accent":"#111318","number":"#FF8A3D","image":"assets/logos/race-teams/red-bull-ktm-factory-racing.svg","fit":"wide"},
  "Red Bull KTM Tech3":{"color":"#F36C21","accent":"#142448","number":"#FF8747","image":"https://www.teamtech3.fr/Tech3-team-logo-2025.jpg","fallbackImage":"assets/logos/race-teams/red-bull-ktm-tech3.svg","fit":"square"},
- "Superfile Trackhouse MotoGP Team":{"color":"#0876B9","accent":"#D7EF00","number":"#43AEE4","image":"https://res.cloudinary.com/nascarnextgen/image/upload/c_fill,g_auto,w_767/q_auto/f_auto/v1/SuperFile-MGP-Black-Outline_recky7","fallbackImage":"assets/logos/race-teams/superfile-trackhouse-motogp-team.svg","fit":"wide"}
+ "Superfile Trackhouse MotoGP Team":{"color":"#0876B9","accent":"#D7EF00","number":"#43AEE4","image":"assets/logos/race-teams/superfile-trackhouse-motogp-user.png","fit":"wide"}
 };
 function raceTeamBrand(value){
  const key=norm(value);

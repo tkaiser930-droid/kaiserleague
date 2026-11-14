@@ -69,3 +69,13 @@ Logo image sources:
 - Mercedes-AMG Petronas: now uses the exact Mercedes manufacturer star image and same color from BRAND.Mercedes.
 
 The six MotoGP logos are loaded by HTTPS; the earlier locally bundled custom lockups remain as fallback images to avoid empty banners if a third-party image host is unavailable. The site requires an internet connection for the preferred official/team-hosted logo assets.
+
+
+User-supplied MotoGP team logos (14 November 2026)
+
+The user supplied exact logo artwork for three MotoGP teams. These files are bundled locally and are used as the primary logo in both Athlete Profile banners and the Race Teams directory:
+- Castrol Honda LCR: assets/logos/race-teams/castrol-honda-lcr-user.png (user-provided Honda LCR logo; cropped from the supplied image with its white background retained).
+- BK8 Gresini Racing MotoGP: assets/logos/race-teams/bk8-gresini-racing-motogp-user.png (user-provided Gresini Racing logo; supplied white background retained).
+- Superfile Trackhouse MotoGP Team: assets/logos/race-teams/superfile-trackhouse-motogp-user.png (user-requested white-background version of the supplied Trackhouse logo).
+
+All three logos are local assets, not external image URLs. Their existing 2026 team banner and number colours are unchanged.
