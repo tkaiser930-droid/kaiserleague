@@ -8,17 +8,17 @@ PURPOSE
 - The GitHub copy is a backup of league data, not a backup of website source code.
 
 GITHUB SETUP
-1) Use the GitHub repository and branch that should store the league JSON copy.
+1) The configured repository is tkaiser930-droid/LeagueSave. The service automatically detects that repository's default branch unless GITHUB_BRANCH is explicitly set.
 2) Create a fine-grained personal access token restricted to that repository.
 3) Grant Contents: Read and write, and Metadata: Read.
 4) Set these values in Render > Service > Environment:
    - GITHUB_TOKEN = your fine-grained token
-   - GITHUB_REPOSITORY = owner/repository
-   - GITHUB_BRANCH = main
+   - GITHUB_REPOSITORY = tkaiser930-droid/LeagueSave
+   - GITHUB_BRANCH = (leave blank to auto-detect the repository default branch)
    - GITHUB_DATA_PATH = league-data/league-data.json
    - GITHUB_BACKUP_PASSWORD = a separate long password for the manual Save/Sync buttons
    - GITHUB_AUTO_BACKUP = true
-5) Save and restart/redeploy the service.
+5) If GITHUB_REPOSITORY was previously set to a different name, edit the existing Render variable and change it to exactly tkaiser930-droid/LeagueSave. Save and restart/redeploy the service.
 
 LOCAL DEVELOPMENT
 1) Copy .env.example to .env.
@@ -33,8 +33,15 @@ HOW SAVING WORKS
 - Manual comparison: enter GITHUB_BACKUP_PASSWORD and use Scan GitHub & Render — Load Newest Save. The selected save is loaded and the page reloads.
 - Manual portable backup: Download League Backup and Restore a Backup (.json) remain available and unchanged.
 
+TROUBLESHOOTING
+- The Data & Backup status must show repository tkaiser930-droid/LeagueSave. If it shows a different repository, the Render Environment variable GITHUB_REPOSITORY is overriding the default; correct that variable and redeploy.
+- If status reports 401, create a valid token. If it reports 403, grant Contents: Read and write and Metadata: Read to this exact repository. If it reports 404, verify the repository spelling and that the token has access to it.
+- If the repository has no commits yet, the first backup now initializes the first tree, commit, and default branch. No README or starter file is required.
+- If the first backup has succeeded, the status should show a GitHub JSON save timestamp and the commit link/SHA.
+
 IMPORTANT
 - GITHUB_TOKEN is only read by the Node server from environment variables or an untracked .env file. Never put it in app.js, HTML, browser storage, or a committed file.
 - Do not remove the Render persistent disk. It remains the live database location.
-- GitHub save path is controlled by GITHUB_DATA_PATH and defaults to league-data/league-data.json.
+- GitHub save path is controlled by GITHUB_DATA_PATH and defaults to league-data/league-data.json. The repository is preconfigured as tkaiser930-droid/LeagueSave. The service detects the repository's default branch; set GITHUB_BRANCH only if you intentionally want a different branch.
+- If the repository has no commits/branch yet, the first automatic save creates the initial Git tree, commit, and branch. This avoids the common empty-repository failure from the Contents API.
 - If GitHub cannot be reached during startup, the server keeps the Render/local file and logs the error rather than replacing live data with an empty save.

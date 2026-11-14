@@ -30,7 +30,7 @@
     <section class="panel" id="githubBackupPanel">
       <p class="eyebrow">SECONDARY LEAGUE-DATA BACKUP</p>
       <h2>GitHub + Render Save Sync</h2>
-      <p>The server checks the live Render JSON file (<code>/var/data/league-data.json</code>) against the GitHub league-data JSON file when it starts. It loads whichever save has the newer <code>savedAt</code> timestamp. When the live league JSON changes, the server automatically commits that updated JSON file to GitHub after the write settles. GitHub stores league data only here; it does not replace the website source-code repository.</p>
+      <p>The server checks the live Render JSON file (<code>/var/data/league-data.json</code>) against the GitHub copy in <code>tkaiser930-droid/LeagueSave</code> when it starts. It loads whichever save has the newer <code>savedAt</code> timestamp. When the live league JSON changes, the server automatically commits that updated JSON file to GitHub after the write settles. A brand-new, empty GitHub repository is initialized automatically on the first save.</p>
       <p id="githubBackupStatus" class="storage-detail warn" role="status" aria-live="polite">Checking Render and GitHub saves…</p>
       <p id="githubBackupLatest" class="muted">The latest timestamps will appear here.</p>
       <label for="githubBackupPassword">GitHub manual-action password</label>
@@ -44,10 +44,10 @@
       <p class="muted">Render remains the live working database and continues saving to its persistent disk. GitHub is a timestamp-compared mirror of the same JSON save. Manual JSON download/import and the Render/local Save / Flush option below remain available. The GitHub token is stored only in server environment variables.</p>
       <details class="github-setup"><summary>GitHub league-data setup instructions</summary>
         <ol>
-          <li>Use the same GitHub repository you want to hold the league backup, on the branch <code>main</code> (or your configured branch).</li>
+          <li>The backup repository is preconfigured as <code>tkaiser930-droid/LeagueSave</code>. Its default branch is detected automatically. Set <code>GITHUB_BRANCH</code> only if you intentionally want to use a different branch.</li>
           <li>Create a fine-grained personal access token restricted to that repository with <b>Contents: Read and write</b> and <b>Metadata: Read</b>.</li>
-          <li>On Render, set <code>GITHUB_TOKEN</code>, <code>GITHUB_REPOSITORY</code> (owner/repository), and <code>GITHUB_BACKUP_PASSWORD</code> in the service Environment page.</li>
-          <li>Keep <code>GITHUB_BRANCH=main</code>, <code>GITHUB_DATA_PATH=league-data/league-data.json</code>, and <code>GITHUB_AUTO_BACKUP=true</code>, unless you need a different branch or JSON path.</li>
+          <li>On Render, set <code>GITHUB_TOKEN</code> and <code>GITHUB_BACKUP_PASSWORD</code> in the service Environment page. Confirm <code>GITHUB_REPOSITORY=tkaiser930-droid/LeagueSave</code>.</li>
+          <li>Leave <code>GITHUB_BRANCH</code> blank for automatic default-branch detection. Keep <code>GITHUB_DATA_PATH=league-data/league-data.json</code> and <code>GITHUB_AUTO_BACKUP=true</code>.</li>
           <li>Restart/redeploy the Node service. On startup it compares the saved timestamps and selects the newest copy. Later changes to <code>league-data.json</code> are committed to GitHub automatically.</li>
         </ol>
         <p class="muted">Locally, copy <code>.env.example</code> to <code>.env</code> and enter the same values. Never put your GitHub token in browser code or commit it to the repository.</p>

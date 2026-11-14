@@ -880,9 +880,11 @@ function dataInit(){
    const response=await fetch("/api/github/status",{cache:"no-store"});
    if(!response.ok)throw new Error("The Node.js server does not expose GitHub league-data sync. Use npm start or your Render-hosted site.");
    const info=await response.json();
-   if(!info.configured){githubStatus.textContent="GitHub league-data backup is not configured. Add GITHUB_TOKEN and GITHUB_REPOSITORY to the server environment.";githubStatus.className="storage-detail warn";githubLatest.textContent="Render/local JSON saving remains available. GitHub sync starts after repository setup.";saveGithubButton.disabled=true;syncButton.disabled=true;return;}
+   if(!info.configured){githubStatus.textContent=`GitHub backup is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;githubStatus.className="storage-detail warn";githubLatest.textContent="Render/local JSON saving remains available. GitHub sync starts after the token is configured.";saveGithubButton.disabled=true;syncButton.disabled=true;return;}
    const autoText=info.automaticSave?"Automatic GitHub JSON saves are enabled.":"Automatic GitHub JSON saves are disabled by server configuration.";
-   if(info.error&&!info.latestGitHubSave){githubStatus.textContent=`GitHub is configured (${info.repository}), but the latest JSON could not be checked: ${info.error}`;githubStatus.className="storage-detail warn";}
+   if(info.error){githubStatus.textContent=`GitHub connection problem for ${info.repository}: ${info.error}`;githubStatus.className="storage-detail warn";}
+   else if(info.repositoryReadyForFirstSave){githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). Repository has no first commit yet; the first league save will initialize it. ${autoText}`;githubStatus.className="storage-detail good";}
+   else if(info.githubSaveFileMissing){githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). The repository is reachable but does not yet contain the league JSON file; the next save will create it. ${autoText}`;githubStatus.className="storage-detail good";}
    else{githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). ${autoText}`;githubStatus.className="storage-detail good";}
    const localWhen=info.localSavedAt?new Date(info.localSavedAt).toLocaleString():"not yet saved";
    const gh=info.latestGitHubSave;const githubWhen=gh?.savedAt?new Date(gh.savedAt).toLocaleString():"no GitHub JSON save yet";
