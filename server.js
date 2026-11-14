@@ -51,6 +51,14 @@ function onlyKnownState(input) {
   for (const key of KEYS) if (Object.prototype.hasOwnProperty.call(input, key)) out[key] = input[key];
   return out;
 }
+function formatVancouverDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value ?? "");
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Vancouver", month: "long", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true
+  }).format(date);
+}
 function timestampMs(value) {
   if (typeof value === "string") return Date.parse(value) || 0;
   const number = Number(value || 0);
@@ -129,7 +137,7 @@ async function syncNewestLeagueSave(sourceLabel = "manual scan") {
   if (remote.found && remoteSavedAt > localSavedAt) {
     db = normalizeDatabase(remote.data, remoteSavedAt);
     await queueSave({ syncGithub: false, preserveSavedAt: true });
-    githubLastSync = { source: "GitHub", at: new Date().toISOString(), message: `Loaded the newer GitHub save (${new Date(remoteSavedAt).toLocaleString()}) into ${DATA_DIR}.` };
+    githubLastSync = { source: "GitHub", at: new Date().toISOString(), message: `Loaded the newer GitHub save (${formatVancouverDateTime(remoteSavedAt)}) into ${DATA_DIR}.` };
     return { ok: true, source: "GitHub", localSavedAt, githubSavedAt: remoteSavedAt, savedAt: remoteSavedAt, message: githubLastSync.message };
   }
 
@@ -141,7 +149,7 @@ async function syncNewestLeagueSave(sourceLabel = "manual scan") {
     githubSave = await githubBackup.saveLeagueData(local.data, `Kaiser Family Fantasy SMX: ${sourceLabel} sync from Render`);
   }
   const message = remote.found
-    ? `Render is the newest save (${new Date(localSavedAt).toLocaleString()}); GitHub was checked${githubSave?.changed ? " and updated" : ""}.`
+    ? `Render is the newest save (${formatVancouverDateTime(localSavedAt)}); GitHub was checked${githubSave?.changed ? " and updated" : ""}.`
     : `Only the Render save existed; ${githubSave?.changed ? "a GitHub copy was created" : "GitHub auto-backup is currently disabled"}.`;
   githubLastSync = { source: "Render", at: new Date().toISOString(), message };
   return { ok: true, source: "Render", localSavedAt, githubSavedAt: githubSave?.savedAt || remoteSavedAt, savedAt: localSavedAt, githubCommit: githubSave?.commit || null, message };

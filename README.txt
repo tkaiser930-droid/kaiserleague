@@ -102,3 +102,10 @@ GITHUB + RENDER LEAGUE-DATA SYNC
 - The existing “Save / Flush to Render or Local Server” button still flushes the live database to Render/local storage. “Download League Backup” and “Restore a Backup” remain the portable manual JSON export/import options.
 - GITHUB_AUTO_BACKUP=false disables automatic GitHub writes but leaves startup comparison and protected manual GitHub save/sync actions available.
 - Never put GITHUB_TOKEN in app.js, HTML, browser localStorage, or a committed file. The token is read only by server.js from environment variables or the untracked local .env file.
+
+
+NAVIGATION AND TIME DISPLAY UPDATE
+----------------------------------
+The navigation is consolidated into Teams, Athletes, and Teams & Manufacturers. Team claiming and roster management are available on the Teams page. Athlete filters include all/available, series, and ownership. Race-team and manufacturer directories share dropdown filters. Data & Backup is embedded as a commissioner-only tab. Legacy page URLs redirect to their consolidated destinations.
+
+All date/time interpretation and display in the website uses the America/Vancouver timezone. Draft planned starts entered in the commissioner datetime-local field are interpreted as Vancouver local time.
