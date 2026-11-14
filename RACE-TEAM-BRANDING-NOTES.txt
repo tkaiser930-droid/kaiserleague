@@ -24,3 +24,48 @@ Manufacturer and team branding additions
 - Williams now shares the Williams manufacturer logo and light blue (#00AEEF).
 
 Selected external logo assets are loaded over HTTPS from the brand icon source or the manufacturers' published logo resource. An internet connection is required for those external assets.
+
+
+2026 MotoGP logo and colour refinements
+
+Six MotoGP team marks now reference team-published or team-specific logo assets, with image sizing adjusted to the shape of each mark. The associated banner and number colours are based on the teams' 2026 MotoGP launch materials:
+
+- Castrol Honda LCR: Castrol green with red accent; 2026 team lockup used for the Zarco entry.
+- BK8 Gresini Racing MotoGP: richer, solid light blue; logo hosted by Gresini Racing.
+- Pertamina Enduro VR46 Racing Team: black with fluorescent yellow; 2026 BLACKANDLIGHT identity.
+- Prima Pramac Yamaha MotoGP: purple primary with red and Yamaha blue accents; official Yamaha MotoGP team badge.
+- Red Bull KTM Tech3: KTM orange with dark blue accent; official Tech3 team logo.
+- Superfile Trackhouse MotoGP Team: blue with black/day-glo yellow identity; official Trackhouse-hosted team mark.
+
+Mercedes AMG Petronas now directly reuses the Mercedes manufacturer star image and the same teal brand colour for its banner and number text.
+
+Logo references:
+- LCR: 2026 Castrol Honda LCR team logo image (file link from LCR team listing; credited to LCR logo entry).
+- Gresini: https://www.gresiniracing.com/wp-content/uploads/2025/02/motogp-gresini-2025-new.png.webp
+- VR46: https://upload.wikimedia.org/wikipedia/commons/a/ab/Pertamina_Enduro_VR46_Racing_Team_-_logo_2024_updated.jpg
+- Prima Pramac: https://www.yamahamotogp.com/assets/img/team/ppym-logo.png
+- Tech3: https://www.teamtech3.fr/Tech3-team-logo-2025.jpg
+- Trackhouse: https://res.cloudinary.com/nascarnextgen/image/upload/c_fill,g_auto,w_767/q_auto/f_auto/v1/SuperFile-MGP-Black-Outline_recky7
+
+The app already loads other logos from HTTPS image sources. These MotoGP team image references therefore require an internet connection. The LCR logo file is referenced from the Namu mirror's 2026 logo file listing, which identifies the asset as the Castrol Honda LCR logo; the listing notes a CC BY-NC-SA 2.0 KR license.
+
+Verified source references (retrieved 14 November 2026)
+
+2026 MotoGP team colors:
+- Castrol Honda LCR: MotoGP team presentation on 1 February 2026; 2026 Castrol livery; white/red/green scheme. https://www.motogp.com/en/news/2026/02/01/castrol-honda-lcr-et-pro-honda-lcr-nous-devoilent-leurs-couleurs-pour-2026/827151
+- BK8 Gresini Racing MotoGP: MotoGP presentation on 31 January 2026; official description calls the refreshed signature color a richer, more solid light blue. https://www.motogp.com/en/news/2026/02/01/pure-essence-bk8-gresini-racing-motogp-unveil-2026-colours/826840
+- Pertamina Enduro VR46: official team and MotoGP launch description says black dominates with fluorescent yellow as the team's signature color. https://vr46racingteam.it/black-and-light-ritorno-alle-origini-per-il-pertamina-enduro-vr46-racing-team/ and https://www.motogp.com/en/news/2026/01/14/blackandlight-new-year-new-colours-for-pertamina-enduro-vr46/825185
+- Prima Pramac Yamaha: 2026 MotoGP presentation. Pramac's team partner information identifies Prima purple, Pramac red, and Yamaha blue in the livery. https://www.motogp.com/en/news/2026/01/13/prima-pramac-yamaha-zeigt-das-projekt-fur-die-saison-2026/825075 and https://www.pramacracing.com/en/partners-en/
+- Red Bull KTM Tech3: MotoGP's 2026 launch describes the color direction as orange and blue. https://www.motogp.com/en/news/2026/01/26/red-bull-ktm-factory-racing-and-tech3-unleash-2026-challengers/826283
+- SuperFile Trackhouse: MotoGP describes the 2026 Trackhouse base palette as blue, black, and dayglo yellow. https://www.motogp.com/en/news/2026/01/22/trackhouse-pulls-the-covers-off-2026-with-two-stunning-liveries/825875
+
+Logo image sources:
+- Castrol Honda LCR 2026 team mark: https://file.namu.moe/file/a0182488ca9f41e3d8303265d7d16c735761b108af03cc434cd6cf22011020c9bda48c3432546c25d5c0eb1a44a8d198 (the Namu LCR file listing identifies this item as the 2026 Castrol Honda LCR logo; the listing states CC BY-NC-SA 2.0 KR. If the host is unavailable, the old locally bundled site mark is used as fallback.)
+- BK8 Gresini Racing MotoGP: https://www.gresiniracing.com/wp-content/uploads/2025/02/motogp-gresini-2025-new.png.webp (official Gresini Racing website image; the BK8 NEWS title mark remains in use in the team's 2026 identity.)
+- Pertamina Enduro VR46 Racing Team: https://upload.wikimedia.org/wikipedia/commons/a/ab/Pertamina_Enduro_VR46_Racing_Team_-_logo_2024_updated.jpg (team mark sourced via Wikimedia Commons; the official team confirmed the black/fluorescent-yellow 2026 color identity.)
+- Prima Pramac Yamaha MotoGP: https://www.yamahamotogp.com/assets/img/team/ppym-logo.png (official Yamaha MotoGP team image).
+- Red Bull KTM Tech3: https://www.teamtech3.fr/Tech3-team-logo-2025.jpg (official Tech3 website image).
+- SuperFile Trackhouse MotoGP Team: https://res.cloudinary.com/nascarnextgen/image/upload/c_fill,g_auto,w_767/q_auto/f_auto/v1/SuperFile-MGP-Black-Outline_recky7 (Trackhouse-hosted Cloudinary image).
+- Mercedes-AMG Petronas: now uses the exact Mercedes manufacturer star image and same color from BRAND.Mercedes.
+
+The six MotoGP logos are loaded by HTTPS; the earlier locally bundled custom lockups remain as fallback images to avoid empty banners if a third-party image host is unavailable. The site requires an internet connection for the preferred official/team-hosted logo assets.

@@ -249,30 +249,38 @@ const RACE_TEAM_BRANDS={
  "Ferrari":{"color":"#DC0000","accent":"#DC0000","number":"#DC0000","image":"https://cdn.simpleicons.org/ferrari/DC0000","fit":"square"},
  "Haas":{"color":"#FFFFFF","accent":"#FFFFFF","number":"#FFFFFF","image":"https://f1store4.formula1.com/content/ws/all/686828d2-e6e4-4e2f-9056-412cd5fffbaf__1179X1179.jpg","fit":"square"},
  "McLaren":{"color":"#D95B00","accent":"#D95B00","number":"#D95B00","image":"https://cdn.simpleicons.org/mclaren/D95B00","fit":"square"},
- "Mercedes AMG Petronas":{"color":"#00A19B","accent":"#D7FFF9","number":"#00E5D5","image":"assets/logos/race-teams/mercedes-amg-petronas.svg","fit":"wide"},
+ "Mercedes AMG Petronas":{"color":"#00A19B","accent":"#00A19B","number":"#00A19B","image":BRAND.Mercedes.image,"fit":BRAND.Mercedes.fit},
  "Racing Bulls":{"color":"#65C7F7","accent":"#65C7F7","number":"#65C7F7","image":"https://cdn.simpleicons.org/redbull/001E62","fit":"square"},
  "Red Bull Racing":{"color":"#001E62","accent":"#001E62","number":"#001E62","image":"https://cdn.simpleicons.org/redbull/001E62","fit":"square"},
  "Williams":{"color":"#00AEEF","accent":"#00AEEF","number":"#00AEEF","image":"assets/logos/williams-w.svg","fit":"square"},
  "Aprilia Racing":{"color":"#5D3A9B","accent":"#5D3A9B","number":"#5D3A9B","image":"https://poptuning.fr/8726-large_default/aprilia-lion-sticker-autocollant.jpg","fit":"square"},
- "BK8 Gresini Racing MotoGP":{"color":"#0066A6","accent":"#F28C28","number":"#4BB8FF","image":"assets/logos/race-teams/bk8-gresini-racing-motogp.svg","fit":"wide"},
+ "BK8 Gresini Racing MotoGP":{"color":"#66BCE6","accent":"#173F78","number":"#77C9F1","image":"https://www.gresiniracing.com/wp-content/uploads/2025/02/motogp-gresini-2025-new.png.webp","fallbackImage":"assets/logos/race-teams/bk8-gresini-racing-motogp.svg","fit":"square"},
  "Ducati Lenovo Team":{"color":"#800020","accent":"#800020","number":"#800020","image":"https://cdn.simpleicons.org/ducati/800020","fit":"square"},
  "Honda HRC Castrol":{"color":"#E60012","accent":"#00529B","number":"#FF424F","image":"https://global.honda/en/wingmark/assets/img/2dlogo/7.webp","fit":"wide"},
- "Castrol Honda LCR":{"color":"#006B45","accent":"#00A6D6","number":"#00D18B","image":"assets/logos/race-teams/castrol-honda-lcr.svg","fit":"wide"},
+ "Castrol Honda LCR":{"color":"#006B45","accent":"#D71920","number":"#19B56A","image":"https://file.namu.moe/file/a0182488ca9f41e3d8303265d7d16c735761b108af03cc434cd6cf22011020c9bda48c3432546c25d5c0eb1a44a8d198","fallbackImage":"assets/logos/race-teams/castrol-honda-lcr.svg","fit":"square"},
  "Monster Energy Yamaha MotoGP":{"color":"#003399","accent":"#003399","number":"#003399","image":"https://3.bp.blogspot.com/-Y_Pw6SK7wM8/VtbvwDNlfwI/AAAAAAAAOhY/n99f-418EnE/s1600/logo-yamaha-tuning_forks.jpg","fit":"square"},
- "Pertamina Enduro VR46 Racing Team":{"color":"#F2E500","accent":"#151515","number":"#F2E500","image":"assets/logos/race-teams/pertamina-enduro-vr46-racing-team.svg","fit":"wide"},
- "Prima Pramac Yamaha MotoGP":{"color":"#293B87","accent":"#D71938","number":"#7F91FF","image":"assets/logos/race-teams/prima-pramac-yamaha-motogp.svg","fit":"wide"},
+ "Pertamina Enduro VR46 Racing Team":{"color":"#111111","accent":"#EFFF00","number":"#EFFF00","image":"https://upload.wikimedia.org/wikipedia/commons/a/ab/Pertamina_Enduro_VR46_Racing_Team_-_logo_2024_updated.jpg","fallbackImage":"assets/logos/race-teams/pertamina-enduro-vr46-racing-team.svg","fit":"square"},
+ "Prima Pramac Yamaha MotoGP":{"color":"#573B8A","accent":"#D7193F","number":"#B59AE7","image":"https://www.yamahamotogp.com/assets/img/team/ppym-logo.png","fallbackImage":"assets/logos/race-teams/prima-pramac-yamaha-motogp.svg","fit":"square"},
  "Red Bull KTM Factory Racing":{"color":"#F36C21","accent":"#111318","number":"#FF8A3D","image":"assets/logos/race-teams/red-bull-ktm-factory-racing.svg","fit":"wide"},
- "Red Bull KTM Tech3":{"color":"#E84B25","accent":"#111318","number":"#FF8056","image":"assets/logos/race-teams/red-bull-ktm-tech3.svg","fit":"wide"},
- "Superfile Trackhouse MotoGP Team":{"color":"#168BCB","accent":"#F0B323","number":"#42B8F6","image":"assets/logos/race-teams/superfile-trackhouse-motogp-team.svg","fit":"wide"}
+ "Red Bull KTM Tech3":{"color":"#F36C21","accent":"#142448","number":"#FF8747","image":"https://www.teamtech3.fr/Tech3-team-logo-2025.jpg","fallbackImage":"assets/logos/race-teams/red-bull-ktm-tech3.svg","fit":"square"},
+ "Superfile Trackhouse MotoGP Team":{"color":"#0876B9","accent":"#D7EF00","number":"#43AEE4","image":"https://res.cloudinary.com/nascarnextgen/image/upload/c_fill,g_auto,w_767/q_auto/f_auto/v1/SuperFile-MGP-Black-Outline_recky7","fallbackImage":"assets/logos/race-teams/superfile-trackhouse-motogp-team.svg","fit":"wide"}
 };
-function raceTeamBrand(value){const key=norm(value);for(const [label,config] of Object.entries(RACE_TEAM_BRANDS)){if(norm(label)===key)return config;}return null;}
+function raceTeamBrand(value){
+ const key=norm(value);
+ const aliases={lcrhondacastrol:"Castrol Honda LCR",hondalcrcastrol:"Castrol Honda LCR",hondalcr:"Castrol Honda LCR",gresiniracingmotogp:"BK8 Gresini Racing MotoGP"};
+ const canonical=aliases[key]||value;
+ const lookup=norm(canonical);
+ for(const [label,config] of Object.entries(RACE_TEAM_BRANDS)){if(norm(label)===lookup)return config;}
+ return null;
+}
 function isTeamColorSeries(athlete){return ["F1","MOTOGP"].includes(cls(athlete).toUpperCase());}
 function raceTeamBannerHTML(value,displayValue=value,kicker="RACE TEAM",variant="profile"){
  const raw=clean(value)||"Unknown Race Team",config=raceTeamBrand(raw)||{color:"#344054",accent:"#CBD5E1",image:"",fit:"wide"};
  const color=config.color||"#344054",label=esc(clean(displayValue)||raw),bannerLabel=esc(kicker);
  const image=config.image||"",hex=color.replace("#",""),rgb=hex.length===6?[parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)]:[52,64,84];
  const brightness=(rgb[0]*299+rgb[1]*587+rgb[2]*114)/1000,ink=config.ink||(brightness>160?"#111318":"#FFFFFF");
- return `<div class="athlete-manufacturer-banner${variant==="directory"?" directory-brand-banner":""}" style="--athlete-mfr-color:${color};--athlete-mfr-ink:${ink}" aria-label="${bannerLabel}: ${label}"><div class="athlete-manufacturer-banner-brand">${image?`<img class="athlete-manufacturer-logo wide" src="${image}" alt="${esc(raw)} race team logo" loading="lazy" onerror="this.onerror=null;this.hidden=true">`:""}<div class="athlete-manufacturer-banner-copy"><span>${bannerLabel}</span><strong>${label}</strong></div></div></div>`;
+ const logoClass=config.fit==="square"?"square":"wide";
+ return `<div class="athlete-manufacturer-banner${variant==="directory"?" directory-brand-banner":""}" style="--athlete-mfr-color:${color};--athlete-mfr-ink:${ink}" aria-label="${bannerLabel}: ${label}"><div class="athlete-manufacturer-banner-brand">${image?`<img class="athlete-manufacturer-logo ${logoClass}" src="${image}" data-fallback="${esc(config.fallbackImage||"")}" alt="${esc(raw)} race team logo" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.hidden=true;}">`:""}<div class="athlete-manufacturer-banner-copy"><span>${bannerLabel}</span><strong>${label}</strong></div></div></div>`;
 }
 function athleteBannerHTML(athlete){return isTeamColorSeries(athlete)&&clean(athlete?.raceTeam)?raceTeamBannerHTML(athlete.raceTeam):manufacturerBannerHTML(athlete?.manufacturer||"Unknown Manufacturer");}
 
