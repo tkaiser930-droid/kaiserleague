@@ -869,6 +869,41 @@ function dataInit(){
  $("saveDataNow")?.addEventListener("click",async()=>{if(!window.KFStorage){message.textContent="Storage helper is unavailable. Refresh this page.";return}try{await window.KFStorage.flush();message.textContent=window.KFStorage.mode==="server"?`All pending changes have been saved to ${window.KFStorage.location||"server storage"}.`:"Browser data is saved, but this page is not connected to server storage. Start locally with npm start or deploy to Render.";showCount()}catch(err){message.textContent="Save failed: "+err.message}});
  $("exportData")?.addEventListener("click",async()=>{try{const state=await window.KFStorage.exportState();const backup={format:"kaiser-family-fantasy-smx-backup-v1",exportedAt:new Date().toISOString(),state};const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`kaiser-fantasy-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);message.textContent="Backup downloaded."}catch(err){message.textContent="Could not create backup: "+err.message}});
  $("importData")?.addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;try{const parsed=JSON.parse(await file.text()),state=parsed.state||parsed;if(!state||typeof state!=="object"||Array.isArray(state))throw new Error("This file is not a valid league backup.");if(!confirm("Replace the current league data with this backup? The current data will be overwritten.")){e.target.value="";return}await window.KFStorage.replaceState(state);message.textContent="Backup restored. Reloading the website…";setTimeout(()=>location.reload(),250)}catch(err){message.textContent="Import failed: "+err.message}finally{e.target.value=""}});
+
+ const githubStatus=$("githubBackupStatus"),githubLatest=$("githubBackupLatest"),githubMessage=$("githubBackupMessage");
+ const githubPassword=()=>$("githubBackupPassword")?.value||"";
+ const saveGithubButton=$("saveLeagueToGithub"),syncButton=$("syncNewestLeagueSave"),refreshButton=$("refreshGithubStatus");
+ async function refreshGithubStatus(){
+  if(!githubStatus)return;
+  githubStatus.textContent="Checking both Render and GitHub league saves…";githubStatus.className="storage-detail warn";
+  try{
+   const response=await fetch("/api/github/status",{cache:"no-store"});
+   if(!response.ok)throw new Error("The Node.js server does not expose GitHub league-data sync. Use npm start or your Render-hosted site.");
+   const info=await response.json();
+   if(!info.configured){githubStatus.textContent="GitHub league-data backup is not configured. Add GITHUB_TOKEN and GITHUB_REPOSITORY to the server environment.";githubStatus.className="storage-detail warn";githubLatest.textContent="Render/local JSON saving remains available. GitHub sync starts after repository setup.";saveGithubButton.disabled=true;syncButton.disabled=true;return;}
+   const autoText=info.automaticSave?"Automatic GitHub JSON saves are enabled.":"Automatic GitHub JSON saves are disabled by server configuration.";
+   if(info.error&&!info.latestGitHubSave){githubStatus.textContent=`GitHub is configured (${info.repository}), but the latest JSON could not be checked: ${info.error}`;githubStatus.className="storage-detail warn";}
+   else{githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). ${autoText}`;githubStatus.className="storage-detail good";}
+   const localWhen=info.localSavedAt?new Date(info.localSavedAt).toLocaleString():"not yet saved";
+   const gh=info.latestGitHubSave;const githubWhen=gh?.savedAt?new Date(gh.savedAt).toLocaleString():"no GitHub JSON save yet";
+   const source=info.lastSync?.source?` Last startup/manual selection: ${info.lastSync.source}.`:"";
+   githubLatest.textContent=`Render/local save: ${localWhen}. GitHub JSON save: ${githubWhen}. File: ${info.dataPath||"league-data/league-data.json"}.${source}`;
+   saveGithubButton.disabled=!info.writeReady;syncButton.disabled=!info.writeReady;
+   if(info.autoSaveLastError)githubMessage.textContent="Last automatic GitHub JSON save failed: "+info.autoSaveLastError;
+   else if(info.autoSaveLastAt)githubMessage.textContent="Last automatic GitHub save check: "+new Date(info.autoSaveLastAt).toLocaleString();
+   else if(!info.writeReady)githubMessage.textContent="Set GITHUB_BACKUP_PASSWORD on the server to enable manual GitHub save and sync actions.";
+   else if(info.lastSync?.message)githubMessage.textContent=info.lastSync.message;
+  }catch(err){githubStatus.textContent=err.message;githubStatus.className="storage-detail warn";githubLatest.textContent="GitHub status is unavailable; Render/local saving is unchanged.";saveGithubButton.disabled=true;syncButton.disabled=true;}
+ }
+ async function githubAction(path,body){
+  const password=githubPassword();if(!password)throw new Error("Enter the GitHub backup action password first.");
+  const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-KF-GitHub-Backup-Password":password},body:JSON.stringify(body||{}),cache:"no-store"});
+  const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||`GitHub request failed (HTTP ${response.status}).`);return result;
+ }
+ saveGithubButton?.addEventListener("click",async()=>{try{await window.KFStorage?.flush();saveGithubButton.disabled=true;githubMessage.textContent="Saving the current league-data JSON to GitHub…";const result=await githubAction("/api/github/save",{});githubMessage.textContent=result.changed?`Saved league-data JSON to GitHub (${result.commit.shortSha||result.commit.sha.slice(0,7)}).`:`GitHub already has this exact league-data save.`;await refreshGithubStatus();}catch(err){githubMessage.textContent="GitHub league save failed: "+err.message;saveGithubButton.disabled=false;}});
+ syncButton?.addEventListener("click",async()=>{if(prompt("Scan Render and GitHub, then load whichever league-data JSON is newer? Type LOAD NEWEST to continue.")!=="LOAD NEWEST")return;try{await window.KFStorage?.flush();syncButton.disabled=true;githubMessage.textContent="Comparing Render and GitHub timestamps…";const result=await githubAction("/api/github/sync",{});githubMessage.textContent=result.message+" Reloading the league data…";setTimeout(()=>location.reload(),300);}catch(err){githubMessage.textContent="Save comparison failed: "+err.message;syncButton.disabled=false;}});
+ refreshButton?.addEventListener("click",refreshGithubStatus);
+ refreshGithubStatus();
 }
 function init(){seed();document.addEventListener("click",event=>{const trigger=event.target.closest("[data-athlete-detail]");if(trigger){event.preventDefault();openAthleteDetail(trigger.dataset.athleteDetail)}});const p=document.body.dataset.page;if(p==="home")standings();if(p==="teams")renderTeams();if(p==="available"||p==="all"){populateClassFilter();["search","classFilter","ownerFilter"].forEach(i=>$(i)?.addEventListener("input",renderAthletes));renderAthletes()}if(p==="race-teams"||p==="manufacturers")directoryInit(p);if(p==="manage")setupManage();if(p==="commissioner")commInit();if(p==="trades")tradeInit();if(p==="draft")draftInit();if(p==="data")dataInit();if(p==="schedule"){const f=$("seriesFilters");f.innerHTML=SCHEDULE_SERIES.map(s=>`<label><input type="checkbox" value="${s}" checked> ${s}</label>`).join("");f.querySelectorAll("input").forEach(x=>x.onchange=renderSchedule);renderSchedule()}if(p==="manage"||p==="trades")scheduleDailyRosterLockRefresh()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();window.addEventListener("storage",refresh);

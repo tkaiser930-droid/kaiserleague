@@ -76,12 +76,18 @@
     const remote = await apiState();
     let changed = false;
     for (const key of KEYS) {
-      if (!Object.prototype.hasOwnProperty.call(remote.state, key)) continue;
+      const hasRemoteStamp = Object.prototype.hasOwnProperty.call(remote.keyUpdatedAt, key);
       const remoteTs = Number(remote.keyUpdatedAt[key] || 0);
       const localTs = localTime(key);
       const localValue = parseLocal(key);
-      if (remoteTs > localTs || (remoteTs === localTs && JSON.stringify(localValue) !== JSON.stringify(remote.state[key]))) {
-        loadLocal(key, remote.state[key], remoteTs);
+      if (Object.prototype.hasOwnProperty.call(remote.state, key)) {
+        if (remoteTs > localTs || (remoteTs === localTs && JSON.stringify(localValue) !== JSON.stringify(remote.state[key]))) {
+          loadLocal(key, remote.state[key], remoteTs);
+          changed = true;
+        }
+      } else if (hasRemoteStamp && remoteTs >= localTs && localValue !== null) {
+        localStorage.removeItem(key);
+        localStorage.removeItem(TS_PREFIX + key);
         changed = true;
       }
     }
@@ -149,13 +155,18 @@
         const localValue = parseLocal(key);
         const localTs = localTime(key);
         const hasRemote = Object.prototype.hasOwnProperty.call(remote.state, key);
+        const hasRemoteStamp = Object.prototype.hasOwnProperty.call(remote.keyUpdatedAt, key);
         const remoteTs = Number(remote.keyUpdatedAt[key] || 0);
-        if (localValue !== null && (!hasRemote || localTs > remoteTs)) {
+        if (localValue !== null && ((!hasRemote && !hasRemoteStamp) || localTs > remoteTs)) {
           // Local-only data is migrated, and a newer unsynced browser edit wins safely.
           loadLocal(key, localValue, localTs || Date.now());
           work.push(apiPut(key, localValue, localTs || Date.now()));
         } else if (hasRemote) {
           loadLocal(key, remote.state[key], remoteTs);
+        } else if (hasRemoteStamp && remoteTs >= localTs) {
+          // A timestamp without a value is a saved deletion, not a missing category to migrate.
+          localStorage.removeItem(key);
+          localStorage.removeItem(TS_PREFIX + key);
         }
       }
       await Promise.all(work);

@@ -90,3 +90,14 @@ SCORING FORMATS
 - F1 Sprint event: two scoring tabs, Grand Prix and Sprint. Grand Prix uses the standard F1 Grand Prix table. Sprint awards 8 points for 1st, then decreases by one point through 8th (1 point); 9th–22nd receive 0. Both tabs use Fastest Qualifier (+3) and Fastest Lap (+1).
 - MotoGP: always has two scoring tabs, Grand Prix and Sprint. Grand Prix uses the standard 22-place points table. Sprint awards 12 points for 1st, 9 for 2nd, 7 for 3rd, then decreases by one point per place through 9th (1 point); 10th–22nd receive 0. Both tabs use Fastest Qualifier (+3) and Fastest Lap (+1).
 - The scoring form derives event type from the selected schedule event. MotoGP always displays both tabs; F1 displays separate tabs only for scheduled Sprint events.
+
+GITHUB + RENDER LEAGUE-DATA SYNC
+- Render remains the live working database at /var/data/league-data.json. GitHub stores a second copy of that same JSON save at league-data/league-data.json by default; it does not replace the website source files.
+- On every server startup, the server scans Render/local league-data.json and the GitHub JSON copy, compares their savedAt timestamps, and loads whichever save is newer. Render/local wins exact timestamp ties.
+- Every update written to league-data.json automatically queues a GitHub commit after the file write settles. A file watcher also detects direct edits to the save JSON file and backs those up.
+- Configure GITHUB_TOKEN, GITHUB_REPOSITORY (owner/repository), GITHUB_BRANCH (defaults to main), GITHUB_DATA_PATH (defaults to league-data/league-data.json), GITHUB_BACKUP_PASSWORD, and GITHUB_AUTO_BACKUP=true. The token needs Contents: Read and write and Metadata: Read. Use a fine-grained token restricted to the selected repository.
+- For local development, copy .env.example to .env, fill in the values, and run npm start. On Render, set the secret environment variables in the service Environment page and keep the persistent disk mounted at /var/data.
+- Data & Backup displays Render and GitHub saved timestamps. Its “Scan GitHub & Render — Load Newest Save” control performs the same comparison manually. “Save Current League JSON to GitHub” forces a manual JSON backup. Enter GITHUB_BACKUP_PASSWORD for these manual actions.
+- The existing “Save / Flush to Render or Local Server” button still flushes the live database to Render/local storage. “Download League Backup” and “Restore a Backup” remain the portable manual JSON export/import options.
+- GITHUB_AUTO_BACKUP=false disables automatic GitHub writes but leaves startup comparison and protected manual GitHub save/sync actions available.
+- Never put GITHUB_TOKEN in app.js, HTML, browser localStorage, or a committed file. The token is read only by server.js from environment variables or the untracked local .env file.
