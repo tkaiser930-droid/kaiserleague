@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="140" viewBox="0 0 520 140" role="img" aria-label="Monster Energy Yamaha Factory MXGP team logo">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#172131"/><stop offset="1" stop-color="#080D16"/></linearGradient>
+ <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#003399"/><stop offset="1" stop-color="#D7E3FF"/></linearGradient>
+ <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect x="3" y="4" width="514" height="132" rx="18" fill="#000000" opacity=".24" filter="url(#shadow)"/>
+<path d="M14 4 H506 Q516 4 516 14 V126 Q516 136 506 136 H14 Q4 136 4 126 V14 Q4 4 14 4Z" fill="url(#bg)" stroke="#003399" stroke-width="4"/>
+<path d="M5 18 L20 4 H116 L96 18Z" fill="#D7E3FF" opacity=".95"/>
+<path d="M404 136 L516 28 V54 L434 136Z" fill="#003399" opacity=".22"/>
+<path d="M14 110 L48 76 H74 L42 110Z" fill="#D7E3FF" opacity=".7"/>
+<path d="M25 123 L69 79 H83 L39 123Z" fill="#003399" opacity=".8"/>
+<path d="M25 20 L111 20 L127 38 L111 118 L25 118 L13 104 L13 36Z" fill="#0C111B" stroke="url(#edge)" stroke-width="4"/>
+<path d="M22 32 H116 L104 45 H31Z" fill="#003399" opacity=".3"/>
+<text x="69" y="82" text-anchor="middle" font-family="Arial Narrow,Arial,sans-serif" font-size="23" font-weight="900" letter-spacing="-1.2" fill="#FFFFFF">YAMAHA</text>
+<path d="M150 27 H478" stroke="#D7E3FF" stroke-width="2" opacity=".85"/>
+<text x="154" y="18" font-family="Arial,sans-serif" font-size="9" font-weight="700" letter-spacing="2.1" fill="#B9C5D4">MXGP / MX2  •  RACE TEAM</text>
+<text x="154" y="62.5" class="title" font-size="23" fill="#FFFFFF">Monster Energy Yamaha</text><text x="154" y="93.5" class="title" font-size="23" fill="#FFFFFF">Factory MXGP</text>
+<path d="M154 119 H475" stroke="#FFFFFF" stroke-opacity=".3" stroke-width="1"/>
+<text x="154" y="130" font-family="Arial,sans-serif" font-size="9" font-weight="700" letter-spacing="1.8" fill="#B9C5D4">FACTORY MXGP TEAM</text>
+</svg>

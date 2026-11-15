@@ -79,3 +79,19 @@ The user supplied exact logo artwork for three MotoGP teams. These files are bun
 - Superfile Trackhouse MotoGP Team: assets/logos/race-teams/superfile-trackhouse-motogp-user.png (user-requested white-background version of the supplied Trackhouse logo).
 
 All three logos are local assets, not external image URLs. Their existing 2026 team banner and number colours are unchanged.
+
+
+MXGP, SMX and Triple Crown Series Race Team logos (15 November 2026)
+
+Team coverage was taken from the uploaded Kaiser Fantasy backup JSON (kaiserFantasyAthletes). The uploaded file contains 11 MXGP/MX2 team names, 20 SMX team names and 8 Triple Crown Series team names. Two names are shared between series (Red Bull KTM Factory Racing and Triumph Factory Racing), leaving 37 distinct team names. The pre-existing Red Bull KTM Factory Racing logo entry is reused exactly as-is because it is also used by MotoGP.
+
+The Race Teams directory now displays team branding for F1, MotoGP, MXGP, MX2, SMX 250/450, and Triple Crown Series CAN 250/CAN 450 team groups. Athlete profile banner logic and athlete sidebar colour logic still treat F1 and MotoGP as the only team-colour series; MXGP, SMX and Triple Crown athlete profile/number styling remains manufacturer-based.
+
+Official/team-published image sources used where a clean logo asset was available:
+- MXGP: Nestaan Husqvarna Factory Racing; Kawasaki Racing Team; Honda HRC PETRONAS; Monster Energy Yamaha Factory MXGP; Red Bull Ducati Factory MXGP Team; Team Honda Motoblouz SR Motul; Van Venrooy KTM. Official MXGP team directory: https://www.mxgp.com/teams?race_category=1&year_filter=2026
+- Supercross.com: ClubMX, Honda HRC, ISRT, Pro Circuit, Star Racing, Quad Lock Honda, Team Tedder, and Troy Lee Designs. Official team directory: https://www.supercross.com/pages/teams-directory
+- Official Triple Crown Series 2026 marketing assets were reviewed: https://triplecrownseries.ca/marketing. These are series-level marks, not team-level logos, so they were not incorrectly assigned to individual teams.
+
+Where a clean standalone logo was not publicly available, a team-specific local SVG wordmark/monogram was created using team name, manufacturer/sponsor cues and team palette. These are custom site marks, not presented as official original logo artwork. Local SVGs are bundled so the team directory remains branded if an external image host is unavailable.
+
+The JSON team labels are preserved exactly as uploaded, including wording variants such as “Neestan Husqvarna Factory Racing”, “Mx6 Kawasaki”, “PMG Suzuki”, and “Quadlock Honda”. No athlete, team roster, or backup data was imported into the website; the JSON was used only to identify team names.

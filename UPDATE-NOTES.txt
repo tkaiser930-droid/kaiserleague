@@ -43,3 +43,10 @@ HEADER BRANDING UPDATE
 - Opening the Trade Center marks all accepted/rejected outgoing trade notifications for that team as viewed (responseViewedAt), and the alerts disappear from Team Management.
 - Pending outgoing and incoming trade alerts are unchanged.
 - Existing trade records without a viewed timestamp are treated as unread, so prior unanswered-to-view outcome alerts are not lost during this update.
+
+
+15 November 2026 — MXGP / SMX / Triple Crown team logos
+- Added local team-specific SVG marks for every team in the uploaded backup JSON, except Red Bull KTM Factory Racing which reuses its existing shared mark unchanged.
+- Added official MXGP-hosted and Supercross.com team image references where clean standalone marks were available, with local SVG fallbacks.
+- Race Teams directory now shows race-team logos for MXGP, MX2, SMX 250/450 and Triple Crown CAN 250/CAN 450.
+- F1 and MotoGP race-team mapping entries are byte-for-byte unchanged. Athlete profile and sidebar colour behavior for motocross series remains manufacturer-based.
