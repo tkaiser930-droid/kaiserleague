@@ -95,3 +95,12 @@ Official/team-published image sources used where a clean logo asset was availabl
 Where a clean standalone logo was not publicly available, a team-specific local SVG wordmark/monogram was created using team name, manufacturer/sponsor cues and team palette. These are custom site marks, not presented as official original logo artwork. Local SVGs are bundled so the team directory remains branded if an external image host is unavailable.
 
 The JSON team labels are preserved exactly as uploaded, including wording variants such as “Neestan Husqvarna Factory Racing”, “Mx6 Kawasaki”, “PMG Suzuki”, and “Quadlock Honda”. No athlete, team roster, or backup data was imported into the website; the JSON was used only to identify team names.
+
+
+Official Kawasaki team logos added (15 November 2026)
+
+The Race Teams directory and Athlete Profile banners now use the separately published official Kawasaki racing-site logo images for these two teams:
+- Monster Energy Kawasaki: https://kawasaki-global-admin.com/ContentStorage/KMC/RacingTeams/1/9e9bcea2-7a5a-4f4b-b056-18fb0d42c0a3.jpg
+- Monster Energy Pro Circuit Kawasaki: https://kawasaki-global-admin.com/ContentStorage/KMC/RacingTeams/2/a1e1ddc3-4978-46a0-b86a-2a0d98865de5.jpg
+
+Each team has its own separate logo image. Separate locally bundled WEBP fallbacks are included at assets/logos/race-teams/monster-energy-kawasaki-official.webp and assets/logos/race-teams/monster-energy-pro-circuit-kawasaki-official.webp. The local fallback images are high-resolution enhancements of the separate reference logos supplied in the conversation. No combined logo image is used. Only these two race-team mappings were changed; F1 and MotoGP team logo entries remain unchanged.
