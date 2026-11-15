@@ -834,20 +834,47 @@ function renderOfficialSourceHelp(){
  }
 }
 function normalizeImportedRiderName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"")}
-function importedAthleteNumber(value){return String(value??"").replace(/[^0-9]/g,"").replace(/^0+(?=\d)/,"")}
+function importedAthleteNumber(value){
+ const raw=String(value??"").normalize("NFKC").trim().toUpperCase().replace(/^#+/,"").replace(/\s+/g,"");
+ const numeric=raw.match(/^0*(\d+)([A-Z]?)$/);
+ return numeric?`${Number(numeric[1])}${numeric[2]}`:raw.replace(/[^A-Z0-9]/g,"");
+}
 function matchOfficialResultAthlete(row){
  const series=$("scoreSeries")?.value||"SMX",division=$("scoreClass")?.value||"",eligible=athletes().filter(a=>athleteEligibleForScoring(a,series,division));
  const sourceName=normalizeImportedRiderName(row.name),sourceNumber=importedAthleteNumber(row.number);
  const byName=sourceName?eligible.filter(a=>normalizeImportedRiderName(name(a))===sourceName):[];
  const byNumber=sourceNumber?eligible.filter(a=>importedAthleteNumber(a.number)===sourceNumber):[];
- let match=null,conflict=false,smxPlateDiffers=false;
- if(byName.length===1){match=byName[0];if(sourceNumber&&importedAthleteNumber(match.number)!==sourceNumber){if(series!=="SMX"){match=null;conflict=true}else smxPlateDiffers=true}}
- else if(byName.length>1&&sourceNumber){const exact=byName.filter(a=>importedAthleteNumber(a.number)===sourceNumber);if(exact.length===1)match=exact[0]}
- else if(!byName.length&&byNumber.length===1)match=byNumber[0];
+ let match=null,matchedByNumber=false,nameDiffers=false,numberDiffers=false;
+ // A unique exact name match takes priority over the race number. Official
+ // numbers can be stale, mistyped, or changed between seasons; when the name
+ // identifies exactly one eligible league athlete, keep that athlete and flag
+ // the number discrepancy for review instead of dropping the result.
+ if(byName.length===1){
+  match=byName[0];
+  numberDiffers=!!sourceNumber&&importedAthleteNumber(match.number)!==sourceNumber;
+ }else if(byName.length>1&&sourceNumber){
+  // If duplicate athlete names exist, use the number only to disambiguate
+  // among those same-name candidates. Never let a conflicting number redirect
+  // a clearly matched name to a different athlete.
+  const exact=byName.filter(a=>importedAthleteNumber(a.number)===sourceNumber);
+  if(exact.length===1)match=exact[0];
+ }else if(!byName.length&&sourceNumber&&byNumber.length===1){
+  // Fall back to a unique number only when the official name did not match an
+  // eligible athlete (or was omitted). This keeps number-only/variant-name
+  // result rows importable without overriding a valid exact name match.
+  match=byNumber[0];matchedByNumber=true;
+  nameDiffers=!!sourceName&&normalizeImportedRiderName(name(match))!==sourceName;
+ }
  const blocked=alreadyScoredAthleteIds(currentScoringScope(),editingScoreGroupKey||"");
  if(match&&blocked.has(id(match)))return {athlete:match,status:"Already scored in this segment",state:"blocked"};
- if(match)return {athlete:match,status:smxPlateDiffers?`Matched by name: official plate #${clean(row.number)}; roster #${clean(match.number)||"—"}`:`Matched: #${clean(match.number)||"—"} ${name(match)}`,state:"matched"};
- return {athlete:null,status:conflict?"Name / number conflict":byNumber.length>1?"Number is ambiguous":"No matching league athlete",state:"unmatched"};
+ if(match){
+  const label=matchedByNumber
+   ?`Matched by number #${clean(row.number)}: ${name(match)}${!sourceName?" (official name not supplied)":nameDiffers?` (official name differs: ${clean(row.name)})`:""}`
+   :numberDiffers?`Matched by name: ${name(match)}; official #${clean(row.number)} differs from league #${clean(match.number)||"—"}`
+   :`Matched: #${clean(match.number)||"—"} ${name(match)}`;
+  return {athlete:match,status:label,state:"matched",matchedByNumber,numberDiffers};
+ }
+ return {athlete:null,status:byName.length>1?"Name is ambiguous":byNumber.length>1?"Number is ambiguous":"No matching league athlete",state:"unmatched"};
 }
 function renderOfficialResultsPreview(){
  const preview=$("officialResultsImportPreview"),summary=$("officialResultsImportSummary"),el=$("officialResultsImportTable");if(!preview||!el)return;
@@ -862,7 +889,7 @@ function renderOfficialResultsPreview(){
  const fastestLapLabel=officialImportMeta?.fastestLap?`<span class="official-import-match">Official fastest lap: ${esc(officialImportMeta.fastestLap.name)}${officialImportMeta.fastestLap.number?` (#${esc(officialImportMeta.fastestLap.number)})`:""}</span>`:"";
  const ncCount=officialImportRows.filter(row=>row.status==="NC"||String(row.displayPosition||"").toUpperCase()==="NC").length;
  summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span>${divisionLabel?`<span class="official-import-match">Class: ${esc(divisionLabel)}</span>`:""}${sessionLabel?`<span>Session: ${esc(sessionLabel)}</span>`:""}${fastestQualifierLabel}${fastestQualifierWarning}${fastestLapLabel}<span>${officialImportRows.length} official rows</span>${ncCount?`<span class="official-import-match">${ncCount} NC driver${ncCount===1?"":"s"} retained in official order</span>`:""}<span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
- el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.displayPosition||row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name)}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
+ el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.displayPosition||row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name||"Name not supplied — number match")}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
 }
 function rematchOfficialResults(){if(!officialImportRows.length)return;officialImportRows=officialImportRows.map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();renderOfficialResultsPreview()}
 async function previewOfficialResults(){

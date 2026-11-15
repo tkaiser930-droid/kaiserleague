@@ -99,30 +99,38 @@ function findColumn(headers, patterns) {
   return headers.findIndex(header => patterns.some(pattern => pattern.test(normalizeHeader(header))));
 }
 
+function numberColumnIndex(headers) {
+  let index = findColumn(headers, [/^(no|number|racenumber|carnumber|carno|driverno|drivernumber|ridernumber|riderno|ridernum|competitornumber|platenumber|plate)$/]);
+  if (index < 0) index = headers.findIndex(header => String(header || "").trim() === "#");
+  return index;
+}
+
 function headerColumns(headers) {
   const position = findColumn(headers, [/^(pos|position|rank|place|finish|finishposition)$/]);
   const name = findColumn(headers, [/^(rider|driver|racer|competitor|athlete|name|ridername|drivername)$/]);
-  return { position, name };
+  const number = numberColumnIndex(headers);
+  return { position, name, number };
 }
 
 function normalizeRows(rawRows, sourceTitle, options = {}) {
   if (!Array.isArray(rawRows) || rawRows.length < 2) {
     throw new Error("No result rows were found. Use an official classification page or export its results as CSV.");
   }
-  let headerIndex = -1, positionIndex = -1, nameIndex = -1;
+  let headerIndex = -1, positionIndex = -1, nameIndex = -1, numberIndex = -1;
   for (let i = 0; i < Math.min(rawRows.length, 30); i++) {
     const headers = rawRows[i].map(cell => String(cell || "").trim());
     const cols = headerColumns(headers);
-    if (cols.position >= 0 && cols.name >= 0) {
-      headerIndex = i; positionIndex = cols.position; nameIndex = cols.name; break;
+    // Some official classifications contain a position and race-number
+    // column even when the rider/driver name cell (or entire name column) is
+    // missing. Keep those rows so the commissioner can match by number.
+    if (cols.position >= 0 && (cols.name >= 0 || cols.number >= 0)) {
+      headerIndex = i; positionIndex = cols.position; nameIndex = cols.name; numberIndex = cols.number; break;
     }
   }
   if (headerIndex < 0) {
-    throw new Error("I couldn't identify the position and rider/driver columns. Use the official result table or a CSV with Position and Rider (or Driver) headers.");
+    throw new Error("I couldn't identify the position and rider/driver or race-number columns. Use the official result table or a CSV with Position and Rider, Driver, or Number headers.");
   }
   const headers = rawRows[headerIndex].map(cell => String(cell || "").trim());
-  let numberIndex = findColumn(headers, [/^(no|number|racenumber|carnumber|ridernumber|ridernum|platenumber|plate)$/]);
-  if (numberIndex < 0) numberIndex = headers.findIndex(header => String(header || "").trim() === "#");
   const teamIndex = findColumn(headers, [/^team/, /^raceteam/, /^constructor$/]);
   const bestLapIndex = findColumn(headers, [/^bestlap/, /^fastestlap/]);
   const divisionIndex = findColumn(headers, [/^(class|division|category|raceclass|seriesclass)$/]);
@@ -137,16 +145,16 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
     const rawPosition = String(cells[positionIndex] || "").trim();
     const status = options.series === "F1" && /^NC$/i.test(rawPosition) ? "NC" : "";
     const position = parsePosition(rawPosition);
-    const riderName = cleanRiderName(cells[nameIndex]);
-    // Formula 1's official classifications display non-classified drivers as
-    // NC after the numbered finishers. Keep those rows in source order and
-    // give them sequential internal slots so they can be reviewed/imported.
-    if ((!position && !status) || !riderName || ["rider", "driver"].includes(normalizeHeader(riderName))) continue;
+    const riderName = nameIndex >= 0 ? cleanRiderName(cells[nameIndex]) : "";
     let number = numberIndex >= 0 ? cleanNumber(cells[numberIndex]) : "";
-    if (!number) {
-      const leadingNumber = String(cells[nameIndex] || "").trim().match(/^#?(\d{1,3})\s+.+$/);
+    if (!number && nameIndex >= 0) {
+      const leadingNumber = String(cells[nameIndex] || "").trim().match(/^#?(\d{1,3}[A-Za-z]?)\s+.+$/);
       if (leadingNumber) number = leadingNumber[1];
     }
+    // Keep a classification row if it has either a usable name or a race
+    // number. A unique number is sufficient for the browser to match it to a
+    // league athlete, including across series when the name is blank or differs.
+    if ((!position && !status) || (!riderName && !number) || ["rider", "driver"].includes(normalizeHeader(riderName))) continue;
     normalized.push({
       position,
       displayPosition: status || String(position),
@@ -233,11 +241,11 @@ function parseHtmlTable(tableHtml, sourceTitle, options = {}) {
   for (let i = 0; i < Math.min(rawRows.length, 20); i++) {
     const headers = rawRows[i].map(cell => stripHtml(cell));
     const cols = headerColumns(headers);
-    if (cols.position >= 0 && cols.name >= 0) { headerIndex = i; nameIndex = cols.name; break; }
+    if (cols.position >= 0 && (cols.name >= 0 || cols.number >= 0)) { headerIndex = i; nameIndex = cols.name; break; }
   }
   if (headerIndex < 0) return null;
   const mapped = rawRows.map((cells, rowIndex) => cells.map((cell, columnIndex) => {
-    if (rowIndex > headerIndex && columnIndex === nameIndex) return extractRiderCell(cell);
+    if (rowIndex > headerIndex && nameIndex >= 0 && columnIndex === nameIndex) return extractRiderCell(cell);
     return stripHtml(cell);
   }));
   const headerCount = mapped[headerIndex].length;
@@ -297,7 +305,7 @@ function parseHtml(html, sourceTitle = "Official race results", options = {}) {
     }
     throw new Error(`No ${target} results table was found. Open the selected event in the official SMX archive, then use its ${target} result link for the correct session (for example, ${target} Moto #1 or ${target} Overall Results).`);
   }
-  if (/\b(position|pos)\b.{0,80}\b(rider|driver|name)\b/i.test(source) && source.includes(",")) return parseCsv(source, sourceTitle, options);
+  if (/\b(position|pos)\b.{0,100}\b(rider|driver|name|number|no)\b/i.test(source) && source.includes(",")) return parseCsv(source, sourceTitle, options);
   throw new Error("The official page did not expose a readable results table. Try its direct session-results link or upload the official CSV export.");
 }
 
