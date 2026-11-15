@@ -265,47 +265,6 @@ const RACE_TEAM_BRANDS={
  "Red Bull KTM Tech3":{"color":"#F36C21","accent":"#142448","number":"#FF8747","image":"https://www.teamtech3.fr/Tech3-team-logo-2025.jpg","fallbackImage":"assets/logos/race-teams/red-bull-ktm-tech3.svg","fit":"square"},
  "Superfile Trackhouse MotoGP Team":{"color":"#0876B9","accent":"#D7EF00","number":"#43AEE4","image":"assets/logos/race-teams/superfile-trackhouse-motogp-user.png","fit":"wide"}
 };
-
-// MXGP/MX2, SMX and Triple Crown Series team marks from the uploaded league backup.
-// Existing F1 and MotoGP entries above remain unchanged.
-Object.assign(RACE_TEAM_BRANDS, {
- "Beddini Racing Ducati Corse Factory MX2 Team":{"color":"#C8102E","accent":"#F5F5F5","number":"#C8102E","image":"assets/logos/race-teams/beddini-racing-ducati-corse-factory-mx2-team.svg","fit":"wide"},
- "HLA ZXMoto JM Racing Factory Team":{"color":"#00A6A6","accent":"#101820","number":"#00A6A6","image":"assets/logos/race-teams/hla-zxmoto-jm-racing-factory-team.svg","fit":"wide"},
- "Honda HRC Petronas":{"color":"#D71920","accent":"#00529B","number":"#D71920","image":"https://www.mxgp.com/sites/default/files/styles/team_logo_detail/public/team/image/Honda%20HRC%20Petronas_2.png?itok=ibcVduy-","fallbackImage":"assets/logos/race-teams/honda-hrc-petronas.svg","fit":"wide"},
- "Kawasaki Racing Team":{"color":"#006B3F","accent":"#E6FF00","number":"#006B3F","image":"https://www.mxgp.com/sites/default/files/styles/team_logo_detail/public/team/image/LOGO_OK_9.jpg?itok=PbUfpuzU","fallbackImage":"assets/logos/race-teams/kawasaki-racing-team.svg","fit":"wide"},
- "Monster Energy Yamaha Factory MXGP":{"color":"#003399","accent":"#D7E3FF","number":"#003399","image":"https://www.mxgp.com/sites/default/files/styles/team_logo_detail/public/team/image/YAMAHA%20FACTORY%20MXGP_3.jpg?itok=d_9Yf81F","fallbackImage":"assets/logos/race-teams/monster-energy-yamaha-factory-mxgp.svg","fit":"wide"},
- "Neestan Husqvarna Factory Racing":{"color":"#002B49","accent":"#F3A712","number":"#002B49","image":"https://www.mxgp.com/sites/default/files/styles/team_logo_detail/public/team/image/Nestaan%20Husqvarna%20Factory_0.png?itok=sMuQZvnZ","fallbackImage":"assets/logos/race-teams/neestan-husqvarna-factory-racing.svg","fit":"wide"},
- "Red Bull Ducati Factory MXGP Team":{"color":"#C8102E","accent":"#0A0A0A","number":"#C8102E","image":"https://www.mxgp.com/sites/default/files/styles/team_logo_detail/public/team/image/_MXGP_Team_Logo_TOKR%20copia_0.jpg?itok=ohQovTQy","fallbackImage":"assets/logos/race-teams/red-bull-ducati-factory-mxgp-team.svg","fit":"wide"},
- "Team Honda Motoblouz SR Motul":{"color":"#D71920","accent":"#101820","number":"#D71920","image":"https://www.mxgp.com/sites/default/files/styles/team_logo_detail/public/team/image/Team%20Honda%20Motoblouz%20SR%20Motul__2.png?itok=lPDde7B7","fallbackImage":"assets/logos/race-teams/team-honda-motoblouz-sr-motul.svg","fit":"wide"},
- "Triumph Factory Racing":{"color":"#111111","accent":"#D6D6D6","number":"#111111","image":"assets/logos/race-teams/triumph-factory-racing.svg","fit":"wide"},
- "Van Venrooy KTM Racing":{"color":"#F36C21","accent":"#111111","number":"#F36C21","image":"https://www.mxgp.com/sites/default/files/styles/team_logo_detail/public/team/image/Venrooy%20LTM__0.png?itok=7DrK3duu","fallbackImage":"assets/logos/race-teams/van-venrooy-ktm-racing.svg","fit":"wide"},
- "AEO Powersports Husqvarna":{"color":"#005C97","accent":"#F4F4F4","number":"#005C97","image":"assets/logos/race-teams/aeo-powersports-husqvarna.svg","fit":"wide"},
- "Champion Tool Storage KMR KTM Racing":{"color":"#F36C21","accent":"#111111","number":"#F36C21","image":"assets/logos/race-teams/champion-tool-storage-kmr-ktm-racing.svg","fit":"wide"},
- "ClubMX Yamaha":{"color":"#003399","accent":"#FFCC00","number":"#003399","image":"https://www.supercross.com/cdn/shop/files/ClubMX.png?v=1790715933&width=240","fallbackImage":"assets/logos/race-teams/clubmx-yamaha.svg","fit":"wide"},
- "Heartbeat Hot Sauce Solitaire Yamaha":{"color":"#C8102E","accent":"#F5F5F5","number":"#C8102E","image":"assets/logos/race-teams/heartbeat-hot-sauce-solitaire-yamaha.svg","fit":"wide"},
- "Honda HRC Progressive":{"color":"#D71920","accent":"#00529B","number":"#D71920","image":"https://www.supercross.com/cdn/shop/files/HRC_Honda.png?v=1782340488&width=240","fallbackImage":"assets/logos/race-teams/honda-hrc-progressive.svg","fit":"wide"},
- "ISRT Kawasaki":{"color":"#006B3F","accent":"#D7FF00","number":"#006B3F","image":"https://www.supercross.com/cdn/shop/files/ISRT.png?v=1784155989&width=240","fallbackImage":"assets/logos/race-teams/isrt-kawasaki.svg","fit":"wide"},
- "Liqui Moly Beta Factory Racing":{"color":"#C8102E","accent":"#00529B","number":"#C8102E","image":"assets/logos/race-teams/liqui-moly-beta-factory-racing.svg","fit":"wide"},
- "Monster Energy Kawasaki":{"color":"#006B3F","accent":"#D7FF00","number":"#006B3F","image":"https://kawasaki-global-admin.com/ContentStorage/KMC/RacingTeams/1/9e9bcea2-7a5a-4f4b-b056-18fb0d42c0a3.jpg","fallbackImage":"assets/logos/race-teams/monster-energy-kawasaki-official.webp","fit":"wide"},
- "Monster Energy Pro Circuit Kawasaki":{"color":"#006B3F","accent":"#D7FF00","number":"#006B3F","image":"https://kawasaki-global-admin.com/ContentStorage/KMC/RacingTeams/2/a1e1ddc3-4978-46a0-b86a-2a0d98865de5.jpg","fallbackImage":"assets/logos/race-teams/monster-energy-pro-circuit-kawasaki-official.webp","fit":"wide"},
- "Monster Energy Star Racing Yamaha":{"color":"#003399","accent":"#D7E3FF","number":"#003399","image":"https://www.supercross.com/cdn/shop/files/star_racing_logo.png?v=1783029085&width=240","fallbackImage":"assets/logos/race-teams/monster-energy-star-racing-yamaha.svg","fit":"wide"},
- "Mx6 Kawasaki":{"color":"#006B3F","accent":"#E6FF00","number":"#006B3F","image":"assets/logos/race-teams/mx6-kawasaki.svg","fit":"wide"},
- "Phoenix Racing Honda":{"color":"#D71920","accent":"#F5F5F5","number":"#D71920","image":"assets/logos/race-teams/phoenix-racing-honda.svg","fit":"wide"},
- "PMG Suzuki":{"color":"#E5B900","accent":"#101820","number":"#E5B900","image":"assets/logos/race-teams/pmg-suzuki.svg","fit":"wide"},
- "Quadlock Honda":{"color":"#111827","accent":"#E6F21A","number":"#111827","image":"https://www.supercross.com/cdn/shop/files/sx-lineups-v2-quad-d8e0c73e69.png?v=1792616978&width=240","fallbackImage":"assets/logos/race-teams/quadlock-honda.svg","fit":"wide"},
- "Rocky Mountain ATV/MC Monster Energy Team Tedder Husqvarna Racing":{"color":"#151515","accent":"#8FCB32","number":"#151515","image":"https://www.supercross.com/cdn/shop/files/sx-lineups-v2-tedder-a39c4f9a0f.png?v=1792616963&width=240","fallbackImage":"assets/logos/race-teams/rocky-mountain-atv-mc-monster-energy-team-tedder-husqvarna-racing.svg","fit":"wide"},
- "Rokit Partzilla PRMX Yamaha":{"color":"#003399","accent":"#D7193F","number":"#003399","image":"assets/logos/race-teams/rokit-partzilla-prmx-yamaha.svg","fit":"wide"},
- "Toyota of Redlands BarX Husqvarna":{"color":"#CF202E","accent":"#F5F5F5","number":"#CF202E","image":"assets/logos/race-teams/toyota-of-redlands-barx-husqvarna.svg","fit":"wide"},
- "Troy Lee Designs Red Bull Ducati Factory Racing":{"color":"#C8102E","accent":"#101820","number":"#C8102E","image":"https://www.supercross.com/cdn/shop/files/troy_lee_designs_logo.png?v=1784159529&width=240","fallbackImage":"assets/logos/race-teams/troy-lee-designs-red-bull-ducati-factory-racing.svg","fit":"wide"},
- "AVL Husqvarna":{"color":"#101820","accent":"#D3212D","number":"#101820","image":"assets/logos/race-teams/avl-husqvarna.svg","fit":"wide"},
- "Dusty Rocks Yamaha":{"color":"#003399","accent":"#D7E3FF","number":"#003399","image":"assets/logos/race-teams/dusty-rocks-yamaha.svg","fit":"wide"},
- "GDR Honda":{"color":"#D71920","accent":"#F5F5F5","number":"#D71920","image":"assets/logos/race-teams/gdr-honda.svg","fit":"wide"},
- "Guaranteed Comfort Honda":{"color":"#D71920","accent":"#F5F5F5","number":"#D71920","image":"assets/logos/race-teams/guaranteed-comfort-honda.svg","fit":"wide"},
- "Kawasaki SSR":{"color":"#006B3F","accent":"#E6FF00","number":"#006B3F","image":"assets/logos/race-teams/kawasaki-ssr.svg","fit":"wide"},
- "KTM Canada Red Bull":{"color":"#F36C21","accent":"#0A0A0A","number":"#F36C21","image":"assets/logos/race-teams/ktm-canada-red-bull.svg","fit":"wide"},
- "MX101 FXR Yamaha":{"color":"#003399","accent":"#E7B527","number":"#003399","image":"assets/logos/race-teams/mx101-fxr-yamaha.svg","fit":"wide"},
- "Priority MX Thor GasGas":{"color":"#E60012","accent":"#0A0A0A","number":"#E60012","image":"assets/logos/race-teams/priority-mx-thor-gasgas.svg","fit":"wide"}
-});
 function raceTeamBrand(value){
  const key=norm(value);
  const aliases={lcrhondacastrol:"Castrol Honda LCR",hondalcrcastrol:"Castrol Honda LCR",hondalcr:"Castrol Honda LCR",gresiniracingmotogp:"BK8 Gresini Racing MotoGP"};
@@ -315,7 +274,6 @@ function raceTeamBrand(value){
  return null;
 }
 function isTeamColorSeries(athlete){return ["F1","MOTOGP"].includes(cls(athlete).toUpperCase());}
-function isRaceTeamDirectorySeries(athlete){return ["F1","MOTOGP","MXGP","MX2","250","450","CAN 250","CAN 450"].includes(cls(athlete).toUpperCase());}
 function athleteSidebarColor(athlete){if(isTeamColorSeries(athlete)&&clean(athlete?.raceTeam)){const team=raceTeamBrand(athlete.raceTeam);if(team?.color)return team.color;if(team?.accent)return team.accent;}return mcolor(athlete?.manufacturer);}
 function raceTeamBannerHTML(value,displayValue=value,kicker="RACE TEAM",variant="profile"){
  const raw=clean(value)||"Unknown Race Team",config=raceTeamBrand(raw)||{color:"#344054",accent:"#CBD5E1",image:"",fit:"wide"};
@@ -506,7 +464,7 @@ function directoryGroups(page){
  });
  return [...groups.values()].map(group=>{
   const groupAthletes=sortRiders(group.athletes);
-  const useRaceTeamBrand=field==="raceTeam"&&groupAthletes.length>0&&groupAthletes.every(isRaceTeamDirectorySeries)&&!!raceTeamBrand(group.label);
+  const useRaceTeamBrand=field==="raceTeam"&&groupAthletes.length>0&&groupAthletes.every(isTeamColorSeries)&&!!raceTeamBrand(group.label);
   let bannerBrand=group.label;
   if(field==="raceTeam"&&!useRaceTeamBrand)bannerBrand=[...group.brands.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label))[0]?.label||group.label;
   return {...group,bannerBrand,useRaceTeamBrand,athletes:groupAthletes};
