@@ -7,13 +7,13 @@ The Commissioner → Scoring tab includes a preview-first results importer. It a
 
 Supported official host groups are restricted server-side by series:
 
-- SMX: supercross.com and results.supercrosslive.com.
+- SMX: supermotocross.com (official results archive and class/session result pages), results.supermotocross.com (legacy archive), supercross.com, results.supercrosslive.com, and results.supercross.com.
 - Triple Crown Series: triplecrownseries.ca and its official Trackside / LiveLaps timing hosts.
 - MXGP / MXON: mxgp.com, results.mxgp.com, docs.mxgp.com, and fim-moto.com.
 - F1: formula1.com.
 - MotoGP: motogp.com and stats.motogp.com.
 
-The server rejects non-HTTPS URLs, unknown hosts, non-standard ports, and redirects outside the approved domain list. Source pages are limited to 5 MB and requests time out after 12 seconds. The importer does not write league scores automatically. It previews rows, matches riders to the selected fantasy division by name and number, and then loads matched positions into the existing scoring table for commissioner review. When Best Lap values are included and the selected scoring mode has a generic Fastest Lap bonus, the quickest classified rider's Fastest Lap checkbox is preselected. Other bonuses must be checked by the commissioner.
+The server rejects non-HTTPS URLs, unknown hosts, non-standard ports, and redirects outside the approved domain list. Source pages are limited to 5 MB and requests time out after 12 seconds. For SMX, the importer follows the selected event on the official SuperMotocross archive to its class-specific result link (for example, `/250-moto-1/`, `/450-moto-1/`, `/250-main-event/`, `/450-main-event/`, or `/overall/250/`). It then verifies that the fetched page matches the selected 250 or 450 class before parsing. Official rider image alt text is used to avoid mixing hometown text into rider names; official number suffixes such as `1W` are preserved. The importer does not write league scores automatically. It previews rows, matches riders to the selected fantasy division by name and number, and then loads matched positions into the existing scoring table for commissioner review. When Best Lap values are included and the selected scoring mode has a generic Fastest Lap bonus, the quickest classified rider's Fastest Lap checkbox is preselected. Other bonuses must be checked by the commissioner.
 
 Official pages that require sign-in, render results only after client-side scripts, or provide only PDF / Excel files may not be parsed directly. In those cases, use the official CSV export if available. Direct PDF and Excel imports are not currently supported.
 

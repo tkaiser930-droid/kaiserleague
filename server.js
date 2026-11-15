@@ -192,7 +192,11 @@ async function readBody(req) {
 async function handleApi(req, res, url) {
   if (url.pathname === "/api/results/preview" && req.method === "POST") {
     const body = await readBody(req);
-    const result = await fetchOfficialResults({ url: body.url, series: body.series, csv: body.csv });
+    const result = await fetchOfficialResults({
+      url: body.url, series: body.series, division: body.division, csv: body.csv, csvName: body.csvName,
+      event: body.event, round: body.round, eventDate: body.eventDate, eventType: body.eventType,
+      phase: body.phase, supercrossFormat: body.supercrossFormat
+    });
     return send(res, 200, result);
   }
   if (url.pathname === "/api/github/status" && req.method === "GET") {

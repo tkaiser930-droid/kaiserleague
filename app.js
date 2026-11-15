@@ -808,7 +808,7 @@ function renderScoreEntryTable(){
 }
 function updateScoreRow(row){if(!row)return;const bonus=[...row.querySelectorAll('[data-bonus]:checked')].reduce((sum,input)=>sum+Number(input.dataset.points||2),0)*Number(row.dataset.multiplier||1),base=Number(row.dataset.basePoints||0);const bp=row.querySelector('.score-bonus-points'),total=row.querySelector('.score-total');if(bp)bp.textContent=String(bonus);if(total)total.textContent=String(base+bonus);row.classList.toggle('score-row-selected',!!row.querySelector('.score-rider-select')?.value)}
 const OFFICIAL_RESULT_SOURCES={
- SMX:{url:"https://www.supercross.com/pages/results",help:"Open the official Supercross / SMX results archive, choose the event, then copy the direct session-results link (for example a 250 or 450 Main Event result). Official timing pages from results.supercrosslive.com are supported."},
+ SMX:{url:"https://www.supermotocross.com/results",help:"Use the official SuperMotocross results archive. Select the scheduled event, 250 or 450 class, and scoring segment first. Pasting this archive link follows the selected event to its exact class/session results; direct class-specific results links also work. A 250 selection imports 250 results only, and a 450 selection imports 450 results only."},
  "Triple Crown Series":{url:"https://triplecrownseries.ca/results/",help:"Open the official Triple Crown Series results archive or its Live Timing page. Paste a direct result table link, or download an official CSV export from the timing provider and upload it here."},
  MXGP:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP result files. If the classification is supplied as PDF or Excel only, export/save it as CSV with Position and Rider columns before uploading; direct PDF/Excel parsing is not enabled yet."},
  MXON:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP / Motocross of Nations result files. Paste a readable official results-table URL or upload an official CSV classification."},
@@ -819,9 +819,18 @@ let officialImportRows=[],officialImportMeta=null,officialImportScopeSnapshot=nu
 function officialImportScope(){return JSON.stringify(currentScoringScope())}
 function officialSourceInfo(){return OFFICIAL_RESULT_SOURCES[$("scoreSeries")?.value||"SMX"]||OFFICIAL_RESULT_SOURCES.SMX}
 function renderOfficialSourceHelp(){
- const source=officialSourceInfo(),link=$("officialResultsSourceLink"),help=$("officialResultsSourceHelp");
+ const series=$("scoreSeries")?.value||"SMX",source=officialSourceInfo(),link=$("officialResultsSourceLink"),help=$("officialResultsSourceHelp"),urlInput=$("officialResultsUrl");
  if(link){link.href=source.url;link.textContent="Open official results source ↗"}
  if(help)help.textContent=source.help+" CSV columns required: Position and Rider (or Driver); Number, Team and Best Lap are optional.";
+ // Keep the SMX archive prefilled, but don't overwrite a URL the commissioner typed.
+ if(urlInput){
+  const previousAuto=clean(urlInput.dataset.autoSourceUrl),current=clean(urlInput.value);
+  if(!current||current===previousAuto){
+   const next=series==="SMX"?source.url:"";
+   urlInput.value=next;
+   urlInput.dataset.autoSourceUrl=next;
+  }
+ }
 }
 function normalizeImportedRiderName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"")}
 function importedAthleteNumber(value){return String(value??"").replace(/[^0-9]/g,"").replace(/^0+(?=\d)/,"")}
@@ -830,13 +839,13 @@ function matchOfficialResultAthlete(row){
  const sourceName=normalizeImportedRiderName(row.name),sourceNumber=importedAthleteNumber(row.number);
  const byName=sourceName?eligible.filter(a=>normalizeImportedRiderName(name(a))===sourceName):[];
  const byNumber=sourceNumber?eligible.filter(a=>importedAthleteNumber(a.number)===sourceNumber):[];
- let match=null,conflict=false;
- if(byName.length===1){match=byName[0];if(sourceNumber&&importedAthleteNumber(match.number)!==sourceNumber){match=null;conflict=true}}
+ let match=null,conflict=false,smxPlateDiffers=false;
+ if(byName.length===1){match=byName[0];if(sourceNumber&&importedAthleteNumber(match.number)!==sourceNumber){if(series!=="SMX"){match=null;conflict=true}else smxPlateDiffers=true}}
  else if(byName.length>1&&sourceNumber){const exact=byName.filter(a=>importedAthleteNumber(a.number)===sourceNumber);if(exact.length===1)match=exact[0]}
  else if(!byName.length&&byNumber.length===1)match=byNumber[0];
  const blocked=alreadyScoredAthleteIds(currentScoringScope(),editingScoreGroupKey||"");
  if(match&&blocked.has(id(match)))return {athlete:match,status:"Already scored in this segment",state:"blocked"};
- if(match)return {athlete:match,status:`Matched: #${clean(match.number)||"—"} ${name(match)}`,state:"matched"};
+ if(match)return {athlete:match,status:smxPlateDiffers?`Matched by name: official plate #${clean(row.number)}; roster #${clean(match.number)||"—"}`:`Matched: #${clean(match.number)||"—"} ${name(match)}`,state:"matched"};
  return {athlete:null,status:conflict?"Name / number conflict":byNumber.length>1?"Number is ambiguous":"No matching league athlete",state:"unmatched"};
 }
 function renderOfficialResultsPreview(){
@@ -845,7 +854,9 @@ function renderOfficialResultsPreview(){
  const matched=officialImportRows.filter(row=>row.match.state==="matched").length,blocked=officialImportRows.filter(row=>row.match.state==="blocked").length,unmatched=officialImportRows.length-matched-blocked;
  preview.hidden=false;
  const sourceLabel=officialImportMeta?.source==="Official CSV upload"?"Official CSV upload":(()=>{try{return new URL(officialImportMeta?.source||"").hostname||"Official results page"}catch{return "Official results page"}})();
- summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span><span>${officialImportRows.length} official rows</span><span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
+ const divisionLabel=officialImportMeta?.division?`${officialImportMeta.division} class`:"";
+ const sessionLabel=officialImportMeta?.sessionTitle||"";
+ summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span>${divisionLabel?`<span class="official-import-match">Class: ${esc(divisionLabel)}</span>`:""}${sessionLabel?`<span>Session: ${esc(sessionLabel)}</span>`:""}<span>${officialImportRows.length} official rows</span><span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
  el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name)}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
 }
 function rematchOfficialResults(){if(!officialImportRows.length)return;officialImportRows=officialImportRows.map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();renderOfficialResultsPreview()}
@@ -854,13 +865,27 @@ async function previewOfficialResults(){
  if(!file&&!url){message.textContent="Paste an official results URL or choose an official CSV file.";return}
  button.disabled=true;message.textContent="Fetching the official results and matching riders…";officialImportRows=[];officialImportMeta=null;renderOfficialResultsPreview();
  try{
-  const body={series};if(file){if(file.size>5*1024*1024)throw new Error("CSV files must be 5 MB or smaller.");body.csv=await file.text()}else body.url=url;
+  const scheduled=selectedScoreScheduleEvent();
+  const body={
+   series,
+   division:$("scoreClass")?.value||"",
+   event:clean($("scoreEvent")?.value||scheduled?.name),
+   round:clean($("scoreRound")?.value||scheduled?.round),
+   eventDate:scheduled?.date||"",
+   eventType:series==="SMX"?currentSmxEventType():"",
+   phase:series==="SMX"?scoringPhase:"",
+   supercrossFormat:series==="SMX"?$("scoreSmxSupercrossFormat")?.value||"Standard":""
+  };
+  if(file){if(file.size>5*1024*1024)throw new Error("CSV files must be 5 MB or smaller.");body.csv=await file.text();body.csvName=file.name||"Official CSV results"}else body.url=url;
   const response=await fetch("/api/results/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   let payload={};try{payload=await response.json()}catch{}
   if(!response.ok)throw new Error(payload.error||`Import request failed (${response.status}).`);
   officialImportMeta=payload;officialImportRows=(payload.rows||[]).map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();
   if(!officialImportRows.length)throw new Error("No classified riders were returned by that source.");
-  renderOfficialResultsPreview();message.textContent=`Preview loaded from ${payload.title||"the official source"}. Review the matches below, then load positions into the scoring grid.`;
+  renderOfficialResultsPreview();
+  const importedClass=payload.division?` for the ${payload.division} class`:"";
+  const importedSession=payload.sessionTitle?` (${payload.sessionTitle})`:"";
+  message.textContent=`Preview loaded${importedClass}${importedSession} from ${payload.title||"the official source"}. Only this class/session was imported. Review the matches below, then load positions into the scoring grid.`;
  }catch(error){message.textContent=error.message||"Could not import the official results.";if(String(error.message||"").includes("Failed to fetch"))message.textContent="Could not reach the results-import endpoint. Run the site with npm start (not VS Code Live Server) and try again."}
  finally{button.disabled=false}
 }
@@ -885,7 +910,7 @@ function applyOfficialResults(){
  message.textContent=`Loaded ${loaded} rider position${loaded===1?"":"s"} into the scoring table. ${skipped} unmatched/already-scored rows, ${duplicate} duplicate athlete rows and ${outOfRange} positions outside this scoring table were skipped. If the official source included best-lap times, the fastest-lap bonus was preselected; verify all bonuses and positions before recording results.`;
  $("scoreEntryTable")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
-function clearOfficialResults(){officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;if($("officialResultsUrl"))$("officialResultsUrl").value="";if($("officialResultsCsv"))$("officialResultsCsv").value="";if($("officialResultsImportMessage"))$("officialResultsImportMessage").textContent="Import preview cleared.";renderOfficialResultsPreview()}
+function clearOfficialResults(){officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;if($("officialResultsUrl"))$("officialResultsUrl").value="";if($("officialResultsCsv"))$("officialResultsCsv").value="";if($("officialResultsImportMessage"))$("officialResultsImportMessage").textContent="Import preview cleared.";renderOfficialSourceHelp();renderOfficialResultsPreview()}
 function setupOfficialResultsImport(){
  renderOfficialSourceHelp();
  $("previewOfficialResults")?.addEventListener("click",previewOfficialResults);
