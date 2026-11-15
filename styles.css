@@ -383,3 +383,24 @@ body[data-page="home"] #topUndraftedAthletes {
 .team-trade-alert a{flex:0 0 auto;color:var(--gold);font-size:11px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
 .team-trade-alert a:hover,.team-trade-alert a:focus-visible{color:#f5d98e}
 @media(max-width:600px){.team-trade-alert{align-items:flex-start;flex-direction:column;gap:5px}}
+
+/* Official results importer */
+.official-import-panel{margin:0 0 22px;padding:16px;border:1px solid rgba(214,180,92,.38);border-radius:14px;background:linear-gradient(145deg,rgba(214,180,92,.075),rgba(115,75,180,.07));}
+.official-import-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.official-import-heading h2{margin:0 0 6px}
+.official-import-heading .muted{margin:0;max-width:780px}
+.official-import-controls{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(230px,1fr);gap:12px;margin:12px 0 8px}
+.official-import-controls label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.official-import-controls input{width:100%;min-width:0}
+.official-import-help{font-size:12px;margin:8px 0 12px}
+.official-source-link{white-space:nowrap;font-weight:800;color:var(--gold,#d6b45c);text-decoration:none}
+.official-import-preview{margin-top:14px;padding-top:14px;border-top:1px solid rgba(214,180,92,.24)}
+.official-import-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-weight:800}
+.official-import-summary span{padding:7px 10px;border-radius:8px;background:rgba(255,255,255,.055)}
+.official-import-match{font-weight:800;color:#73d69a}
+.official-import-unmatched{font-weight:800;color:#e4a35c}
+.official-import-blocked{font-weight:800;color:#ed8b8b}
+.official-import-preview .table{max-height:360px;overflow:auto;margin:10px 0}
+.official-import-preview table{min-width:640px}
+.official-import-preview td,.official-import-preview th{padding:7px 9px}
+@media(max-width:680px){.official-import-heading{display:block}.official-import-heading .official-source-link{display:inline-block;margin-top:10px}.official-import-controls{grid-template-columns:1fr}.official-import-panel{padding:12px}}

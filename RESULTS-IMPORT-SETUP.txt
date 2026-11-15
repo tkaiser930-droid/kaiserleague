@@ -1,0 +1,20 @@
+# Official race-results importer
+
+The Commissioner → Scoring tab includes a preview-first results importer. It accepts:
+
+- Direct HTTPS official results pages when the page exposes an HTML results table.
+- Official CSV exports with a Position and Rider (or Driver) column. Optional columns are Number, Team, and Best Lap.
+
+Supported official host groups are restricted server-side by series:
+
+- SMX: supercross.com and results.supercrosslive.com.
+- Triple Crown Series: triplecrownseries.ca and its official Trackside / LiveLaps timing hosts.
+- MXGP / MXON: mxgp.com, results.mxgp.com, docs.mxgp.com, and fim-moto.com.
+- F1: formula1.com.
+- MotoGP: motogp.com and stats.motogp.com.
+
+The server rejects non-HTTPS URLs, unknown hosts, non-standard ports, and redirects outside the approved domain list. Source pages are limited to 5 MB and requests time out after 12 seconds. The importer does not write league scores automatically. It previews rows, matches riders to the selected fantasy division by name and number, and then loads matched positions into the existing scoring table for commissioner review. When Best Lap values are included and the selected scoring mode has a generic Fastest Lap bonus, the quickest classified rider's Fastest Lap checkbox is preselected. Other bonuses must be checked by the commissioner.
+
+Official pages that require sign-in, render results only after client-side scripts, or provide only PDF / Excel files may not be parsed directly. In those cases, use the official CSV export if available. Direct PDF and Excel imports are not currently supported.
+
+Run the site with `npm start` (not VS Code Live Server) because URL fetching is performed by the Node server at `/api/results/preview`.

@@ -807,6 +807,93 @@ function renderScoreEntryTable(){
  const title=$("scoreEntryHeading");if(title)title.textContent=config.phase?`${config.phase} Results`:`${config.eventType||series} Results`;
 }
 function updateScoreRow(row){if(!row)return;const bonus=[...row.querySelectorAll('[data-bonus]:checked')].reduce((sum,input)=>sum+Number(input.dataset.points||2),0)*Number(row.dataset.multiplier||1),base=Number(row.dataset.basePoints||0);const bp=row.querySelector('.score-bonus-points'),total=row.querySelector('.score-total');if(bp)bp.textContent=String(bonus);if(total)total.textContent=String(base+bonus);row.classList.toggle('score-row-selected',!!row.querySelector('.score-rider-select')?.value)}
+const OFFICIAL_RESULT_SOURCES={
+ SMX:{url:"https://www.supercross.com/pages/results",help:"Open the official Supercross / SMX results archive, choose the event, then copy the direct session-results link (for example a 250 or 450 Main Event result). Official timing pages from results.supercrosslive.com are supported."},
+ "Triple Crown Series":{url:"https://triplecrownseries.ca/results/",help:"Open the official Triple Crown Series results archive or its Live Timing page. Paste a direct result table link, or download an official CSV export from the timing provider and upload it here."},
+ MXGP:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP result files. If the classification is supplied as PDF or Excel only, export/save it as CSV with Position and Rider columns before uploading; direct PDF/Excel parsing is not enabled yet."},
+ MXON:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP / Motocross of Nations result files. Paste a readable official results-table URL or upload an official CSV classification."},
+ F1:{url:"https://www.formula1.com/en/results",help:"Open the official Formula 1 results archive and copy the direct Race Result or Sprint Result page URL. The importer uses the official position and driver columns."},
+ MotoGP:{url:"https://stats.motogp.com/en/gp-results",help:"Open the official MotoGP Results archive and copy the direct Grand Prix or Sprint classification URL. If the page requires sign-in or blocks automated reading, download an official CSV export and upload it."}
+};
+let officialImportRows=[],officialImportMeta=null,officialImportScopeSnapshot=null;
+function officialImportScope(){return JSON.stringify(currentScoringScope())}
+function officialSourceInfo(){return OFFICIAL_RESULT_SOURCES[$("scoreSeries")?.value||"SMX"]||OFFICIAL_RESULT_SOURCES.SMX}
+function renderOfficialSourceHelp(){
+ const source=officialSourceInfo(),link=$("officialResultsSourceLink"),help=$("officialResultsSourceHelp");
+ if(link){link.href=source.url;link.textContent="Open official results source ↗"}
+ if(help)help.textContent=source.help+" CSV columns required: Position and Rider (or Driver); Number, Team and Best Lap are optional.";
+}
+function normalizeImportedRiderName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"")}
+function importedAthleteNumber(value){return String(value??"").replace(/[^0-9]/g,"").replace(/^0+(?=\d)/,"")}
+function matchOfficialResultAthlete(row){
+ const series=$("scoreSeries")?.value||"SMX",division=$("scoreClass")?.value||"",eligible=athletes().filter(a=>athleteEligibleForScoring(a,series,division));
+ const sourceName=normalizeImportedRiderName(row.name),sourceNumber=importedAthleteNumber(row.number);
+ const byName=sourceName?eligible.filter(a=>normalizeImportedRiderName(name(a))===sourceName):[];
+ const byNumber=sourceNumber?eligible.filter(a=>importedAthleteNumber(a.number)===sourceNumber):[];
+ let match=null,conflict=false;
+ if(byName.length===1){match=byName[0];if(sourceNumber&&importedAthleteNumber(match.number)!==sourceNumber){match=null;conflict=true}}
+ else if(byName.length>1&&sourceNumber){const exact=byName.filter(a=>importedAthleteNumber(a.number)===sourceNumber);if(exact.length===1)match=exact[0]}
+ else if(!byName.length&&byNumber.length===1)match=byNumber[0];
+ const blocked=alreadyScoredAthleteIds(currentScoringScope(),editingScoreGroupKey||"");
+ if(match&&blocked.has(id(match)))return {athlete:match,status:"Already scored in this segment",state:"blocked"};
+ if(match)return {athlete:match,status:`Matched: #${clean(match.number)||"—"} ${name(match)}`,state:"matched"};
+ return {athlete:null,status:conflict?"Name / number conflict":byNumber.length>1?"Number is ambiguous":"No matching league athlete",state:"unmatched"};
+}
+function renderOfficialResultsPreview(){
+ const preview=$("officialResultsImportPreview"),summary=$("officialResultsImportSummary"),el=$("officialResultsImportTable");if(!preview||!el)return;
+ if(!officialImportRows.length){preview.hidden=true;summary.innerHTML="";el.innerHTML="";return}
+ const matched=officialImportRows.filter(row=>row.match.state==="matched").length,blocked=officialImportRows.filter(row=>row.match.state==="blocked").length,unmatched=officialImportRows.length-matched-blocked;
+ preview.hidden=false;
+ const sourceLabel=officialImportMeta?.source==="Official CSV upload"?"Official CSV upload":(()=>{try{return new URL(officialImportMeta?.source||"").hostname||"Official results page"}catch{return "Official results page"}})();
+ summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span><span>${officialImportRows.length} official rows</span><span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
+ el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name)}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
+}
+function rematchOfficialResults(){if(!officialImportRows.length)return;officialImportRows=officialImportRows.map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();renderOfficialResultsPreview()}
+async function previewOfficialResults(){
+ const button=$("previewOfficialResults"),message=$("officialResultsImportMessage"),file=$("officialResultsCsv")?.files?.[0],url=clean($("officialResultsUrl")?.value),series=$("scoreSeries")?.value||"SMX";
+ if(!file&&!url){message.textContent="Paste an official results URL or choose an official CSV file.";return}
+ button.disabled=true;message.textContent="Fetching the official results and matching riders…";officialImportRows=[];officialImportMeta=null;renderOfficialResultsPreview();
+ try{
+  const body={series};if(file){if(file.size>5*1024*1024)throw new Error("CSV files must be 5 MB or smaller.");body.csv=await file.text()}else body.url=url;
+  const response=await fetch("/api/results/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  let payload={};try{payload=await response.json()}catch{}
+  if(!response.ok)throw new Error(payload.error||`Import request failed (${response.status}).`);
+  officialImportMeta=payload;officialImportRows=(payload.rows||[]).map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();
+  if(!officialImportRows.length)throw new Error("No classified riders were returned by that source.");
+  renderOfficialResultsPreview();message.textContent=`Preview loaded from ${payload.title||"the official source"}. Review the matches below, then load positions into the scoring grid.`;
+ }catch(error){message.textContent=error.message||"Could not import the official results.";if(String(error.message||"").includes("Failed to fetch"))message.textContent="Could not reach the results-import endpoint. Run the site with npm start (not VS Code Live Server) and try again."}
+ finally{button.disabled=false}
+}
+function applyOfficialResults(){
+ const message=$("officialResultsImportMessage");if(!officialImportRows.length){message.textContent="Preview official results before loading them.";return}
+ if(officialImportScopeSnapshot!==officialImportScope()){message.textContent="The selected series, class, event, round or scoring segment changed after preview. Fetch the results again to avoid loading them into the wrong scoring group.";return}
+ const config=scoreFormatConfig(),gridRows=new Map([...document.querySelectorAll("#scoreEntryTable tr[data-score-row]")].map(row=>[Number(row.dataset.scoreRow),row])),used=new Set([...document.querySelectorAll("#scoreEntryTable .score-rider-select")].map(select=>select.value).filter(Boolean));
+ let loaded=0,skipped=0,duplicate=0,outOfRange=0;
+ const importedRows=officialImportRows.slice().sort((a,b)=>a.position-b.position);
+ for(const row of importedRows){
+  if(!row.match?.athlete||row.match.state!=="matched"){skipped++;continue}
+  if(row.position<1||row.position>config.rowCount||!gridRows.has(row.position)){outOfRange++;continue}
+  const athleteId=id(row.match.athlete);if(used.has(athleteId)){duplicate++;continue}
+  const select=gridRows.get(row.position).querySelector(".score-rider-select");if(!select||![...select.options].some(option=>option.value===athleteId)){skipped++;continue}
+  select.value=athleteId;used.add(athleteId);updateScoreRow(gridRows.get(row.position));loaded++;
+ }
+ // When the official session table explicitly supplies best-lap times, award the existing fastest-lap checkbox to the quickest classified rider.
+ const fastestLapBonus=config.bonuses.find(([key])=>key==="fastestLap");
+ const parseLapTime=value=>{const match=String(value||"").trim().match(/^(\d{1,2}:)?\d{1,2}(?:\.\d+)?/);if(!match)return Infinity;const token=match[0],parts=token.split(":").map(Number);if(parts.some(value=>!Number.isFinite(value)))return Infinity;return parts.length===2?parts[0]*60000+parts[1]*1000:parts[0]*1000};
+ if(fastestLapBonus){const lapRows=importedRows.filter(row=>row.match?.athlete&&row.match.state==="matched"&&row.bestLap&&Number.isFinite(parseLapTime(row.bestLap))).sort((a,b)=>parseLapTime(a.bestLap)-parseLapTime(b.bestLap));const fastest=lapRows[0];if(fastest&&gridRows.has(fastest.position)){const check=gridRows.get(fastest.position).querySelector(`[data-bonus="${fastestLapBonus[0]}"]`);if(check){check.checked=true;updateScoreRow(gridRows.get(fastest.position))}}}
+ syncScoreRiderOptions();
+ message.textContent=`Loaded ${loaded} rider position${loaded===1?"":"s"} into the scoring table. ${skipped} unmatched/already-scored rows, ${duplicate} duplicate athlete rows and ${outOfRange} positions outside this scoring table were skipped. If the official source included best-lap times, the fastest-lap bonus was preselected; verify all bonuses and positions before recording results.`;
+ $("scoreEntryTable")?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function clearOfficialResults(){officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;if($("officialResultsUrl"))$("officialResultsUrl").value="";if($("officialResultsCsv"))$("officialResultsCsv").value="";if($("officialResultsImportMessage"))$("officialResultsImportMessage").textContent="Import preview cleared.";renderOfficialResultsPreview()}
+function setupOfficialResultsImport(){
+ renderOfficialSourceHelp();
+ $("previewOfficialResults")?.addEventListener("click",previewOfficialResults);
+ $("applyOfficialResults")?.addEventListener("click",applyOfficialResults);
+ $("clearOfficialResults")?.addEventListener("click",clearOfficialResults);
+ $("scoreSeries")?.addEventListener("change",()=>{officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;renderOfficialResultsPreview();renderOfficialSourceHelp()});
+ $("scoreClass")?.addEventListener("change",rematchOfficialResults);
+}
 function setupScoreGrid(){
  const series=$("scoreSeries");if(!series)return;
  series.addEventListener('change',()=>{scoringPhase="";updateScoreClass()});
@@ -963,7 +1050,7 @@ async function runYearlyRosterReset(){
 }
 function commInit(){
  setupCommissionerTabs();
- populatePrimarySeriesSelect($("athClass"),"250");populatePrimarySeriesSelect($("editAthClass"),"250");populateNationalitySelect($("athNationality"));populateNationalitySelect($("editAthNationality"));populateNationalitySelect($("eventCountry"));populateRegionSelect($("athNationalityRegion"),$("athNationality"));populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));populateRegionSelect($("eventRegion"),$("eventCountry"));$("athNationality").onchange=()=>populateRegionSelect($("athNationalityRegion"),$("athNationality"));$("editAthNationality").onchange=()=>populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));$("eventCountry").onchange=()=>populateRegionSelect($("eventRegion"),$("eventCountry"));renderSecondarySeriesChecks("athSecondarySeries",[], $("athClass").value);$("athClass").onchange=()=>renderSecondarySeriesChecks("athSecondarySeries",secondarySeriesChecked("athSecondarySeries",$("athClass").value),$("athClass").value);$("editAthClass").onchange=()=>renderSecondarySeriesChecks("editAthSecondarySeries",secondarySeriesChecked("editAthSecondarySeries",$("editAthClass").value),$("editAthClass").value);populateScheduleSeriesSelect();populateScoreSeriesSelect();populateDraftRoomSelects();setupScoreGrid();$("scoreForm").onsubmit=submitRaceResults;$("cancelScoreEdit").onclick=cancelScoreEdit;
+ populatePrimarySeriesSelect($("athClass"),"250");populatePrimarySeriesSelect($("editAthClass"),"250");populateNationalitySelect($("athNationality"));populateNationalitySelect($("editAthNationality"));populateNationalitySelect($("eventCountry"));populateRegionSelect($("athNationalityRegion"),$("athNationality"));populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));populateRegionSelect($("eventRegion"),$("eventCountry"));$("athNationality").onchange=()=>populateRegionSelect($("athNationalityRegion"),$("athNationality"));$("editAthNationality").onchange=()=>populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));$("eventCountry").onchange=()=>populateRegionSelect($("eventRegion"),$("eventCountry"));renderSecondarySeriesChecks("athSecondarySeries",[], $("athClass").value);$("athClass").onchange=()=>renderSecondarySeriesChecks("athSecondarySeries",secondarySeriesChecked("athSecondarySeries",$("athClass").value),$("athClass").value);$("editAthClass").onchange=()=>renderSecondarySeriesChecks("editAthSecondarySeries",secondarySeriesChecked("editAthSecondarySeries",$("editAthClass").value),$("editAthClass").value);populateScheduleSeriesSelect();populateScoreSeriesSelect();populateDraftRoomSelects();setupScoreGrid();setupOfficialResultsImport();$("scoreForm").onsubmit=submitRaceResults;$("cancelScoreEdit").onclick=cancelScoreEdit;
  $("editAthleteForm").onsubmit=saveEditedAthlete;
  const cancelEdit=()=>{$("editAthletePanel").hidden=true;$("editAthleteForm").reset();$("editAthleteMessage").textContent=""};
  $("cancelEditAthlete").onclick=cancelEdit;$("cancelEditAthleteBottom").onclick=cancelEdit;

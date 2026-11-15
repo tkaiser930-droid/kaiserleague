@@ -5,6 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { URL } = require("url");
 const { createGithubBackup } = require("./github-backup");
+const { fetchOfficialResults } = require("./race-results-import");
 
 const ROOT = __dirname;
 const githubBackup = createGithubBackup(ROOT);
@@ -189,6 +190,11 @@ async function readBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 async function handleApi(req, res, url) {
+  if (url.pathname === "/api/results/preview" && req.method === "POST") {
+    const body = await readBody(req);
+    const result = await fetchOfficialResults({ url: body.url, series: body.series, csv: body.csv });
+    return send(res, 200, result);
+  }
   if (url.pathname === "/api/github/status" && req.method === "GET") {
     const local = await currentDiskDatabase().catch(() => ({ data: db, stat: null }));
     const localSavedAt = databaseTimestamp(local.data, local.stat?.mtimeMs || 0);

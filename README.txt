@@ -109,3 +109,8 @@ NAVIGATION AND TIME DISPLAY UPDATE
 The navigation is consolidated into Teams, Athletes, and Teams & Manufacturers. Team claiming and roster management are available on the Teams page. Athlete filters include all/available, series, and ownership. Race-team and manufacturer directories share dropdown filters. Data & Backup is embedded as a commissioner-only tab. Legacy page URLs redirect to their consolidated destinations.
 
 All date/time interpretation and display in the website uses the America/Vancouver timezone. Draft planned starts entered in the commissioner datetime-local field are interpreted as Vancouver local time.
+OFFICIAL RACE RESULTS IMPORT
+----------------------------
+The Commissioner > Scoring tab supports a preview-first official race-results importer. Paste an official result-table URL or upload an official CSV export. It matches rider names/numbers to the selected series and division, then loads matched finishing positions into the existing scoring grid for review. It never posts scores automatically. CSV files need Position and Rider (or Driver) columns; Number, Team, and Best Lap are optional.
+
+URL fetching is handled by the Node server, so run the site with `npm start` rather than VS Code Live Server. The importer allowlists official domains per series and will refuse unrelated URLs. Some official sites require a sign-in or render their result tables dynamically; for those, download an official CSV export and upload it. Direct PDF and Excel imports are not supported yet. See RESULTS-IMPORT-SETUP.txt for the source-domain list and details.

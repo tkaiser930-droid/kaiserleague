@@ -43,3 +43,5 @@ HEADER BRANDING UPDATE
 - Opening the Trade Center marks all accepted/rejected outgoing trade notifications for that team as viewed (responseViewedAt), and the alerts disappear from Team Management.
 - Pending outgoing and incoming trade alerts are unchanged.
 - Existing trade records without a viewed timestamp are treated as unread, so prior unanswered-to-view outcome alerts are not lost during this update.
+
+Official results importer (November 15, 2026): Added Commissioner > Scoring > Import Official Race Results. The Node server can preview official HTTPS race-result HTML tables from allowlisted series domains, or parse official CSV uploads. Matched results are loaded into the existing scoring table for review; scores are not saved until the commissioner submits the scoring form. CSV requires Position and Rider/Driver columns. Best Lap can preselect the generic Fastest Lap bonus when supplied. See RESULTS-IMPORT-SETUP.txt for source support and limitations.
