@@ -18,3 +18,9 @@ The consolidated site was used as the base. Existing league data, server setup, 
 - Removed the standalone "Manage a Team" button from the Teams page.
 - Each owned team's "Manage / Sign In" button now directly opens the existing team-management login panel, preselects that card's team, clears stale password/error text, and smoothly scrolls to the panel.
 - Retained the existing login, password verification, roster management, quota, scoring, and lock/unlock workflows.
+
+
+HEADER BRANDING UPDATE
+- Replaced the KF text badge and two-line site title with a custom purple-and-gold motorsports crest and clean wordmark.
+- Applied the header identity consistently across all eight pages with the shared site navigation.
+- Added a transparent logo asset at assets/logo/kaiser-family-fantasy-smx-mark.png.
