@@ -631,7 +631,9 @@ function renderTeamTradeAlerts(k){
  const relevant=read(K.TR,[]).filter(tr=>tr.fromKey===k||tr.toKey===k);
  const pendingSent=relevant.filter(tr=>tr.fromKey===k&&tr.status==="Pending");
  const pendingReceived=relevant.filter(tr=>tr.toKey===k&&tr.status==="Pending");
- const answered=relevant.filter(tr=>tr.fromKey===k&&["Accepted","Rejected"].includes(tr.status)).sort((a,b)=>String(b.respondedAt||b.createdAt||"").localeCompare(String(a.respondedAt||a.createdAt||""))).slice(0,3);
+ // An accepted/rejected result is a one-time notification for the team that sent it.
+ // It stays visible on Team Management until that team opens its Trade Center.
+ const answered=relevant.filter(tr=>tr.fromKey===k&&["Accepted","Rejected"].includes(tr.status)&&!tr.responseViewedAt).sort((a,b)=>String(b.respondedAt||b.createdAt||"").localeCompare(String(a.respondedAt||a.createdAt||"")));
  const link=`<a href="trades.html?team=${encodeURIComponent(k)}">View Trade Center</a>`;
  const alerts=[];
  if(pendingReceived.length){
@@ -891,15 +893,17 @@ async function runYearlyRosterReset(){
  }
  const currentTeams=teams();
  const currentScores=scores();
+ const currentTrades=read(K.TR,[]);
+ const tradeProposalCount=Array.isArray(currentTrades)?currentTrades.length:0;
  const assignmentCount=currentTeams.reduce((sum,team)=>sum+roster(team).length,0);
  const teamPoints=currentTeams.reduce((sum,team)=>sum+currentScores.filter(record=>String(record.teamKey)===key(team)).reduce((points,record)=>points+Number(record.points||0),0),0);
  const riderPoints=currentScores.reduce((sum,record)=>sum+Number(record.points||0),0);
  const riderCount=new Set(currentScores.map(record=>String(record.riderId||norm(record.riderName||record.athleteName))).filter(Boolean)).size;
- if(!assignmentCount&&!currentScores.length){
-  if(message)message.textContent="The yearly reset is already complete. All team rosters are empty and no rider or team scoring points remain.";
+ if(!assignmentCount&&!currentScores.length&&!tradeProposalCount){
+  if(message)message.textContent="The yearly reset is already complete. All team rosters are empty, no rider or team scoring points remain, and no trade proposals are saved.";
   return;
  }
- const confirmed=confirm(`YEARLY RESET\n\nThis will permanently:\n• Remove ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}.\n• Reset ${teamPoints.toLocaleString()} accumulated team points.\n• Reset ${riderPoints.toLocaleString()} accumulated rider points across ${riderCount} scored athlete${riderCount===1?"":"s"} and ${currentScores.length} result record${currentScores.length===1?"":"s"}.\n\nAll scoring records will be deleted. This also clears athlete profile results, averages, scoring history, and top-undrafted scoring totals.\n\nAthlete records, team names, owners and passwords, draft settings, trades, and the event schedule will be preserved.\n\nContinue?`);
+ const confirmed=confirm(`YEARLY RESET\n\nThis will permanently:\n• Remove ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}.\n• Reset ${teamPoints.toLocaleString()} accumulated team points.\n• Reset ${riderPoints.toLocaleString()} accumulated rider points across ${riderCount} scored athlete${riderCount===1?"":"s"} and ${currentScores.length} result record${currentScores.length===1?"":"s"}.\n• Delete ${tradeProposalCount} trade proposal${tradeProposalCount===1?"":"s"}, including pending proposals, accepted/rejected history, and their notification/viewed status.\n\nAll scoring records will be deleted. This also clears athlete profile results, averages, scoring history, and top-undrafted scoring totals.\n\nAthlete records, team names, owners and passwords, draft settings, and the event schedule will be preserved.\n\nContinue?`);
  if(!confirmed)return;
  const phrase=prompt('To confirm the yearly reset, type RESET SEASON:');
  if(phrase===null)return;
@@ -909,12 +913,13 @@ async function runYearlyRosterReset(){
  }
  saveTeams(currentTeams.map(team=>({...team,roster:[]})));
  write(K.S,[]);
+ write(K.TR,[]);
  refresh();
  try{
   if(window.KFStorage&&typeof window.KFStorage.flush==="function")await window.KFStorage.flush();
-  if(message)message.textContent=`Yearly reset complete. Removed ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"}; reset ${teamPoints.toLocaleString()} team points and ${riderPoints.toLocaleString()} rider points; cleared ${currentScores.length} scoring result record${currentScores.length===1?"":"s"}. Athlete records, team ownership and passwords, draft settings, trades, and the event schedule remain intact.`;
+  if(message)message.textContent=`Yearly reset complete. Removed ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"}; reset ${teamPoints.toLocaleString()} team points and ${riderPoints.toLocaleString()} rider points; cleared ${currentScores.length} scoring result record${currentScores.length===1?"":"s"} and ${tradeProposalCount} trade proposal${tradeProposalCount===1?"":"s"}, including all trade notifications and response history. Athlete records, team ownership and passwords, draft settings, and the event schedule remain intact.`;
  }catch(error){
-  if(message)message.textContent=`The rosters and scoring points were cleared in this browser, but the project database did not confirm the save: ${error.message||"Unknown storage error"}. Check the storage status and retry using Data & Backup if needed.`;
+  if(message)message.textContent=`The rosters, scoring points, and trade proposals were cleared in this browser, but the project database did not confirm the save: ${error.message||"Unknown storage error"}. Check the storage status and retry using Data & Backup if needed.`;
  }
 }
 function commInit(){
@@ -944,7 +949,14 @@ function renderCommSchedule(){
 }
 function tradeInit(){options($("tradeTeam"),teams().map(t=>({value:key(t),label:tname(t)})),"Choose your team");const requestedTeam=new URLSearchParams(location.search).get("team"),managedTeam=sessionStorage.getItem("managedTeam");if(requestedTeam&&teams().some(t=>key(t)===requestedTeam)){$("tradeTeam").value=requestedTeam;if(managedTeam===requestedTeam)sessionStorage.setItem("tradeTeam",requestedTeam);else if(sessionStorage.getItem("tradeTeam")!==requestedTeam)sessionStorage.removeItem("tradeTeam")}$("tradeLoginForm").onsubmit=async e=>{e.preventDefault();if(renderRosterLockNotice("trades"))return;const t=teams().find(t=>key(t)===$("tradeTeam").value);if(!t||!t.passwordHash||await hash($("tradePassword").value)!==t.passwordHash){$("tradeLoginMessage").textContent="Team not claimed or password incorrect.";return}sessionStorage.setItem("tradeTeam",key(t));showTrades(key(t))};$("tradePartner").onchange=()=>{if(!renderRosterLockNotice("trades"))tradeChoices(sessionStorage.getItem("tradeTeam"))};$("tradeForm").onsubmit=submitTrade;$("tradeLogout").onclick=()=>{sessionStorage.removeItem("tradeTeam");$("tradeBody").hidden=true;$("tradeLogin").hidden=false};if(renderRosterLockNotice("trades"))return;const k=sessionStorage.getItem("tradeTeam");if(k)showTrades(k);else{$("tradeLogin").hidden=false;$("tradeBody").hidden=true}}
 
-function showTrades(k){if(renderRosterLockNotice("trades"))return;const t=teams().find(t=>key(t)===k);if(!t)return;$("tradeLogin").hidden=true;$("tradeBody").hidden=false;$("tradeSummary").innerHTML=`<div><strong>${esc(tname(t))}</strong><span>Your team</span></div><div><strong>${roster(t).length}/${MAX_ROSTER_SIZE}</strong><span>Roster</span></div><div><strong>${total(t)}</strong><span>Season points</span></div>`;options($("tradePartner"),teams().filter(x=>key(x)!==k&&x.owner).map(x=>({value:key(x),label:tname(x)})),"Choose partner");tradeChoices(k);renderTrades(k)}
+function markTradeResponsesViewed(k){
+ const all=read(K.TR,[]),viewedAt=new Date().toISOString();let changed=false;
+ all.forEach(tr=>{
+  if(tr.fromKey===k&&["Accepted","Rejected"].includes(tr.status)&&!tr.responseViewedAt){tr.responseViewedAt=viewedAt;changed=true}
+ });
+ if(changed)write(K.TR,all);
+}
+function showTrades(k){if(renderRosterLockNotice("trades"))return;const t=teams().find(t=>key(t)===k);if(!t)return;$("tradeLogin").hidden=true;$("tradeBody").hidden=false;$("tradeSummary").innerHTML=`<div><strong>${esc(tname(t))}</strong><span>Your team</span></div><div><strong>${roster(t).length}/${MAX_ROSTER_SIZE}</strong><span>Roster</span></div><div><strong>${total(t)}</strong><span>Season points</span></div>`;options($("tradePartner"),teams().filter(x=>key(x)!==k&&x.owner).map(x=>({value:key(x),label:tname(x)})),"Choose partner");tradeChoices(k);renderTrades(k);markTradeResponsesViewed(k)}
 function tradeChoices(k){const t=teams().find(t=>key(t)===k),p=teams().find(t=>key(t)===$("tradePartner").value);const render=(list,n)=>list.length?sortRiders(list).map(a=>`<label><input type="checkbox" name="${n}" value="${esc(id(a))}"> ${nationalityHTML(a.nationality,a.nationalityRegion)} ${numberHTML(a.number,a.manufacturer,a)} ${esc(name(a))} <small>(${esc(seriesDisplayText(a))})</small></label>`).join(""):"<p class=muted>No athletes.</p>";$("offerRoster").innerHTML=render(t?roster(t):[],"offer");$("requestRoster").innerHTML=render(p?roster(p):[],"request")}
 function submitTrade(e){e.preventDefault();if(renderRosterLockNotice("trades"))return;const k=sessionStorage.getItem("tradeTeam"),t=teams().find(t=>key(t)===k),p=teams().find(t=>key(t)===$("tradePartner").value),offers=[...document.querySelectorAll('[name="offer"]:checked')].map(x=>x.value),requests=[...document.querySelectorAll('[name="request"]:checked')].map(x=>x.value);if(!t||!p||!offers.length||!requests.length){$("tradeMessage").textContent="Choose a partner and at least one athlete on each side.";return}const names=(team,ids)=>ids.map(i=>roster(team).find(a=>id(a)===i)).filter(Boolean).map(name);const all=read(K.TR,[]);all.push({id:uid(),fromKey:k,fromName:tname(t),toKey:key(p),toName:tname(p),offerIds:offers,requestIds:requests,offerNames:names(t,offers),requestNames:names(p,requests),note:clean($("tradeNote").value),status:"Pending",createdAt:new Date().toISOString()});write(K.TR,all);$("tradeMessage").textContent="Proposal submitted.";renderTrades(k)}
 function tradeNamesHTML(tr,which){const ids=tr[`${which}Ids`]||[],saved=tr[`${which}Names`]||[];const entries=ids.length?ids.map((rid,i)=>{const a=athletes().find(x=>id(x)===String(rid));return {a,nm:a?name(a):(saved[i]||"Athlete")}}):saved.map(n=>({a:athletes().find(x=>norm(name(x))===norm(n)),nm:n}));return entries.sort((x,y)=>compareRiderNumbers(x.a||{name:x.nm,number:""},y.a||{name:y.nm,number:""})).map(({a,nm})=>athleteNameHTML(a||{name:nm})).join(" ")}
@@ -975,7 +987,7 @@ let draftSyncTimer=null;function startDraftSync(){if(draftSyncTimer)clearInterva
 function eventRoom(series){const value=clean(series);if(["CAN","CAN 250","CAN 450"].includes(value))return "Triple Crown Series";for(const [room,classes] of Object.entries(SERIES_GROUPS)){if(classes.includes(value))return room}return value} 
 function renderSchedule(){if(!$("scheduleTable"))return;const selected=[...document.querySelectorAll("#seriesFilters input:checked")].map(x=>x.value),list=read(K.CAL,[]).filter(e=>selected.includes(eventRoom(e.series))).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));$("scheduleTable").innerHTML=table(["Date(s)","Round","Series","Event Type","Event","Country / Region","Location"],list.map(e=>`<tr><td>${esc(eventDateLabel(e))}</td><td>${clean(e.round)?esc(e.round):"—"}</td><td>${scheduleSeriesBadge(e.series)}</td><td>${esc(eventTypeLabel(e))}</td><td>${esc(e.name)}</td><td>${eventCountryHTML(e)}</td><td>${esc(e.location||"—")}</td></tr>`))}
 function refresh(){standings();renderTeams();renderAthletes();if(document.body.dataset.page==="teams-manufacturers")renderCombinedDirectory();else if(activeDirectoryPage){if(activeDirectoryKey)renderDirectorySelection();else renderDirectoryMenu();}if($("commBody")&&!$("commBody").hidden)renderComm();if($("manageLogin")){const panel=$("teamManagePanel"),k=sessionStorage.getItem("managedTeam"),params=new URLSearchParams(location.search),requested=!!params.get("team")||!!k||params.get("manage")==="1";if(panel)panel.hidden=!requested;if(!renderRosterLockNotice("manage")){if(k&&teams().some(t=>key(t)===k))showManage(k);else{$("manageLogin").hidden=false;$("manageBody").hidden=true}}}if($("tradeLogin")){if(!renderRosterLockNotice("trades")){const k=sessionStorage.getItem("tradeTeam");if(k)showTrades(k);else{$("tradeLogin").hidden=false;$("tradeBody").hidden=true}}}if($("draftStatusCard"))renderDraft();renderSchedule()}
-function startTeamTradeAlertSync(){if(document.body.dataset.page!=="teams")return;let syncing=false;const sync=async()=>{const k=sessionStorage.getItem("managedTeam");if(!k||syncing||!window.KFStorage||window.KFStorage.mode!=="server")return;syncing=true;try{const changed=await window.KFStorage.refreshFromServer();if(changed&&sessionStorage.getItem("managedTeam")===k)renderTeamTradeAlerts(k)}catch(error){console.warn("Trade alert sync failed:",error)}finally{syncing=false}};window.addEventListener("storage",event=>{if(event.key===K.TR){const k=sessionStorage.getItem("managedTeam");if(k)renderTeamTradeAlerts(k)}});window.addEventListener("focus",sync);setInterval(sync,15000)}
+function startTeamTradeAlertSync(){if(document.body.dataset.page!=="teams")return;let syncing=false;const sync=async()=>{const k=sessionStorage.getItem("managedTeam");if(!k||syncing)return;syncing=true;try{if(window.KFStorage&&window.KFStorage.mode==="server"){const changed=await window.KFStorage.refreshFromServer();if(changed&&sessionStorage.getItem("managedTeam")===k)renderTeamTradeAlerts(k)}else{renderTeamTradeAlerts(k)}}catch(error){console.warn("Trade alert sync failed:",error)}finally{syncing=false}};window.addEventListener("storage",event=>{if(event.key===K.TR){const k=sessionStorage.getItem("managedTeam");if(k)renderTeamTradeAlerts(k)}});window.addEventListener("focus",sync);window.addEventListener("pageshow",sync);setInterval(sync,15000)}
 function scheduleDailyRosterLockRefresh(){const page=document.body.dataset.page;if(page!=="teams"&&page!=="manage"&&page!=="trades")return;setTimeout(()=>{refresh();scheduleDailyRosterLockRefresh()},60000)}
 function dataInit(){
  const status=$("dataModeDetail"),message=$("dataMessage");
