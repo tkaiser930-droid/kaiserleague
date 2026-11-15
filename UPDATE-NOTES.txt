@@ -24,3 +24,7 @@ HEADER BRANDING UPDATE
 - Replaced the KF text badge and two-line site title with a custom purple-and-gold motorsports crest and clean wordmark.
 - Applied the header identity consistently across all eight pages with the shared site navigation.
 - Added a transparent logo asset at assets/logo/kaiser-family-fantasy-smx-mark.png.
+
+2026-11-14 navigation and roster count update:
+- Corrected the home-page roster-class count from 9 to 8.
+- Updated shared top navigation links to bold gold text with no underlines, including hover and keyboard-focus states.
