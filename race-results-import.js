@@ -128,15 +128,20 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
   const divisionIndex = findColumn(headers, [/^(class|division|category|raceclass|seriesclass)$/]);
   const requestedDivision = options.series === "SMX" ? divisionKey(options.division) : "";
   const normalized = [];
-  for (const cells of rawRows.slice(headerIndex + 1)) {
+  for (const [sourceOrder, cells] of rawRows.slice(headerIndex + 1).entries()) {
     if (!Array.isArray(cells)) continue;
     if (requestedDivision && divisionIndex >= 0) {
       const rowDivision = divisionKey(cells[divisionIndex]);
       if (rowDivision && rowDivision !== requestedDivision) continue;
     }
-    const position = parsePosition(cells[positionIndex]);
+    const rawPosition = String(cells[positionIndex] || "").trim();
+    const status = options.series === "F1" && /^NC$/i.test(rawPosition) ? "NC" : "";
+    const position = parsePosition(rawPosition);
     const riderName = cleanRiderName(cells[nameIndex]);
-    if (!position || !riderName || ["rider", "driver"].includes(normalizeHeader(riderName))) continue;
+    // Formula 1's official classifications display non-classified drivers as
+    // NC after the numbered finishers. Keep those rows in source order and
+    // give them sequential internal slots so they can be reviewed/imported.
+    if ((!position && !status) || !riderName || ["rider", "driver"].includes(normalizeHeader(riderName))) continue;
     let number = numberIndex >= 0 ? cleanNumber(cells[numberIndex]) : "";
     if (!number) {
       const leadingNumber = String(cells[nameIndex] || "").trim().match(/^#?(\d{1,3})\s+.+$/);
@@ -144,19 +149,32 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
     }
     normalized.push({
       position,
+      displayPosition: status || String(position),
+      status,
+      sourceOrder,
       number,
       name: riderName,
       team: teamIndex >= 0 ? String(cells[teamIndex] || "").trim() : "",
       bestLap: bestLapIndex >= 0 ? String(cells[bestLapIndex] || "").trim() : ""
     });
   }
+  if (options.series === "F1") {
+    const lastClassifiedPosition = normalized.reduce((max, row) => Math.max(max, row.position || 0), 0);
+    let nextNcPosition = lastClassifiedPosition + 1;
+    for (const row of normalized) {
+      if (row.status === "NC") row.position = nextNcPosition++;
+    }
+  }
   const unique = new Map();
   for (const row of normalized) {
-    const key = `${row.position}|${row.number}|${normalizeHeader(row.name)}`;
+    const key = `${row.status || "classified"}|${row.position}|${row.number}|${normalizeHeader(row.name)}`;
     if (!unique.has(key)) unique.set(key, row);
   }
-  const results = [...unique.values()].sort((a, b) => a.position - b.position);
-  if (!results.length) throw new Error("The selected official results table contains no classified rider rows for the selected class.");
+  const values = [...unique.values()];
+  const results = options.series === "F1"
+    ? values.sort((a, b) => a.sourceOrder - b.sourceOrder)
+    : values.sort((a, b) => a.position - b.position);
+  if (!results.length) throw new Error("The selected official results table contains no rider rows for the selected class.");
   return { title: sourceTitle || "Official race results", rows: results.slice(0, 100) };
 }
 
@@ -554,7 +572,7 @@ function isF1ArchiveLandingUrl(url) {
 
 function isF1EventResultUrl(url) {
   const path = String(url?.pathname || "").replace(/\/+$/, "");
-  return hostIsAllowed(url?.hostname, "F1") && /^\/en\/results\/\d{4}\/races\/\d+\/[^/]+\/(?:race-result|sprint-results)$/i.test(path);
+  return hostIsAllowed(url?.hostname, "F1") && /^\/en\/results\/\d{4}\/races\/\d+\/[^/]+\/(?:race-result|sprint-results|qualifying|sprint-qualifying|fastest-laps)$/i.test(path);
 }
 
 function f1YearFromContext(context = {}) {
@@ -667,9 +685,18 @@ function chooseF1ArchiveEvent(html, archiveUrl, context = {}) {
 
 function f1EventBaseUrl(url) {
   const next = new URL(url.href);
-  next.pathname = next.pathname.replace(/\/(?:race-result|sprint-results)\/?$/i, "").replace(/\/+$/, "") + "/race-result";
+  next.pathname = next.pathname.replace(/\/(?:race-result|sprint-results|qualifying|sprint-qualifying|fastest-laps)\/?$/i, "").replace(/\/+$/, "") + "/race-result";
   next.search = "";
   next.hash = "";
+  return next;
+}
+
+function f1SessionUrl(eventResultUrl, sessionSlug) {
+  if (!["race-result", "sprint-results", "qualifying", "sprint-qualifying", "fastest-laps"].includes(sessionSlug)) {
+    throw new Error("Unsupported Formula 1 result session.");
+  }
+  const next = f1EventBaseUrl(eventResultUrl);
+  next.pathname = next.pathname.replace(/\/race-result$/i, `/${sessionSlug}`);
   return next;
 }
 
@@ -756,10 +783,27 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
 
   const fetchedUrl = page.finalUrl.href;
   let fastestLap = null;
+  let fastestQualifier = null;
+  let fastestQualifierSessionTitle = "";
+  let fastestQualifierError = "";
+  if (series === "F1") {
+    const sprintSession = normalizeHeader(phase || "Grand Prix").includes("sprint");
+    const qualifierSlug = sprintSession ? "sprint-qualifying" : "qualifying";
+    fastestQualifierSessionTitle = sprintSession ? "Sprint Qualifying" : "Qualifying";
+    try {
+      const qualifierUrl = f1SessionUrl(new URL(fetchedUrl), qualifierSlug);
+      const qualifierPage = await readOfficialPage(qualifierUrl, "F1");
+      const qualifierResults = parseHtml(qualifierPage.body, qualifierPage.title, { series: "F1", url: qualifierPage.finalUrl.href });
+      fastestQualifier = qualifierResults.rows.find(row => row.position === 1) || qualifierResults.rows[0] || null;
+      if (!fastestQualifier) fastestQualifierError = `The official ${fastestQualifierSessionTitle} page did not contain a fastest qualifier row.`;
+      if (fastestQualifier) fastestQualifier.sourceUrl = qualifierPage.finalUrl.href;
+    } catch (error) {
+      fastestQualifierError = error.message || `Could not read the official ${fastestQualifierSessionTitle} classification.`;
+    }
+  }
   if (series === "F1" && !normalizeHeader(phase || "Grand Prix").includes("sprint")) {
     try {
-      const fastestLapUrl = f1EventBaseUrl(new URL(fetchedUrl));
-      fastestLapUrl.pathname = fastestLapUrl.pathname.replace(/\/race-result$/i, "/fastest-laps");
+      const fastestLapUrl = f1SessionUrl(new URL(fetchedUrl), "fastest-laps");
       const fastestPage = await readOfficialPage(fastestLapUrl, "F1");
       const fastestResults = parseHtml(fastestPage.body, fastestPage.title, { series: "F1", url: fastestPage.finalUrl.href });
       if (fastestResults.rows[0]) fastestLap = fastestResults.rows[0];
@@ -772,7 +816,10 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     division: divisionKey(division) || "",
     eventTitle: resolved?.eventTitle || "",
     sessionTitle: resolved?.sessionTitle || "",
-    fastestLap
+    fastestLap,
+    fastestQualifier,
+    fastestQualifierSessionTitle,
+    fastestQualifierError
   };
 }
 

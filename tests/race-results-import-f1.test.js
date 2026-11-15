@@ -12,6 +12,8 @@ const {
 const archiveUrl = "https://www.formula1.com/en/results/2026/races";
 const gpUrl = "https://www.formula1.com/en/results/2026/races/1284/miami/race-result";
 const sprintUrl = "https://www.formula1.com/en/results/2026/races/1284/miami/sprint-results";
+const qualifyingUrl = "https://www.formula1.com/en/results/2026/races/1284/miami/qualifying";
+const sprintQualifyingUrl = "https://www.formula1.com/en/results/2026/races/1284/miami/sprint-qualifying";
 const fastestUrl = "https://www.formula1.com/en/results/2026/races/1284/miami/fastest-laps";
 
 const archivePage = `<!doctype html><html><head><title>2026 Race Results</title></head><body>
@@ -42,6 +44,21 @@ const sprintPage = f1ResultPage("Sprint", [
   [2, 81, "Oscar Piastri", "PIA", "McLaren", "+3.766s", 7],
   [3, 16, "Charles Leclerc", "LEC", "Ferrari", "+6.251s", 6]
 ]);
+function f1QualifyingPage(session, rows) {
+  const data = rows.map(row => `<tr><td>${row[0]}</td><td>${row[1]}</td><td><a href="#"><img alt="${row[2]}" src="/driver.png"></a> ${row[2]} ${row[3] || ""}</td><td>${row[4]}</td><td>${row[5] || "1:30.000"}</td><td>${row[6] || "1:29.000"}</td><td>${row[7] || "1:28.000"}</td><td>19</td></tr>`).join("");
+  return `<!doctype html><html><head><title>Formula 1 Miami Grand Prix 2026 - ${session}</title></head><body>
+  <h1>FORMULA 1 CRYPTO.COM MIAMI GRAND PRIX 2026 - ${session.toUpperCase()}</h1>
+  <table><thead><tr><th>Pos.</th><th>No.</th><th>Driver</th><th>Team</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Laps</th></tr></thead><tbody>${data}</tbody></table>
+  </body></html>`;
+}
+const qualifyingPage = f1QualifyingPage("Qualifying", [
+  [1, 1, "Lando Norris", "NOR", "McLaren", "1:28.000", "1:27.500", "1:27.100"],
+  [2, 81, "Oscar Piastri", "PIA", "McLaren", "1:28.200", "1:27.700", "1:27.300"]
+]);
+const sprintQualifyingPage = f1QualifyingPage("Sprint Qualifying", [
+  [1, 81, "Oscar Piastri", "PIA", "McLaren", "1:28.000", "1:27.500", "1:27.100"],
+  [2, 1, "Lando Norris", "NOR", "McLaren", "1:28.200", "1:27.700", "1:27.300"]
+]);
 const fastestLapsPage = `<!doctype html><html><head><title>Formula 1 Miami Grand Prix 2026 - Fastest Laps</title></head><body>
 <h1>FORMULA 1 CRYPTO.COM MIAMI GRAND PRIX 2026 - FASTEST LAPS</h1>
 <table><thead><tr><th>Pos.</th><th>No.</th><th>Driver</th><th>Team</th><th>Lap</th><th>Time of Day</th><th>Time</th><th>Avg. Speed</th></tr></thead><tbody>
@@ -71,15 +88,24 @@ async function withMockFetch(map, callback) {
   assert.equal(isF1ArchiveLandingUrl(new URL(archiveUrl)), true);
   assert.equal(isF1EventResultUrl(new URL(gpUrl)), true);
   assert.equal(isF1EventResultUrl(new URL(sprintUrl)), true);
+  assert.equal(isF1EventResultUrl(new URL(qualifyingUrl)), true);
+  assert.equal(isF1EventResultUrl(new URL(sprintQualifyingUrl)), true);
 
   const directParsed = parseHtml(gpPage, "Official Formula 1 Race Result", { series: "F1", url: gpUrl });
-  assert.deepEqual(directParsed.rows.map(row => [row.position, row.number, row.name]), [
-    [1, "1", "Lando Norris"], [2, "81", "Oscar Piastri"], [3, "12", "Kimi Antonelli"]
+  assert.deepEqual(directParsed.rows.map(row => [row.position, row.displayPosition, row.number, row.name]), [
+    [1, "1", "1", "Lando Norris"], [2, "2", "81", "Oscar Piastri"], [3, "3", "12", "Kimi Antonelli"], [4, "NC", "27", "Nico Hulkenberg"]
   ]);
   assert.equal(directParsed.rows[0].team, "McLaren");
-  assert.equal(directParsed.rows.length, 3, "NC rows without a numeric official finishing position are not assigned a finishing place");
+  assert.equal(directParsed.rows[3].status, "NC");
+  assert.equal(directParsed.rows[3].sourceOrder, 3);
+  const multipleNc = parseHtml(f1ResultPage("Race Result", [
+    [1, 1, "Lando Norris", "NOR", "McLaren", "1:33:19.273", 25],
+    ["NC", 27, "Nico Hulkenberg", "HUL", "Audi", "DNF", 0],
+    ["NC", 11, "Sergio Perez", "PER", "Cadillac", "DNF", 0]
+  ]), "F1 NC order", { series: "F1" });
+  assert.deepEqual(multipleNc.rows.filter(row => row.status === "NC").map(row => [row.position, row.name]), [[2, "Nico Hulkenberg"], [3, "Sergio Perez"]], "NC drivers receive sequential positions in their official displayed order");
 
-  const sprintImport = await withMockFetch({ [archiveUrl]: archivePage, [gpUrl]: gpPage, [sprintUrl]: sprintPage }, async calls => {
+  const sprintImport = await withMockFetch({ [archiveUrl]: archivePage, [gpUrl]: gpPage, [sprintUrl]: sprintPage, [sprintQualifyingUrl]: sprintQualifyingPage }, async calls => {
     const result = await fetchOfficialResults({
       url: F1_RESULTS_ARCHIVE,
       series: "F1",
@@ -87,7 +113,7 @@ async function withMockFetch(map, callback) {
       eventDate: "2026-05-03",
       phase: "Sprint"
     });
-    assert.deepEqual(calls, [archiveUrl, gpUrl, sprintUrl]);
+    assert.deepEqual(calls, [archiveUrl, gpUrl, sprintUrl, sprintQualifyingUrl]);
     return result;
   });
   assert.equal(sprintImport.sessionTitle, "Sprint");
@@ -95,8 +121,11 @@ async function withMockFetch(map, callback) {
   assert.deepEqual(sprintImport.rows.map(row => row.position), [1, 2, 3]);
   assert.equal(sprintImport.rows[0].name, "Lando Norris");
   assert.equal(sprintImport.fastestLap, null, "Sprint imports must not use the event-wide Grand Prix fastest-laps table");
+  assert.equal(sprintImport.fastestQualifier.name, "Oscar Piastri", "Sprint sessions use Sprint Qualifying, not Grand Prix Qualifying");
+  assert.equal(sprintImport.fastestQualifierSessionTitle, "Sprint Qualifying");
+  assert.equal(sprintImport.fastestQualifier.sourceUrl, sprintQualifyingUrl);
 
-  const gpImport = await withMockFetch({ [archiveUrl]: archivePage, [gpUrl]: gpPage, [fastestUrl]: fastestLapsPage }, async calls => {
+  const gpImport = await withMockFetch({ [archiveUrl]: archivePage, [gpUrl]: gpPage, [qualifyingUrl]: qualifyingPage, [fastestUrl]: fastestLapsPage }, async calls => {
     const result = await fetchOfficialResults({
       url: F1_RESULTS_ARCHIVE,
       series: "F1",
@@ -104,20 +133,22 @@ async function withMockFetch(map, callback) {
       eventDate: "2026-05-03",
       phase: "Grand Prix"
     });
-    assert.deepEqual(calls, [archiveUrl, gpUrl, fastestUrl]);
+    assert.deepEqual(calls, [archiveUrl, gpUrl, qualifyingUrl, fastestUrl]);
     return result;
   });
   assert.equal(gpImport.sessionTitle, "Grand Prix");
   assert.equal(gpImport.rows[0].name, "Lando Norris");
   assert.equal(gpImport.fastestLap.name, "Lando Norris");
   assert.equal(gpImport.fastestLap.number, "1");
+  assert.equal(gpImport.fastestQualifier.name, "Lando Norris");
+  assert.equal(gpImport.fastestQualifierSessionTitle, "Qualifying");
 
   // A direct Sprint URL still obeys the selected scoring tab; Grand Prix selection resolves to Race Result.
-  await withMockFetch({ [gpUrl]: gpPage, [fastestUrl]: fastestLapsPage }, async calls => {
+  await withMockFetch({ [gpUrl]: gpPage, [qualifyingUrl]: qualifyingPage, [fastestUrl]: fastestLapsPage }, async calls => {
     const result = await fetchOfficialResults({ url: sprintUrl, series: "F1", phase: "Grand Prix" });
     assert.equal(result.sessionTitle, "Grand Prix");
     assert.equal(result.rows[0].name, "Lando Norris");
-    assert.deepEqual(calls, [gpUrl, fastestUrl]);
+    assert.deepEqual(calls, [gpUrl, qualifyingUrl, fastestUrl]);
   });
 
   const nonSprintEvent = `<!doctype html><html><body><h1>British Grand Prix 2026</h1><a href="/en/results/2026/races/1290/great-britain/race-result">Race Result</a></body></html>`;
@@ -128,5 +159,13 @@ async function withMockFetch(map, callback) {
     );
   });
 
-  console.log("F1 importer tests passed: official archive event/date matching, Grand Prix and Sprint session routing, driver/number/team extraction, fastest-lap page mapping, direct URL session enforcement, and non-Sprint weekend validation.");
+  // Direct qualifying and sprint-qualifying URLs are accepted but the selected scoring phase still chooses the matching source.
+  await withMockFetch({ [gpUrl]: gpPage, [sprintUrl]: sprintPage, [sprintQualifyingUrl]: sprintQualifyingPage }, async calls => {
+    const result = await fetchOfficialResults({ url: qualifyingUrl, series: "F1", phase: "Sprint" });
+    assert.equal(result.sessionTitle, "Sprint");
+    assert.equal(result.fastestQualifier.name, "Oscar Piastri");
+    assert.deepEqual(calls, [gpUrl, sprintUrl, sprintQualifyingUrl]);
+  });
+
+  console.log("F1 importer tests passed: NC retention and source order, archive event/date matching, Grand Prix and Sprint routing, separate Qualifying/Sprint Qualifying fastest-qualifier lookups, fastest-lap page mapping, direct session URL enforcement, and non-Sprint weekend validation.");
 })().catch(error => { console.error(error); process.exitCode = 1; });
