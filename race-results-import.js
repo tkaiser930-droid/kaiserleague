@@ -3,6 +3,7 @@
 const MAX_SOURCE_BYTES = 5 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 15000;
 const SMX_EVENT_ARCHIVE = "https://www.supermotocross.com/results/";
+const F1_RESULTS_ARCHIVE = "https://www.formula1.com/en/results";
 
 const OFFICIAL_HOSTS_BY_SERIES = {
   SMX: ["supermotocross.com", "results.supermotocross.com", "supercross.com", "results.supercrosslive.com", "results.supercross.com"],
@@ -545,6 +546,165 @@ function isSmxArchiveLanding(url) {
   return false;
 }
 
+
+function isF1ArchiveLandingUrl(url) {
+  const path = String(url?.pathname || "").replace(/\/+$/, "") || "/";
+  return hostIsAllowed(url?.hostname, "F1") && /^\/en\/results(?:\/\d{4}\/races)?$/i.test(path);
+}
+
+function isF1EventResultUrl(url) {
+  const path = String(url?.pathname || "").replace(/\/+$/, "");
+  return hostIsAllowed(url?.hostname, "F1") && /^\/en\/results\/\d{4}\/races\/\d+\/[^/]+\/(?:race-result|sprint-results)$/i.test(path);
+}
+
+function f1YearFromContext(context = {}) {
+  const match = String(context.eventDate || "").match(/\b(19\d{2}|20\d{2})\b/);
+  return match ? match[1] : "";
+}
+
+function f1ArchiveUrlForContext(url, context = {}) {
+  const next = new URL(url.href);
+  const year = f1YearFromContext(context);
+  const match = next.pathname.match(/^\/en\/results(?:\/(\d{4})\/races)?\/?$/i);
+  if (match && year && match[1] !== year) next.pathname = `/en/results/${year}/races`;
+  else if (match && !match[1] && year) next.pathname = `/en/results/${year}/races`;
+  return next;
+}
+
+function f1ArchiveDate(rowText, year) {
+  const text = String(rowText || "");
+  const months = { jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12 };
+  let match = text.match(/\b(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b/i);
+  let day, month;
+  if (match) { day = Number(match[1]); month = months[match[2].toLowerCase()]; }
+  else {
+    match = text.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})\b/i);
+    if (!match) return "";
+    month = months[match[1].toLowerCase()]; day = Number(match[2]);
+  }
+  const parsedYear = Number(year);
+  if (!parsedYear || !month || day < 1 || day > 31) return "";
+  const date = new Date(Date.UTC(parsedYear, month - 1, day));
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeF1EventTokens(value) {
+  const aliases = {
+    australian: "australia", chinese: "china", japanese: "japan", canadian: "canada",
+    spanish: "spain", austrian: "austria", british: "greatbritain", belgian: "belgium",
+    hungarian: "hungary", dutch: "netherlands", italian: "italy", mexican: "mexico",
+    "sao": "brazil", "paulo": "brazil"
+  };
+  const ignored = new Set(["formula", "formula1", "grand", "prix", "gp", "round", "race", "results", "airways", "crypto", "com", "aramco", "heineken", "pirelli", "aws", "lenovo", "rolex"]);
+  const raw = (String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().match(/[a-z0-9]+/g) || [])
+    .filter(token => !ignored.has(token))
+    .map(token => aliases[token] || token);
+  const tokens = [];
+  for (let index = 0; index < raw.length; index++) {
+    const current = raw[index], next = raw[index + 1];
+    if (current === "great" && next === "britain") { tokens.push("greatbritain"); index++; }
+    else if (current === "united" && next === "states") { tokens.push("unitedstates"); index++; }
+    else if (current === "abu" && next === "dhabi") { tokens.push("abudhabi"); index++; }
+    else if (current === "las" && next === "vegas") { tokens.push("lasvegas"); index++; }
+    else if (current === "brazil" && next === "brazil") { tokens.push("brazil"); index++; }
+    else tokens.push(current);
+  }
+  return tokens;
+}
+
+function chooseF1ArchiveEvent(html, archiveUrl, context = {}) {
+  const yearMatch = archiveUrl.pathname.match(/\/results\/(\d{4})\/races/i);
+  const year = yearMatch?.[1] || f1YearFromContext(context);
+  const allLinks = parseAnchorLinks(html, archiveUrl.href);
+  const byHref = new Map();
+  for (const link of allLinks) {
+    let parsed;
+    try { parsed = new URL(link.href); } catch { continue; }
+    const match = parsed.pathname.match(/^\/en\/results\/(\d{4})\/races\/(\d+)\/([^/]+)\/race-result\/?$/i);
+    if (!match || !hostIsAllowed(parsed.hostname, "F1")) continue;
+    const rowHtml = rowTextAround(html, link.index);
+    const rowText = rowHtml || link.contextText || link.linkText;
+    const eventSlug = match[3].replace(/-/g, " ");
+    const event = {
+      ...link,
+      href: parsed.href,
+      year: match[1],
+      eventSlug,
+      eventLabel: link.linkText || eventSlug,
+      rowText,
+      date: f1ArchiveDate(rowText, match[1])
+    };
+    if (!byHref.has(parsed.href)) byHref.set(parsed.href, event);
+  }
+  const events = [...byHref.values()];
+  if (!events.length) throw new Error("The official Formula 1 results archive did not expose its Grand Prix result links. Paste a direct official Race Result or Sprint page URL instead.");
+
+  const desiredDate = String(context.eventDate || "").slice(0, 10);
+  const desiredTokens = normalizeF1EventTokens(context.event || "");
+  let candidates = events.map(event => {
+    const candidateTokens = normalizeF1EventTokens(`${event.eventLabel} ${event.eventSlug}`);
+    const overlap = desiredTokens.filter(token => candidateTokens.includes(token)).length;
+    const score = overlap / Math.max(1, Math.min(desiredTokens.length, candidateTokens.length));
+    return { ...event, dateMatch: !!desiredDate && event.date === desiredDate, nameScore: score };
+  });
+
+  if (desiredDate) {
+    const dateMatches = candidates.filter(event => event.dateMatch);
+    if (dateMatches.length === 1) return dateMatches[0];
+    if (dateMatches.length > 1 && desiredTokens.length) candidates = dateMatches;
+  }
+  if (desiredTokens.length) {
+    const bestScore = Math.max(...candidates.map(event => event.nameScore));
+    const best = candidates.filter(event => event.nameScore === bestScore && bestScore >= 0.5);
+    if (best.length === 1) return best[0];
+  }
+
+  const requested = String(context.event || (desiredDate ? `the event on ${desiredDate}` : "the selected Grand Prix")).trim();
+  const choices = events.slice(0, 8).map(event => `${event.eventLabel}${event.date ? ` (${event.date})` : ""}`).join("; ");
+  throw new Error(`Couldn't uniquely match “${requested}” to the official Formula 1 results archive. Check the scheduled event name/date. Available events include: ${choices}`);
+}
+
+function f1EventBaseUrl(url) {
+  const next = new URL(url.href);
+  next.pathname = next.pathname.replace(/\/(?:race-result|sprint-results)\/?$/i, "").replace(/\/+$/, "") + "/race-result";
+  next.search = "";
+  next.hash = "";
+  return next;
+}
+
+async function resolveF1EventSession(eventResultUrl, context = {}) {
+  const grandPrixUrl = f1EventBaseUrl(eventResultUrl);
+  if (!isF1EventResultUrl(grandPrixUrl)) throw new Error("Use an official Formula 1 event Race Result page, Sprint Result page, or the season results archive.");
+  const grandPrixPage = await readOfficialPage(grandPrixUrl, "F1");
+  const eventTitle = extractEventHeading(grandPrixPage);
+  const sprintSelected = normalizeHeader(context.phase || "Grand Prix").includes("sprint");
+  if (!sprintSelected) {
+    return { url: grandPrixPage.finalUrl.href, page: grandPrixPage, eventTitle, sessionTitle: "Grand Prix" };
+  }
+
+  const links = parseAnchorLinks(grandPrixPage.body, grandPrixPage.finalUrl.href);
+  const sprintLinks = links.filter(link => {
+    try {
+      const target = new URL(link.href);
+      return hostIsAllowed(target.hostname, "F1") && /\/sprint-results\/?$/i.test(target.pathname);
+    } catch { return false; }
+  });
+  const unique = [...new Map(sprintLinks.map(link => [link.href, link])).values()];
+  if (unique.length !== 1) {
+    throw new Error(`The official ${eventTitle || "selected Grand Prix"} page does not provide one clear Sprint result page. This event may not be a Sprint weekend. Choose the Grand Prix scoring tab or check the official event page.`);
+  }
+  const sprintPage = await readOfficialPage(new URL(unique[0].href), "F1");
+  return { url: sprintPage.finalUrl.href, page: sprintPage, eventTitle, sessionTitle: "Sprint" };
+}
+
+async function resolveF1ArchiveUrl(archiveUrl, context = {}) {
+  const normalizedArchiveUrl = f1ArchiveUrlForContext(archiveUrl, context);
+  const archive = await readOfficialPage(normalizedArchiveUrl, "F1");
+  const event = chooseF1ArchiveEvent(archive.body, archive.finalUrl, context);
+  return resolveF1EventSession(new URL(event.href), context);
+}
+
 async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvName, event, round, eventDate, eventType, phase, supercrossFormat } = {}) {
   if (!OFFICIAL_HOSTS_BY_SERIES[series]) throw new Error("Choose a supported racing series before importing results.");
   const options = { series, division };
@@ -561,7 +721,12 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
   if (url.port && url.port !== "443") throw new Error("Only standard secure (HTTPS) official results links are supported.");
 
   let resolved = null;
-  if (series === "SMX") {
+  if (series === "F1") {
+    const context = { event, round, eventDate, eventType, phase: phase || "Grand Prix" };
+    if (isF1ArchiveLandingUrl(url)) resolved = await resolveF1ArchiveUrl(url, context);
+    else if (isF1EventResultUrl(url)) resolved = await resolveF1EventSession(url, context);
+    else throw new Error("For F1, paste the official season results archive or a direct event Race Result / Sprint Result page. The selected Grand Prix or Sprint scoring tab determines which classification is fetched.");
+  } else if (series === "SMX") {
     const context = { event, round, eventDate, division, eventType, phase, supercrossFormat };
     if (url.searchParams.get("p") === "view_event") {
       resolved = await resolveSmxEventPage(url, context);
@@ -578,7 +743,7 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     if (resolved) url = new URL(resolved.url);
   }
 
-  const page = await readOfficialPage(url, series);
+  const page = resolved?.page || await readOfficialPage(resolved ? new URL(resolved.url) : url, series);
   const parseOptions = { ...options, url: page.finalUrl.href };
   const title = page.title || page.finalUrl.hostname;
   let result;
@@ -590,19 +755,31 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
   } else throw new Error("The official source format isn't readable by this importer. Try its HTML result page or an official CSV export.");
 
   const fetchedUrl = page.finalUrl.href;
+  let fastestLap = null;
+  if (series === "F1" && !normalizeHeader(phase || "Grand Prix").includes("sprint")) {
+    try {
+      const fastestLapUrl = f1EventBaseUrl(new URL(fetchedUrl));
+      fastestLapUrl.pathname = fastestLapUrl.pathname.replace(/\/race-result$/i, "/fastest-laps");
+      const fastestPage = await readOfficialPage(fastestLapUrl, "F1");
+      const fastestResults = parseHtml(fastestPage.body, fastestPage.title, { series: "F1", url: fastestPage.finalUrl.href });
+      if (fastestResults.rows[0]) fastestLap = fastestResults.rows[0];
+    } catch { /* Race classification remains usable if the optional fastest-lap page is unavailable. */ }
+  }
   return {
     ...result,
     source: resolved ? resolved.url : fetchedUrl,
     fetchedUrl,
     division: divisionKey(division) || "",
     eventTitle: resolved?.eventTitle || "",
-    sessionTitle: resolved?.sessionTitle || ""
+    sessionTitle: resolved?.sessionTitle || "",
+    fastestLap
   };
 }
 
 module.exports = {
   OFFICIAL_HOSTS_BY_SERIES,
   SMX_EVENT_ARCHIVE,
+  F1_RESULTS_ARCHIVE,
   hostIsAllowed,
   divisionKey,
   parseCsv,
@@ -610,5 +787,9 @@ module.exports = {
   parseJsonResults,
   fetchOfficialResults,
   chooseArchiveEvent,
-  sessionLinkMatches
+  sessionLinkMatches,
+  isF1ArchiveLandingUrl,
+  isF1EventResultUrl,
+  chooseF1ArchiveEvent,
+  resolveF1EventSession
 };

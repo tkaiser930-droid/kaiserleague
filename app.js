@@ -812,7 +812,7 @@ const OFFICIAL_RESULT_SOURCES={
  "Triple Crown Series":{url:"https://triplecrownseries.ca/results/",help:"Open the official Triple Crown Series results archive or its Live Timing page. Paste a direct result table link, or download an official CSV export from the timing provider and upload it here."},
  MXGP:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP result files. If the classification is supplied as PDF or Excel only, export/save it as CSV with Position and Rider columns before uploading; direct PDF/Excel parsing is not enabled yet."},
  MXON:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP / Motocross of Nations result files. Paste a readable official results-table URL or upload an official CSV classification."},
- F1:{url:"https://www.formula1.com/en/results",help:"Open the official Formula 1 results archive and copy the direct Race Result or Sprint Result page URL. The importer uses the official position and driver columns."},
+ F1:{url:"https://www.formula1.com/en/results",help:"Use the official Formula 1 season results archive. Select the scheduled Grand Prix and the Grand Prix or Sprint scoring tab first. Pasting this archive link follows the selected event to its official Race Result or Sprint page. A Sprint selection is accepted only when the selected Grand Prix publishes an official Sprint result."},
  MotoGP:{url:"https://stats.motogp.com/en/gp-results",help:"Open the official MotoGP Results archive and copy the direct Grand Prix or Sprint classification URL. If the page requires sign-in or blocks automated reading, download an official CSV export and upload it."}
 };
 let officialImportRows=[],officialImportMeta=null,officialImportScopeSnapshot=null;
@@ -822,11 +822,12 @@ function renderOfficialSourceHelp(){
  const series=$("scoreSeries")?.value||"SMX",source=officialSourceInfo(),link=$("officialResultsSourceLink"),help=$("officialResultsSourceHelp"),urlInput=$("officialResultsUrl");
  if(link){link.href=source.url;link.textContent="Open official results source ↗"}
  if(help)help.textContent=source.help+" CSV columns required: Position and Rider (or Driver); Number, Team and Best Lap are optional.";
+ if(urlInput)urlInput.placeholder=series==="F1"?"https://www.formula1.com/en/results or a direct Race Result / Sprint Result link":series==="SMX"?"https://www.supermotocross.com/results or a direct class/session result link":"Paste a direct official results-page URL";
  // Keep the SMX archive prefilled, but don't overwrite a URL the commissioner typed.
  if(urlInput){
   const previousAuto=clean(urlInput.dataset.autoSourceUrl),current=clean(urlInput.value);
   if(!current||current===previousAuto){
-   const next=series==="SMX"?source.url:"";
+   const next=["SMX","F1"].includes(series)?source.url:"";
    urlInput.value=next;
    urlInput.dataset.autoSourceUrl=next;
   }
@@ -856,7 +857,8 @@ function renderOfficialResultsPreview(){
  const sourceLabel=officialImportMeta?.source==="Official CSV upload"?"Official CSV upload":(()=>{try{return new URL(officialImportMeta?.source||"").hostname||"Official results page"}catch{return "Official results page"}})();
  const divisionLabel=officialImportMeta?.division?`${officialImportMeta.division} class`:"";
  const sessionLabel=officialImportMeta?.sessionTitle||"";
- summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span>${divisionLabel?`<span class="official-import-match">Class: ${esc(divisionLabel)}</span>`:""}${sessionLabel?`<span>Session: ${esc(sessionLabel)}</span>`:""}<span>${officialImportRows.length} official rows</span><span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
+ const fastestLapLabel=officialImportMeta?.fastestLap?`<span class="official-import-match">Official fastest lap: ${esc(officialImportMeta.fastestLap.name)}${officialImportMeta.fastestLap.number?` (#${esc(officialImportMeta.fastestLap.number)})`:""}</span>`:"";
+ summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span>${divisionLabel?`<span class="official-import-match">Class: ${esc(divisionLabel)}</span>`:""}${sessionLabel?`<span>Session: ${esc(sessionLabel)}</span>`:""}${fastestLapLabel}<span>${officialImportRows.length} official rows</span><span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
  el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name)}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
 }
 function rematchOfficialResults(){if(!officialImportRows.length)return;officialImportRows=officialImportRows.map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();renderOfficialResultsPreview()}
@@ -872,8 +874,8 @@ async function previewOfficialResults(){
    event:clean($("scoreEvent")?.value||scheduled?.name),
    round:clean($("scoreRound")?.value||scheduled?.round),
    eventDate:scheduled?.date||"",
-   eventType:series==="SMX"?currentSmxEventType():"",
-   phase:series==="SMX"?scoringPhase:"",
+   eventType:series==="SMX"?currentSmxEventType():series==="F1"?clean(scheduled?.eventType):"",
+   phase:["SMX","F1"].includes(series)?scoringPhase:"",
    supercrossFormat:series==="SMX"?$("scoreSmxSupercrossFormat")?.value||"Standard":""
   };
   if(file){if(file.size>5*1024*1024)throw new Error("CSV files must be 5 MB or smaller.");body.csv=await file.text();body.csvName=file.name||"Official CSV results"}else body.url=url;
@@ -905,9 +907,25 @@ function applyOfficialResults(){
  // When the official session table explicitly supplies best-lap times, award the existing fastest-lap checkbox to the quickest classified rider.
  const fastestLapBonus=config.bonuses.find(([key])=>key==="fastestLap");
  const parseLapTime=value=>{const match=String(value||"").trim().match(/^(\d{1,2}:)?\d{1,2}(?:\.\d+)?/);if(!match)return Infinity;const token=match[0],parts=token.split(":").map(Number);if(parts.some(value=>!Number.isFinite(value)))return Infinity;return parts.length===2?parts[0]*60000+parts[1]*1000:parts[0]*1000};
- if(fastestLapBonus){const lapRows=importedRows.filter(row=>row.match?.athlete&&row.match.state==="matched"&&row.bestLap&&Number.isFinite(parseLapTime(row.bestLap))).sort((a,b)=>parseLapTime(a.bestLap)-parseLapTime(b.bestLap));const fastest=lapRows[0];if(fastest&&gridRows.has(fastest.position)){const check=gridRows.get(fastest.position).querySelector(`[data-bonus="${fastestLapBonus[0]}"]`);if(check){check.checked=true;updateScoreRow(gridRows.get(fastest.position))}}}
+ let fastestLapPreselected=false;
+ if(fastestLapBonus){const lapRows=importedRows.filter(row=>row.match?.athlete&&row.match.state==="matched"&&row.bestLap&&Number.isFinite(parseLapTime(row.bestLap))).sort((a,b)=>parseLapTime(a.bestLap)-parseLapTime(b.bestLap));const fastest=lapRows[0];if(fastest&&gridRows.has(fastest.position)){const check=gridRows.get(fastest.position).querySelector(`[data-bonus="${fastestLapBonus[0]}"]`);if(check){check.checked=true;updateScoreRow(gridRows.get(fastest.position));fastestLapPreselected=true}}}
+ // Formula 1 publishes the race fastest-lap classification on a separate official tab.
+ // The importer fetches it for Grand Prix sessions and assigns the bonus to that driver.
+ if($("scoreSeries")?.value==="F1"&&config.phase==="Grand Prix"&&officialImportMeta?.fastestLap&&fastestLapBonus){
+  const fastestMatch=matchOfficialResultAthlete(officialImportMeta.fastestLap);
+  if(fastestMatch.athlete&&fastestMatch.state==="matched"){
+   const fastestId=id(fastestMatch.athlete);
+   let targetRow=[...gridRows.values()].find(row=>row.querySelector(".score-rider-select")?.value===fastestId);
+   if(!targetRow){
+    const freeEntry=[...gridRows.entries()].sort((a,b)=>b[0]-a[0]).find(([place,row])=>{const select=row.querySelector(".score-rider-select");return select&&!select.value&&[...select.options].some(option=>option.value===fastestId)});
+    if(freeEntry){const select=freeEntry[1].querySelector(".score-rider-select");select.value=fastestId;updateScoreRow(freeEntry[1]);targetRow=freeEntry[1]}
+   }
+   const check=targetRow?.querySelector(`[data-bonus="${fastestLapBonus[0]}"]`);
+   if(check){check.checked=true;updateScoreRow(targetRow);fastestLapPreselected=true}
+  }
+ }
  syncScoreRiderOptions();
- message.textContent=`Loaded ${loaded} rider position${loaded===1?"":"s"} into the scoring table. ${skipped} unmatched/already-scored rows, ${duplicate} duplicate athlete rows and ${outOfRange} positions outside this scoring table were skipped. If the official source included best-lap times, the fastest-lap bonus was preselected; verify all bonuses and positions before recording results.`;
+ message.textContent=`Loaded ${loaded} rider position${loaded===1?"":"s"} into the scoring table. ${skipped} unmatched/already-scored rows, ${duplicate} duplicate athlete rows and ${outOfRange} positions outside this scoring table were skipped. ${fastestLapPreselected?"The official fastest-lap bonus was preselected where available. ":"Fastest-lap bonus may need manual selection if the official source did not provide it. "}Verify all bonuses and positions before recording results.`;
  $("scoreEntryTable")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
 function clearOfficialResults(){officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;if($("officialResultsUrl"))$("officialResultsUrl").value="";if($("officialResultsCsv"))$("officialResultsCsv").value="";if($("officialResultsImportMessage"))$("officialResultsImportMessage").textContent="Import preview cleared.";renderOfficialSourceHelp();renderOfficialResultsPreview()}

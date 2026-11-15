@@ -5,8 +5,8 @@
   "description": "Kaiser Family Fantasy SMX Node.js web service with Render and GitHub mirrored league-data JSON storage",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check github-backup.js && node --check bootstrap.js && node --check app.js && node --check race-results-import.js && node tests/race-results-import-smx.test.js",
-    "test:results": "node tests/race-results-import-smx.test.js"
+    "check": "node --check server.js && node --check github-backup.js && node --check bootstrap.js && node --check app.js && node --check race-results-import.js && node tests/race-results-import-smx.test.js && node tests/race-results-import-f1.test.js",
+    "test:results": "node tests/race-results-import-smx.test.js && node tests/race-results-import-f1.test.js"
   },
   "engines": {
     "node": ">=22"
