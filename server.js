@@ -123,7 +123,9 @@ function fileHash(contents) {
   return crypto.createHash("sha256").update(contents).digest("hex");
 }
 function queueSave({ syncGithub = true, preserveSavedAt = false } = {}) {
-  writeChain = writeChain.then(async () => {
+  // Keep the queue usable after a transient filesystem failure. The individual
+  // caller still receives the rejection, but later Data & Backup retries can run.
+  const job = writeChain.catch(() => {}).then(async () => {
     await fs.promises.mkdir(DATA_DIR, { recursive: true });
     if (!preserveSavedAt) db.savedAt = Math.max(Date.now(), timestampMs(db.savedAt) + 1);
     const contents = JSON.stringify(db, null, 2);
@@ -133,7 +135,8 @@ function queueSave({ syncGithub = true, preserveSavedAt = false } = {}) {
     lastDbFileHash = fileHash(contents);
     if (syncGithub) scheduleAutomaticGithubSave();
   });
-  return writeChain;
+  writeChain = job.catch(() => {});
+  return job;
 }
 function scheduleAutomaticGithubSave() {
   if (!githubBackup.isAutoEnabled()) return;
@@ -222,7 +225,7 @@ async function readBody(req) {
   const chunks = []; let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 15 * 1024 * 1024) throw new Error("Request is too large (15 MB limit).");
+    if (size > 64 * 1024 * 1024) throw new Error("Request is too large (64 MB limit).");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
@@ -267,6 +270,39 @@ async function handleApi(req, res, url) {
     db.keyUpdatedAt[HISTORICAL_KEY] = timestamp;
     await queueSave();
     return send(res, 200, { ok: true, archivedYear: year, currentYear: nextYear, savedAt: db.savedAt });
+  }
+  const historicalSeasonMatch = url.pathname.match(/^\/api\/historical\/season\/(\d{4})$/);
+  if (historicalSeasonMatch) {
+    if (!requireCommissioner(req)) return send(res, 401, { error: "Commissioner session expired. Sign in again to edit previous seasons." });
+    const year = Number(historicalSeasonMatch[1]);
+    if (!Number.isInteger(year) || year < 2010 || year > 2099) return send(res, 400, { error: "Historical seasons must be between 2010 and 2099." });
+    if (req.method === "PUT") {
+      const body = await readBody(req);
+      const record = body.record;
+      if (!record || typeof record !== "object" || Array.isArray(record) || !record.state || typeof record.state !== "object" || Array.isArray(record.state)) {
+        return send(res, 400, { error: `The ${year} season record must contain a state object.` });
+      }
+      if (Number(record.year || year) !== year) return send(res, 400, { error: `The season record year does not match ${year}.` });
+      const history = db.state[HISTORICAL_KEY] && typeof db.state[HISTORICAL_KEY] === "object" && !Array.isArray(db.state[HISTORICAL_KEY])
+        ? db.state[HISTORICAL_KEY] : { version: 1, seasons: {} };
+      history.seasons = history.seasons && typeof history.seasons === "object" && !Array.isArray(history.seasons) ? history.seasons : {};
+      history.seasons[String(year)] = { ...record, year };
+      history.version = 1;
+      db.state[HISTORICAL_KEY] = history;
+      db.keyUpdatedAt[HISTORICAL_KEY] = Date.now();
+      await queueSave();
+      return send(res, 200, { ok: true, year, savedAt: db.savedAt });
+    }
+    if (req.method === "DELETE") {
+      const history = db.state[HISTORICAL_KEY];
+      if (history?.seasons && Object.prototype.hasOwnProperty.call(history.seasons, String(year))) {
+        delete history.seasons[String(year)];
+        db.keyUpdatedAt[HISTORICAL_KEY] = Date.now();
+        await queueSave();
+      }
+      return send(res, 200, { ok: true, year, savedAt: db.savedAt });
+    }
+    return send(res, 405, { error: "Method not allowed for historical season records." });
   }
   if (url.pathname === "/api/historical") {
     if (!requireCommissioner(req)) return send(res, 401, { error: "Commissioner session expired. Sign in again to access previous seasons." });
@@ -383,7 +419,11 @@ async function serve(req, res) {
   }
   if (url.pathname.startsWith("/api/")) {
     try { return await handleApi(req, res, url); }
-    catch (err) { console.error("API error:", err); return send(res, 400, { error: err.message || "Request failed." }); }
+    catch (err) {
+      console.error("API error:", err);
+      const status = err?.code && ["EACCES", "EPERM", "EROFS", "ENOSPC", "EISDIR", "ENOTDIR", "EMFILE", "ENFILE"].includes(err.code) ? 500 : 400;
+      return send(res, status, { error: err.message || "Request failed.", code: err.code || "" });
+    }
   }
   let pathname;
   try { pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, "Bad URL", "text/plain; charset=utf-8"); }

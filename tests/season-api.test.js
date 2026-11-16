@@ -91,6 +91,34 @@ async function jsonRequest(url, options = {}) {
     const token = login.body.token;
     assert.ok(token);
 
+    // Non-current season switching should be able to create/update only one
+    // year without uploading the entire historical archive on every change.
+    result = await jsonRequest(`${baseUrl}/api/historical/season/2026`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ record: { year: 2026, status: 'workspace', state: {
+        kaiserFantasyAthletes: [{ id: 'rider-2026', name: 'Workspace Rider', number: '7' }],
+        kaiserFantasyScores: [], kaiserFantasyTeams: []
+      } } })
+    });
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    result = await jsonRequest(`${baseUrl}/api/historical`, { headers: { Authorization: `Bearer ${token}` } });
+    assert.equal(result.body.value.seasons['2026'].state.kaiserFantasyAthletes[0].number, '7');
+
+    // A failed disk write must not permanently poison the serialized save queue.
+    const blockedTempPath = path.join(dataDir, 'league-data.json.tmp');
+    await fs.mkdir(blockedTempPath);
+    result = await jsonRequest(`${baseUrl}/api/state/kaiserFantasyAthletes`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: [{ id: 'failed-write' }], updatedAt: Date.now() + 100 })
+    });
+    assert.equal(result.response.status, 500, 'the deliberately blocked temporary file should report a server-side filesystem failure');
+    await fs.rm(blockedTempPath, { recursive: true, force: true });
+    result = await jsonRequest(`${baseUrl}/api/state/kaiserFantasyAthletes`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: [{ id: 'retry-write' }], updatedAt: Date.now() + 200 })
+    });
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+
     const oldState = {
       kaiserFantasyAthletes: [{ id: 'rider-1', name: 'Historic Rider', number: '18', class: 'MXGP', raceTeam: 'Old Factory Team' }],
       kaiserFantasyTeams: [{ key: 'team-1', name: 'Team One', owner: 'Owner', passwordHash: 'keep-me', roster: [{ id: 'rider-1', name: 'Historic Rider' }] }],
@@ -164,7 +192,7 @@ async function jsonRequest(url, options = {}) {
     result = await jsonRequest(`${baseUrl}/api/historical`, { headers: { Authorization: `Bearer ${reLogin.body.token}` } });
     assert.equal(result.body.value.seasons['2027'].state.kaiserFantasyAthletes[0].number, '18', 'archive survives server restart');
 
-    console.log('Season API tests passed: private history auth, single-save archive/new-season transaction, no point carryover, public-state isolation, team preservation and disk persistence.');
+    console.log('Season API tests passed: private history auth, per-season workspace writes, recoverable save queue, single-save archive/new-season transaction, no point carryover, public-state isolation, team preservation and disk persistence.');
   } finally {
     if (processInfo?.child) await stopServer(processInfo.child);
     await fs.rm(dataDir, { recursive: true, force: true });

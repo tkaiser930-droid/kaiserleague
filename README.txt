@@ -72,7 +72,7 @@ BACKGROUND AND BRANDING
 - Manufacturer logos and colors from the GASGAS-logo version remain. Later sponsor-only badge entries have been removed as part of this rollback.
 
 SECURITY
-- Historical records use a server-authenticated Commissioner session and a protected API. Public state reads and writes cannot read or overwrite the private historical key.
+- Historical records use a server-authenticated Commissioner session and a protected API. Public state reads and writes cannot read or overwrite the private historical key. Single-year workspace changes are saved through a dedicated per-season API route to avoid resending the full archive with every year switch; the archive remains inside the same `league-data.json` database.
 - Set `COMMISSIONER_PASSWORD` as a secret environment variable in Render. For local Node.js use, copy `.env.example` to `.env`, enter a unique password, and run `npm start`; Node 22 loads that file automatically. The legacy password remains as a compatibility fallback if the variable is not set; configure a unique password before exposing the service publicly.
 - Keep the configured GitHub backup repository private: the mirrored database includes the private archive even though the website's public API does not expose it.
 

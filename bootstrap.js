@@ -6,10 +6,11 @@
     "kaiserFantasySchedule", "kaiserFantasySeasonSettings"
   ];
   const HISTORICAL_KEY = "kaiserFantasyHistoricalSeasons";
+  const UNSAVED_HISTORY_KEY = "__kf_unsaved_historical__";
   let commissionerToken = sessionStorage.getItem("commApiToken") || "";
   const TS_PREFIX = "__kf_saved_at__";
   // A public visitor on a shared browser must not inherit the commissioner's cached private history.
-  if (!commissionerToken) {
+  if (!commissionerToken && !localStorage.getItem(UNSAVED_HISTORY_KEY)) {
     localStorage.removeItem(HISTORICAL_KEY);
     localStorage.removeItem(TS_PREFIX + HISTORICAL_KEY);
   }
@@ -49,7 +50,10 @@
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ value, updatedAt }), keepalive: true, cache: "no-store"
     });
-    if (!res.ok) throw new Error("Database write failed for " + key + ".");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Database write failed for ${key} (HTTP ${res.status}).`);
+    }
     return res.json();
   }
   async function apiHistoricalPut(value) {
@@ -60,15 +64,80 @@
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || "Historical season data could not be saved.");
+    localStorage.removeItem(UNSAVED_HISTORY_KEY);
     return body;
+  }
+  async function apiHistoricalSeasonPut(year, record, fullHistoryFallback) {
+    if (!commissionerToken) throw new Error("Sign in as commissioner again to save historical seasons.");
+    const res = await fetch(`/api/historical/season/${encodeURIComponent(year)}`, {
+      method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer " + commissionerToken },
+      body: JSON.stringify({ record }), keepalive: true, cache: "no-store"
+    });
+    // Older deployed servers do not yet have the per-season endpoint. Fall back
+    // to the original collection endpoint so the same project file remains usable.
+    if (res.status === 404 && fullHistoryFallback) return apiHistoricalPut(fullHistoryFallback);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Historical season ${year} could not be saved (HTTP ${res.status}).`);
+    return body;
+  }
+  async function apiHistoricalSeasonDelete(year, fullHistoryFallback) {
+    if (!commissionerToken) throw new Error("Sign in as commissioner again to save historical seasons.");
+    const res = await fetch(`/api/historical/season/${encodeURIComponent(year)}`, {
+      method: "DELETE", headers: { Authorization: "Bearer " + commissionerToken }, cache: "no-store"
+    });
+    if (res.status === 404 && fullHistoryFallback) return apiHistoricalPut(fullHistoryFallback);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Historical season ${year} could not be deleted (HTTP ${res.status}).`);
+    return body;
+  }
+  function changedHistoricalSeasonYears(previous, next) {
+    const before = previous?.seasons && typeof previous.seasons === "object" ? previous.seasons : {};
+    const after = next?.seasons && typeof next.seasons === "object" ? next.seasons : {};
+    return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+      .filter(year => JSON.stringify(before[year] ?? null) !== JSON.stringify(after[year] ?? null));
+  }
+  async function apiHistoricalChange(previous, next) {
+    const changed = changedHistoricalSeasonYears(previous, next);
+    if (changed.length === 1) {
+      const year = changed[0];
+      if (Object.prototype.hasOwnProperty.call(next?.seasons || {}, year)) {
+        return apiHistoricalSeasonPut(year, next.seasons[year], next);
+      }
+      return apiHistoricalSeasonDelete(year, next);
+    }
+    return apiHistoricalPut(next);
   }
   async function apiHistoricalGet() {
     if (!commissionerToken) throw new Error("Commissioner sign-in is required to access previous seasons.");
     const res = await fetch("/api/historical", { headers: { Authorization: "Bearer " + commissionerToken }, cache: "no-store" });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || "Historical season data could not be loaded.");
-    loadLocal(HISTORICAL_KEY, body.value || { version: 1, seasons: {} }, body.updatedAt || Date.now());
-    return body.value || { version: 1, seasons: {} };
+    const serverHistory = body.value || { version: 1, seasons: {} };
+    const retainedBrowserHistory = parseLocal(HISTORICAL_KEY);
+    const hasExplicitUnsavedMarker = !!localStorage.getItem(UNSAVED_HISTORY_KEY);
+    // Also recognize copies left by the previous app version, which did not yet
+    // write an explicit marker when a historical save failed.
+    const hasNewerDifferentBrowserCopy = !!retainedBrowserHistory
+      && localTime(HISTORICAL_KEY) > Number(body.updatedAt || 0)
+      && JSON.stringify(retainedBrowserHistory) !== JSON.stringify(serverHistory);
+    if ((hasExplicitUnsavedMarker || hasNewerDifferentBrowserCopy) && retainedBrowserHistory) {
+      // A previous save failed after localStorage was updated. Keep and retry that
+      // exact browser copy instead of silently replacing it with the older server copy.
+      try {
+        const saved = await apiHistoricalChange(serverHistory, retainedBrowserHistory);
+        loadLocal(HISTORICAL_KEY, retainedBrowserHistory, Number(saved?.savedAt) || Date.now());
+        localStorage.removeItem(UNSAVED_HISTORY_KEY);
+        lastError = null;
+        setStatus("Recovered and saved the previously unsaved historical season changes.", "good");
+        return retainedBrowserHistory;
+      } catch (error) {
+        lastError = error;
+        setStatus(`Historical changes are still retained in this browser but could not be saved: ${error.message}`, "error");
+        return retainedBrowserHistory;
+      }
+    }
+    loadLocal(HISTORICAL_KEY, serverHistory, body.updatedAt || Date.now());
+    return serverHistory;
   }
   function loadLocal(key, value, updatedAt) {
     localStorage.setItem(key, JSON.stringify(value));
@@ -76,18 +145,23 @@
   }
   function storageWrite(key, value) {
     const prev = localTime(key);
+    const previousValue = key === HISTORICAL_KEY ? parseLocal(key) : null;
     const updatedAt = Math.max(Date.now(), prev + 1);
     localStorage.setItem(key, JSON.stringify(value));
     localStorage.setItem(TS_PREFIX + key, String(updatedAt));
+    if (key === HISTORICAL_KEY) localStorage.setItem(UNSAVED_HISTORY_KEY, String(updatedAt));
     if (mode !== "server") return;
     setStatus("Saving changes to the project database…", "saving");
-    const saveRequest = key === HISTORICAL_KEY ? () => apiHistoricalPut(value) : () => apiPut(key, value, updatedAt);
+    const saveRequest = key === HISTORICAL_KEY
+      ? () => apiHistoricalChange(previousValue, value)
+      : () => apiPut(key, value, updatedAt);
     pending = pending.then(saveRequest).then(() => {
+      if (key === HISTORICAL_KEY) localStorage.removeItem(UNSAVED_HISTORY_KEY);
       lastError = null;
       setStatus("Saved to server storage: " + storageLabel, "good");
     }).catch(err => {
       lastError = err;
-      setStatus("Save to project file failed. The browser copy is retained; check the server and use Data & Backup to retry.", "error");
+      setStatus(`Save to project file failed: ${err.message || "Unknown server error."} The browser copy is retained; retry after checking the server connection.`, "error");
       throw err;
     });
     // Mark the queued rejection as handled for the UI; flush() still reports it through lastError.
@@ -149,6 +223,7 @@
       else { localStorage.removeItem(key); localStorage.removeItem(TS_PREFIX + key); }
     }
     if (includesHistory) loadLocal(HISTORICAL_KEY, state[HISTORICAL_KEY], timestamp);
+    localStorage.removeItem(UNSAVED_HISTORY_KEY);
     lastError = null;
     setStatus(mode === "server" ? "Backup restored to server storage: " + storageLabel : "Backup restored to browser storage only. Start the project with npm start for file-based saving.", mode === "server" ? "good" : "warn");
   }
@@ -164,6 +239,7 @@
       }
     }
     for (const key of [...KEYS, HISTORICAL_KEY]) { localStorage.removeItem(key); localStorage.removeItem(TS_PREFIX + key); }
+    localStorage.removeItem(UNSAVED_HISTORY_KEY);
     lastError = null;
   }
   async function commissionerLogin(password) {
@@ -203,8 +279,10 @@
     sessionStorage.removeItem("commApiToken");
     sessionStorage.removeItem("commAuthV2");
     // Historical records stay on the server but are removed from this browser cache at sign-out.
-    localStorage.removeItem(HISTORICAL_KEY);
-    localStorage.removeItem(TS_PREFIX + HISTORICAL_KEY);
+    if (!localStorage.getItem(UNSAVED_HISTORY_KEY)) {
+      localStorage.removeItem(HISTORICAL_KEY);
+      localStorage.removeItem(TS_PREFIX + HISTORICAL_KEY);
+    }
   }
   window.KFStorage = {
     get mode() { return mode; },
