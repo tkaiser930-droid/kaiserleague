@@ -69,3 +69,10 @@ MOTOGP FAST LAP RIDER PDF BONUS UPDATE
 - The first rider in the official Fastest Lap of Each Rider ranking is returned as fastestLap and the existing +1 Fastest Lap checkbox is preselected for that rider on both Grand Prix and Sprint scoring tabs.
 - The parser accepts the official table row layout even when the PDF text extractor omits the report heading.
 - Q2 remains the source for the +3 Fastest Qualifier bonus. F1 and all other series parsing are unchanged.
+
+
+MotoGP classification retention update:
+- RAC / SPR import now keeps unclassified MotoGP riders instead of dropping rows with no numeric finishing position.
+- Non-classified / NC, DNF (including first-lap non-finishers), DNS, DSQ and withdrawn rows are included after the classified finishers in the official source order. They receive sequential internal scoring positions so they can be loaded into the scoring grid, while the import preview displays their official status.
+- Classification parsing handles both per-rider status fields and separate grouped arrays (for example `non_classified_riders` and `riders_who_did_not_finish_first_lap`).
+- Fastest Qualifier continues to come from the event's separate `Q2` session classification (P1 in Q2); it is not inferred from RAC / SPR or from a general pole-position summary. The Fast Lap Rider PDF remains the source for Fastest Lap.

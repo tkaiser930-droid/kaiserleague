@@ -170,8 +170,32 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
       { id: "sprint-qatar", type: "SPR", name: "Sprint", session_files: [{ name: "Fast Lap Rider", href: sprintFastLapUrl }] },
       { id: "q2-qatar", type: "Q2", name: "Qualifying 2" }
     ]),
-    [raceUrl]: json({ file: raceFastLapUrl.replace("FastLapRider.pdf", "Classification.pdf"), classification: [{ position: 1, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" }, best_lap: { time: "1:52.123" } }, { position: 2, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" }, best_lap: { time: "1:52.245" } }] }),
-    [sprintUrl]: json({ file: sprintFastLapUrl.replace("FastLapRider.pdf", "Classification.pdf"), classification: [{ position: 1, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" } }, { position: 2, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" } }] }),
+    [raceUrl]: json({
+      file: raceFastLapUrl.replace("FastLapRider.pdf", "Classification.pdf"),
+      classification: [
+        { position: 1, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" }, best_lap: { time: "1:52.123" } },
+        { position: 2, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" }, best_lap: { time: "1:52.245" } }
+      ],
+      sections: [
+        { title: "Non-classified riders", rows: [
+          { rider: { full_name: "Toprak Razgatlioglu", number: 7 }, team: { name: "Prima Pramac Yamaha MotoGP" } },
+          { rider: { full_name: "Raul Fernandez", number: 25 }, team: { name: "Trackhouse MotoGP Team" } }
+        ] },
+        { title: "Riders who did not finish first lap", rows: [
+          { rider: { full_name: "Franco Morbidelli", number: 21 }, team: { name: "Pertamina Enduro VR46 Racing Team" } }
+        ] }
+      ]
+    }),
+    [sprintUrl]: json({
+      file: sprintFastLapUrl.replace("FastLapRider.pdf", "Classification.pdf"),
+      classification: [
+        { position: 1, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" } },
+        { position: 2, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" } }
+      ],
+      non_classified_riders: [
+        { rider: { full_name: "Toprak Razgatlioglu", number: 7 }, team: { name: "Prima Pramac Yamaha MotoGP" } }
+      ]
+    }),
     [raceFastLapUrl]: pdfStub,
     [sprintFastLapUrl]: pdfStub,
     [q2Url]: json([{ position: 1, rider: { full_name: "Francesco Bagnaia", number: 63 }, team: { name: "Ducati Lenovo Team" } }, { position: 2, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" } }])
@@ -184,7 +208,15 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(motogpRace.rows[0].name, "Marco Bezzecchi");
   assert.equal(motogpRace.rows[0].number, "72");
   assert.equal(motogpRace.rows[0].bestLap, "1:52.123");
+  assert.deepEqual(motogpRace.rows.map(row => [row.position, row.displayPosition, row.name, row.status]), [
+    [1, "1", "Marco Bezzecchi", ""],
+    [2, "2", "Marc Marquez", ""],
+    [3, "NC", "Toprak Razgatlioglu", "NC"],
+    [4, "NC", "Raul Fernandez", "NC"],
+    [5, "DNF", "Franco Morbidelli", "DNF"]
+  ], "RAC retains every non-classified rider in the order displayed after the classified finishers");
   assert.equal(motogpRace.fastestQualifier.name, "Francesco Bagnaia");
+  assert.equal(motogpRace.fastestQualifier.sourceUrl, q2Url, "fastest qualifier is sourced from the event's Q2 session endpoint");
   assert.equal(motogpRace.fastestLap, null, "a malformed mocked PDF should not invent a fastest-lap rider");
   assert.ok(motogpRace.fastestLapError, "PDF parsing failures are returned as an explicit importer warning");
   assert.equal(motogpRace.fastestQualifierSessionTitle, "Qualifying 2");
@@ -197,6 +229,9 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   });
   assert.equal(motogpSprint.sessionTitle, "Sprint");
   assert.equal(motogpSprint.rows[0].name, "Marc Marquez", "Sprint selection uses the SPR classification, not the RAC classification");
+  assert.deepEqual(motogpSprint.rows.map(row => [row.position, row.displayPosition, row.name]), [
+    [1, "1", "Marc Marquez"], [2, "2", "Marco Bezzecchi"], [3, "NC", "Toprak Razgatlioglu"]
+  ], "SPR also retains non-classified riders in official display order");
 
-  console.log("TCS / MXGP / MXON / MotoGP importer tests passed: year-specific TCS event selection, strict TCS class and moto filtering, MXGP/MXON class/session validation, rider-number/best-lap parsing, MotoGP RAC/SPR/Q2 routing, and session-specific Fast Lap Rider PDF resolution/parsing.");
+  console.log("TCS / MXGP / MXON / MotoGP importer tests passed: year-specific TCS event selection, strict TCS class and moto filtering, MXGP/MXON class/session validation, rider-number/best-lap parsing, MotoGP RAC/SPR ordering including NC/DNF riders, Q2 fastest-qualifier routing, and session-specific Fast Lap Rider PDF resolution/parsing.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

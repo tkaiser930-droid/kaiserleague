@@ -802,40 +802,133 @@ function motogpEventDate(event) {
   return "";
 }
 
-function motogpSessionCode(session) {
+function motogpSessionMatches(session, code) {
+  const wanted = normalizeHeader(code);
   const values = [session?.type, session?.code, session?.session_type, session?.sessionType, session?.name, session?.description]
-    .map(value => typeof value === "object" ? (value.code || value.type || value.name || "") : String(value || ""));
-  return normalizeHeader(values.join(" "));
+    .map(value => typeof value === "object" ? [value.code, value.type, value.name, value.description].filter(Boolean).join(" ") : String(value || ""));
+  return values.some(value => normalizeHeader(value) === wanted || new RegExp(`(^|[^a-z0-9])${wanted}([^a-z0-9]|$)`, "i").test(value));
+}
+
+function motogpStatusText(value) {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value).trim();
+  if (Array.isArray(value)) return value.map(motogpStatusText).filter(Boolean).join(" ");
+  if (typeof value === "object") {
+    return [value.code, value.short_code, value.shortCode, value.name, value.label, value.description, value.text, value.status]
+      .map(motogpStatusText).filter(Boolean).join(" ");
+  }
+  return "";
+}
+
+function motogpGroupStatus(key) {
+  const normalized = normalizeHeader(key);
+  if (/nonclassified|notclassified/.test(normalized)) return "NC";
+  if (/didnotfinishfirstlap|notfinishedfirstlap|didnotfinish|dnf/.test(normalized)) return "DNF";
+  if (/didnotstart|dns/.test(normalized)) return "DNS";
+  if (/disqualified|disqualification|dsq/.test(normalized)) return "DSQ";
+  if (/withdrawn|withdrawals|wd/.test(normalized)) return "WD";
+  return "";
+}
+
+function collectMotoGPClassificationItems(payload) {
+  const collected = [];
+  const seenObjects = new Set();
+  const isRiderRow = value => value && typeof value === "object" && !Array.isArray(value) &&
+    (value.rider || value.competitor || value.athlete || value.rider_name || value.riderName || value.full_name || value.fullName);
+  const visit = (value, inheritedStatus = "", depth = 0) => {
+    if (depth > 10 || value == null) return;
+    if (Array.isArray(value)) {
+      for (const entry of value) visit(entry, inheritedStatus, depth + 1);
+      return;
+    }
+    if (typeof value !== "object" || seenObjects.has(value)) return;
+    seenObjects.add(value);
+    const ownLabel = [value.label, value.title, value.name, value.description, value.section, value.status]
+      .map(motogpStatusText).filter(Boolean).join(" ");
+    const ownGroupStatus = motogpGroupStatus(ownLabel) || inheritedStatus;
+    if (isRiderRow(value)) {
+      collected.push({ item: value, groupStatus: ownGroupStatus, sourceOrder: collected.length });
+      return;
+    }
+    for (const [key, child] of Object.entries(value)) {
+      const groupStatus = motogpGroupStatus(key) || ownGroupStatus;
+      if (child && typeof child === "object") visit(child, groupStatus, depth + 1);
+    }
+  };
+  visit(payload);
+  // Some older result-service responses wrap a flat list under a less common
+  // key; retain compatibility with the original result-array discovery path.
+  if (!collected.length) {
+    const fallback = arrayFromPayload(payload, ["classification", "results", "rows", "data"]);
+    fallback.forEach((item, sourceOrder) => collected.push({ item, groupStatus: "", sourceOrder }));
+  }
+  return collected;
+}
+
+function motogpClassificationStatus(item, positionValue, groupStatus = "") {
+  const rider = item?.rider || item?.competitor || item?.athlete || {};
+  const raw = [
+    positionValue,
+    item?.status, item?.status_code, item?.statusCode, item?.status_name, item?.statusName,
+    item?.result_status, item?.resultStatus, item?.classification_status, item?.classificationStatus,
+    item?.position_status, item?.positionStatus, item?.rider_status, item?.riderStatus,
+    item?.reason, item?.reason_description, item?.reasonDescription,
+    rider?.status, rider?.result_status, rider?.classification_status
+  ].map(motogpStatusText).filter(Boolean).join(" ");
+  if (/non[ -]?classified|not[ -]?classified|\bNC\b/i.test(raw)) return "NC";
+  if (/did not finish first lap|not finish(?:ed)? first lap|\bDNF\b|did not finish|retired/i.test(raw)) return "DNF";
+  if (/did not start|\bDNS\b/i.test(raw)) return "DNS";
+  if (/disqualif|\bDSQ\b/i.test(raw)) return "DSQ";
+  if (/withdrawn|\bWD\b/i.test(raw)) return "WD";
+  return groupStatus;
 }
 
 function motogpClassificationRows(payload, sourceTitle) {
-  const rows = arrayFromPayload(payload, ["classification", "results", "rows", "data"]);
+  const rows = collectMotoGPClassificationItems(payload);
   if (!rows.length) throw new Error("The official MotoGP classification response did not contain rider rows.");
   const mapped = [];
-  rows.forEach((item, sourceOrder) => {
+  rows.forEach(({ item, groupStatus, sourceOrder }) => {
     const rider = item?.rider || item?.competitor || item?.athlete || {};
     const first = rider.first_name || rider.firstName || rider.given_name || "";
     const last = rider.last_name || rider.lastName || rider.family_name || "";
     const name = normalizeSeriesRiderName(rider.full_name || rider.fullName || rider.name || item.rider_name || item.riderName || `${first} ${last}`, "MotoGP");
     const positionValue = item.position ?? item.pos ?? item.rank ?? item.position_number ?? item.classification_position;
-    const position = parsePosition(positionValue) || Number(positionValue) || 0;
-    if (!name || !position) return;
+    const parsedPosition = parsePosition(positionValue) || Number(positionValue) || 0;
+    const status = motogpClassificationStatus(item, positionValue, groupStatus) || (!parsedPosition ? "NC" : "");
+    // MotoGP's official RAC / SPR pages include separate sections such as
+    // "Non-classified riders" and "Riders who did not finish first lap".
+    // Those entries have no numeric position, but they are real result rows
+    // and must remain in the exact order shown below the classified finishers.
+    if (!name || ["rider", "competitor"].includes(normalizeHeader(name))) return;
     const lap = item.best_lap || item.bestLap || item.fastest_lap || item.fastestLap || {};
     const teamValue = item.team?.name || item.team_name || item.teamName || rider.team?.name || "";
+    const number = cleanNumber(rider.number ?? item.rider_number ?? item.riderNumber ?? item.number ?? "");
+    if (!parsedPosition && !status && !number) return;
     mapped.push({
-      position,
-      displayPosition: String(position),
-      status: "",
+      position: parsedPosition,
+      displayPosition: status || String(parsedPosition || "NC"),
+      status: status || (!parsedPosition ? "NC" : ""),
       sourceOrder,
-      number: cleanNumber(rider.number ?? item.rider_number ?? item.number ?? ""),
+      number,
       name,
       team: String(teamValue || ""),
       bestLap: String(lap.time || lap.lap_time || lap.lapTime || item.best_lap_time || item.bestLapTime || "")
     });
   });
-  mapped.sort((a, b) => a.position - b.position || a.sourceOrder - b.sourceOrder);
-  if (!mapped.length) throw new Error("The official MotoGP classification had no classified riders.");
-  return { title: sourceTitle, rows: mapped };
+
+  const classified = mapped.filter(row => row.position > 0 && !row.status)
+    .sort((a, b) => a.position - b.position || a.sourceOrder - b.sourceOrder);
+  const unclassified = mapped.filter(row => row.status || !row.position)
+    .sort((a, b) => a.sourceOrder - b.sourceOrder);
+  let nextScoringPosition = classified.reduce((max, row) => Math.max(max, row.position), 0) + 1;
+  for (const row of unclassified) {
+    row.position = nextScoringPosition++;
+    row.displayPosition = row.status || "NC";
+    row.status = row.status || "NC";
+  }
+  const ordered = [...classified, ...unclassified];
+  if (!ordered.length) throw new Error("The official MotoGP classification did not contain any readable rider rows.");
+  return { title: sourceTitle, rows: ordered };
 }
 
 function motogpFastLapRiderPdfUrl(classificationPayload) {
@@ -986,7 +1079,7 @@ async function resolveMotoGPResults(context = {}) {
   const sessions = arrayFromPayload(sessionsResponse.json, ["sessions", "results"]);
   const sprint = normalizeHeader(context.phase || "Grand Prix").includes("sprint");
   const raceCode = sprint ? "spr" : "rac";
-  const raceSession = sessions.find(item => motogpSessionCode(item).includes(raceCode));
+  const raceSession = sessions.find(item => motogpSessionMatches(item, raceCode));
   if (!raceSession) throw new Error(`The official ${motogpEventText(event)} session list does not contain a ${sprint ? "Sprint" : "Grand Prix Race"} classification. Check the selected scoring tab and whether results have been published.`);
   const raceSessionId = raceSession.id || raceSession.uuid;
   if (!raceSessionId) throw new Error("The official MotoGP race session did not include a session identifier.");
@@ -1018,15 +1111,18 @@ async function resolveMotoGPResults(context = {}) {
 
   let fastestQualifier = null;
   let fastestQualifierError = "";
-  const q2Session = sessions.find(item => motogpSessionCode(item).includes("q2"))
-    || sessions.find(item => /qualifying\s*2/i.test(String(item.name || item.description || "")));
+  // Fastest qualifier is taken from the event's own Q2 session page, in the
+  // same session-results structure as RAC and SPR (not from a generic grid or
+  // pole-position summary elsewhere on the event page).
+  const q2Session = sessions.find(item => motogpSessionMatches(item, "Q2"));
   if (q2Session?.id || q2Session?.uuid) {
     try {
       const q2Url = new URL(`https://api.motogp.pulselive.com/motogp/v1/results/session/${encodeURIComponent(q2Session.id || q2Session.uuid)}/classification`);
       q2Url.searchParams.set("seasonYear", year);
       q2Url.searchParams.set("test", "false");
       const q2Response = await readOfficialJson(q2Url, "MotoGP");
-      fastestQualifier = motogpClassificationRows(q2Response.json, `${eventTitle} — Qualifying 2`).rows[0] || null;
+      const q2Rows = motogpClassificationRows(q2Response.json, `${eventTitle} — Q2` ).rows;
+      fastestQualifier = q2Rows.find(row => !row.status && row.position === 1) || q2Rows.find(row => !row.status) || q2Rows[0] || null;
       if (fastestQualifier) fastestQualifier.sourceUrl = q2Url.href;
     } catch (error) {
       fastestQualifierError = error.message || "Could not read the official MotoGP Qualifying 2 classification.";
@@ -1543,6 +1639,7 @@ module.exports = {
   resolveTcsEventPage,
   validateMxgpClassification,
   motogpClassificationRows,
+  collectMotoGPClassificationItems,
   motogpFastLapRiderPdfUrl,
   parseMotoGPFastLapRiderText,
   extractMotoGPPdfText,
