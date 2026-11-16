@@ -7,6 +7,10 @@ const {
   parseTcsEventResults,
   parseHtml,
   mxgpSessionOptionMatches,
+  chooseMxgpRoundOption,
+  parseMxgpClassificationPdfText,
+  findMxgpClassificationPdfLink,
+  parseMxgpPageWithPdfFallback,
   resolveMxgpOfficialPage,
   hostIsAllowed,
   OFFICIAL_HOSTS_BY_SERIES,
@@ -120,6 +124,56 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(mxgpSessionOptionMatches("Qualifying", "Qualifying Race"), true);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 2", "Moto 1"), false);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 1", "Moto 2"), false);
+
+  // Event identity must take priority over round/date metadata. In particular,
+  // a single stale French option must not be silently accepted for Great Britain.
+  {
+    const roundControl = { options: [
+      { value: "4113", text: "Grand Prix of France" },
+      { value: "4116", text: "Grand Prix of Great Britain" }
+    ] };
+    assert.equal(chooseMxgpRoundOption(roundControl, {
+      event: "Grand Prix of Great Britain", eventLocation: "Foxhills, Great Britain",
+      round: 20, eventDate: "2026-10-04"
+    }).value, "4116");
+    assert.throws(() => chooseMxgpRoundOption({ options: [{ value: "4113", text: "Grand Prix of France" }] }, {
+      event: "Grand Prix of Great Britain", eventLocation: "Foxhills, Great Britain"
+    }), /did not match any official Grand Prix round/i);
+  }
+
+  // Official classification PDFs are a fallback when the results portal
+  // returns a page shell rather than its HTML classification table.
+  {
+    const pdfRows = [
+      "Race 1 (MXGP) - Classification",
+      "Pos Nat. Nation Rider Fed. Motorcycle Total Tm. Gap1 Speed Points",
+      "1 NED The Netherlands 57 HERLINGS, Jeffrey KNMV Honda 35:15.127 0.000 51.163 1",
+      "2 ESP Spain 28 PRADO, Jorge RFME KTM 35:27.162 12.035 50.873 2",
+      "Fastest lap by HERLINGS, Jeffrey; 1:47.954 in lap 7 with 55.690km/h"
+    ].join("\n");
+    const parsedPdf = parseMxgpClassificationPdfText(pdfRows, "MXGP PDF", { division: "MXGP", phase: "Moto 1" });
+    assert.equal(parsedPdf.rows.length, 2);
+    assert.equal(parsedPdf.rows[0].name, "Jeffrey HERLINGS");
+    assert.equal(parsedPdf.rows[0].number, "57");
+    assert.equal(parsedPdf.fastestLap.name, "Jeffrey HERLINGS");
+    assert.equal(parsedPdf.fastestLap.bestLap, "1:47.954");
+    const wrongPdf = pdfRows.replace("Race 1 (MXGP)", "Race 3 (MXGP + Open)");
+    assert.throws(() => parseMxgpClassificationPdfText(wrongPdf, "MXGP PDF", { division: "MXGP", phase: "Moto 1" }), /not Moto 1/i);
+
+    const pdfLink = findMxgpClassificationPdfLink(
+      '<a href="https://docs.mxgp.com/resultservice/ResPDF/2026/event/RaceClassification.pdf">Download result as PDF</a>',
+      "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4113&type=351&y=2026"
+    );
+    assert.match(pdfLink.href, /docs\.mxgp\.com\/.+RaceClassification\.pdf/i);
+
+    await assert.rejects(() => parseMxgpPageWithPdfFallback({
+      body: '<html><body><h2>Race 3 (MXGP + Open) - Classification</h2></body></html>',
+      title: "Results Infront Moto Racing",
+      contentType: "text/html; charset=utf-8",
+      finalUrl: new URL("https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4113&type=351&y=2026")
+    }, { division: "MXGP", phase: "Moto 1" }), /not Moto 1/i,
+    "a shell response exposing the 2026 MXON Race 3 caption must be rejected as Moto 1 before fallback");
+  }
 
   // Regression test for the official standings iframe filter order:
   // Championship -> Class -> Grand Prix -> Session. The mock intentionally

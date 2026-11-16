@@ -410,13 +410,21 @@ async function fetchApprovedUrl(initialUrl, series, requestOptions = {}) {
     if (current.protocol !== "https:" || current.username || current.password || (current.port && current.port !== "443") || !hostIsAllowed(current.hostname, series)) {
       throw new Error("The official source redirected outside its approved HTTPS domain list.");
     }
+    const browserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
     const headers = {
-      "User-Agent": series === "MotoGP"
-        ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      // Infront's results portal serves the actual classifications to normal
+      // browser requests. Its custom importer UA can receive the page shell
+      // without the result table, so use a conventional browser UA for MXGP.
+      "User-Agent": ["MotoGP", "MXGP", "MXON"].includes(series)
+        ? browserUserAgent
         : "KaiserFamilyFantasySMXResultsImporter/1.2 (+official-results preview)",
       "Accept": series === "MotoGP"
         ? "application/json, text/plain, application/pdf;q=0.9, */*;q=0.8"
         : "text/html,text/csv,application/json,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.5",
+      ...(["MXGP", "MXON"].includes(series) ? {
+        "Accept-Language": "en-US,en;q=0.9",
+        "Upgrade-Insecure-Requests": "1"
+      } : {}),
       ...(series === "MotoGP" ? {
         "Origin": "https://www.motogp.com",
         "Referer": "https://www.motogp.com/",
@@ -577,10 +585,12 @@ function mxgpRoundTokens(value) {
 function chooseMxgpRoundOption(control, context = {}) {
   const candidates = control.options.filter(option => /^grand\s+prix\s+of\b/i.test(option.text));
   if (!candidates.length) throw new Error("The official MXGP Round dropdown did not contain any options beginning with ‘Grand Prix of’. Make sure the FIM Motocross World Championship selection has loaded.");
+
   const eventTokens = mxgpRoundTokens(context.event || "");
   const locationTokens = mxgpRoundTokens(context.eventLocation || "");
   const targetTokens = [...new Set([...eventTokens, ...locationTokens])];
   const requestedRound = Number(context.round || 0);
+  const requestedDate = String(context.eventDate || "").slice(0, 10);
   const scored = candidates.map((option, index) => {
     const tokens = mxgpRoundTokens(option.text);
     const eventOverlap = eventTokens.filter(token => tokens.includes(token)).length;
@@ -590,44 +600,45 @@ function chooseMxgpRoundOption(control, context = {}) {
     const explicitRound = option.text.match(/\b(?:round|rnd)\s*0?(\d+)\b/i);
     const roundMatch = !!(requestedRound && explicitRound && Number(explicitRound[1]) === requestedRound);
     const date = isoDate(option.text);
-    const dateMatch = !!(context.eventDate && date && date === String(context.eventDate).slice(0, 10));
+    const dateMatch = !!(requestedDate && date && date === requestedDate);
     return { option, index, score, eventOverlap, locationOverlap, roundMatch, dateMatch };
   });
-  if (requestedRound && scored.some(item => item.roundMatch)) {
-    const roundMatches = scored.filter(item => item.roundMatch);
-    if (roundMatches.length === 1) return roundMatches[0].option;
-    if (targetTokens.length) {
-      const roundBest = Math.max(...roundMatches.map(item => item.score));
-      const best = roundMatches.filter(item => item.score === roundBest && item.score > 0);
-      if (best.length === 1) return best[0].option;
-    }
-  }
-  if (scored.some(item => item.dateMatch)) {
-    const dateMatches = scored.filter(item => item.dateMatch);
-    if (dateMatches.length === 1) return dateMatches[0].option;
-  }
-  // Prefer a unique match from the scheduled event title. Venue text often
-  // contains extra city/track tokens that do not appear in the official GP label.
-  if (eventTokens.length) {
-    const bestOverlap = Math.max(...scored.map(item => item.eventOverlap));
-    const best = scored.filter(item => item.eventOverlap === bestOverlap && bestOverlap > 0);
-    if (best.length === 1) return best[0].option;
-  }
-  if (locationTokens.length) {
-    const bestOverlap = Math.max(...scored.map(item => item.locationOverlap));
-    const best = scored.filter(item => item.locationOverlap === bestOverlap && bestOverlap > 0);
-    if (best.length === 1) return best[0].option;
-  }
+
+  // A scheduled event name or venue is the primary identity of a round. Never
+  // let a coincidental round number/date, or a single stale dropdown option,
+  // override a contradictory event/venue. This prevents the Motocross of
+  // Nations Ernée event from being mistaken for a Grand Prix of France.
   if (targetTokens.length) {
-    const bestScore = Math.max(...scored.map(item => item.score));
-    const best = scored.filter(item => item.score === bestScore && bestScore > 0);
-    if (best.length === 1) return best[0].option;
-    if (best.length > 1) {
-      const names = best.map(item => item.option.text).join("; ");
-      throw new Error(`More than one official MXGP round could match “${context.event || context.eventLocation || "the scheduled event"}”: ${names}. Check the event name and venue on the Commissioner schedule.`);
+    const identityMatches = scored.filter(item => item.eventOverlap > 0 || item.locationOverlap > 0);
+    if (!identityMatches.length) {
+      const available = candidates.slice(0, 12).map(option => option.text).join("; ");
+      throw new Error(`The scheduled MXGP event “${context.event || context.eventLocation || "selected event"}” did not match any official Grand Prix round. Available options include: ${available}. Check the event name and venue; the importer will not guess a round.`);
     }
+
+    let pool = identityMatches;
+    const bestScore = Math.max(...pool.map(item => item.score));
+    pool = pool.filter(item => item.score === bestScore);
+
+    // Round/date may break a tie only within the event-name/venue matches.
+    const roundMatches = pool.filter(item => item.roundMatch);
+    if (roundMatches.length === 1) return roundMatches[0].option;
+    const dateMatches = pool.filter(item => item.dateMatch);
+    if (dateMatches.length === 1) return dateMatches[0].option;
+    if (pool.length === 1) return pool[0].option;
+
+    const names = pool.map(item => item.option.text).join("; ");
+    throw new Error(`More than one official MXGP round matches “${context.event || context.eventLocation || "the scheduled event"}”: ${names}. Check the event name and venue on the Commissioner schedule.`);
   }
+
+  // When no usable event or venue text is supplied, use only explicit round
+  // or date metadata. A unique candidate is safe only as a last resort when
+  // the caller genuinely has no event identity to compare.
+  const roundMatches = scored.filter(item => item.roundMatch);
+  if (roundMatches.length === 1) return roundMatches[0].option;
+  const dateMatches = scored.filter(item => item.dateMatch);
+  if (dateMatches.length === 1) return dateMatches[0].option;
   if (candidates.length === 1) return candidates[0];
+
   const available = candidates.slice(0, 12).map(option => option.text).join("; ");
   throw new Error(`Couldn't match the scheduled event “${context.event || ""}”${context.round ? ` (Round ${context.round})` : ""} to the official MXGP Round dropdown. Available rounds include: ${available}. Check the scheduled event name and venue.`);
 }
@@ -841,19 +852,78 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   // used by the official results portal (ct, c, e, type, and season y).
   const directSessionUrl = buildMxgpDirectSessionUrl(page, selectedOptions, context);
   page = await readMxgpPage(directSessionUrl, "MXGP", { headers: { Referer: page.finalUrl.href } });
-  const parsed = parseHtml(page.body, page.title, { series: "MXGP", division: targetClass, phase: phaseLabel, url: page.finalUrl.href });
+  const parseOptions = { series: "MXGP", division: targetClass, phase: phaseLabel, url: page.finalUrl.href };
+  const classified = await parseMxgpPageWithPdfFallback(page, parseOptions);
+  const parsed = validateMxgpClassification(classified.parsed, parseOptions);
+  const classificationUrl = classified.url;
   parsed.eventTitle = roundOption.text;
   parsed.sessionTitle = sessionOption.text;
   parsed.filterSelections = selections;
-  parsed.fastestLap = parsed.rows.filter(row => row.bestLap && /^\d{1,2}:\d{2}\.\d{2,3}$/.test(String(row.bestLap).trim()))
+  parsed.fastestLap = parsed.fastestLap || parsed.rows.filter(row => row.bestLap && /^\d{1,2}:\d{2}\.\d{2,3}$/.test(String(row.bestLap).trim()))
     .sort((a, b) => parseMxgpLapTime(a.bestLap) - parseMxgpLapTime(b.bestLap))[0] || null;
-  if (parsed.fastestLap) parsed.fastestLap.sourceUrl = page.finalUrl.href;
-  return { page, url: page.finalUrl.href, eventTitle: roundOption.text, sessionTitle: sessionOption.text, selections, parsed };
+  if (parsed.fastestLap) parsed.fastestLap.sourceUrl = classificationUrl;
+  return { page, url: classificationUrl, eventTitle: roundOption.text, sessionTitle: sessionOption.text, selections, parsed };
 }
 
 function parseMxgpLapTime(value) {
   const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2}(?:\.\d{1,3})?)$/);
   return match ? Number(match[1]) * 60000 + Number(match[2]) * 1000 : Infinity;
+}
+
+function mxgpClassificationHeadingFromText(value) {
+  const source = String(value || "");
+  const htmlHeading = latestMxgpHeadingBefore(source, source.length);
+  if (htmlHeading && /classification/i.test(htmlHeading)) return htmlHeading;
+  const flat = stripHtml(source).replace(/\s+/g, " ").trim();
+  const match = flat.match(/((?:qualifying\s+race|race\s+qualifying|grand\s+prix\s+race\s*[12]|race\s*[123](?:\s*\([^)]*(?:MXGP|MX2)[^)]*\))?))\s*[-–—:]?\s*classification/i);
+  return match ? match[0].trim() : "";
+}
+
+function parseMxgpClassificationPdfText(value, sourceTitle = "Official MXGP classification PDF", options = {}) {
+  const source = String(value || "").replace(/\r/g, "");
+  const lines = source.split(/\n+/).map(line => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const heading = mxgpClassificationHeadingFromText(source);
+  if (!heading) {
+    throw new Error("The official MXGP PDF did not identify a qualifying race or Grand Prix race classification. Confirm that the PDF belongs to the selected event and session.");
+  }
+
+  const rows = [];
+  const riderRow = /^(\d{1,3})\s+([A-Z]{3})\s+.+?\s+(\d{1,3})\s+([\p{L}\p{M}][\p{L}\p{M}'’.-]*(?:\s+[\p{L}\p{M}'’.-]+)*,\s*[\p{L}\p{M}][\p{L}\p{M}'’.-]*(?:\s+[\p{L}\p{M}'’.-]+)*)\s+([A-Z]{2,10})\s+.+?\s+(\d{1,2}:\d{2}\.\d{3}|DNF|DNS|DSQ|NC)\b/u;
+  for (const [sourceOrder, line] of lines.entries()) {
+    const match = line.match(riderRow);
+    if (!match) continue;
+    const position = Number(match[1]);
+    const number = String(match[3]);
+    const name = normalizeSeriesRiderName(match[4], "MXGP");
+    if (!position || !name) continue;
+    rows.push({
+      position,
+      displayPosition: String(position),
+      status: "",
+      sourceOrder,
+      number,
+      name,
+      team: "",
+      bestLap: ""
+    });
+  }
+  if (!rows.length) {
+    throw new Error("The official MXGP PDF contained a session heading but no readable rider classification rows. Upload the official CSV export if the PDF layout has changed.");
+  }
+
+  const fastestMatch = source.match(/fastest\s+lap\s+by\s+([^;\n]+);\s*(\d{1,2}:\d{2}\.\d{3})/i);
+  let fastestLap = null;
+  if (fastestMatch) {
+    const fastestName = normalizeSeriesRiderName(fastestMatch[1], "MXGP");
+    const rider = rows.find(row => normalizeHeader(row.name) === normalizeHeader(fastestName));
+    if (rider) {
+      rider.bestLap = fastestMatch[2];
+      fastestLap = { ...rider };
+    }
+  }
+  rows.sort((a, b) => a.position - b.position || a.sourceOrder - b.sourceOrder);
+  const parsed = { title: sourceTitle, rows: rows.slice(0, 100), tableHeading: heading, fastestLap };
+  return validateMxgpClassification(parsed, { ...options, series: "MXGP" });
 }
 
 function resultYear(context = {}, url = null) {
@@ -1202,7 +1272,7 @@ async function extractMotoGPPdfText(buffer) {
   try {
     pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   } catch (error) {
-    throw new Error("The MotoGP Fast Lap Rider PDF parser is unavailable. Reinstall the project dependencies and redeploy so pdfjs-dist is installed.");
+    throw new Error("The official race-results PDF parser is unavailable. Reinstall the project dependencies and redeploy so pdfjs-dist is installed.");
   }
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(buffer),
@@ -1253,6 +1323,64 @@ async function readOfficialPdf(url, series) {
   }
   const text = await extractMotoGPPdfText(buffer);
   return { text, finalUrl };
+}
+
+async function readMxgpClassificationPdf(urlValue, referer = "https://results.mxgp.com/reslists.aspx") {
+  const url = new URL(String(urlValue));
+  if (!hostIsAllowed(url.hostname, "MXGP") || !/\.pdf(?:$|\?)/i.test(url.href)) {
+    throw new Error("The MXGP classification PDF link was not on an approved official results host.");
+  }
+  const { response, finalUrl } = await fetchApprovedUrl(url, "MXGP", { headers: { Referer: referer } });
+  if (!response.ok) throw new Error(await officialHttpError(response, finalUrl, "The official MXGP classification PDF"));
+  const buffer = await readLimitedBuffer(response);
+  if (buffer.length < 5 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+    throw new Error("The official MXGP classification link did not return a valid PDF file.");
+  }
+  const text = await extractMotoGPPdfText(buffer);
+  return { text, finalUrl };
+}
+
+function findMxgpClassificationPdfLink(html, baseUrl) {
+  const links = parseAnchorLinks(html, baseUrl).filter(link => {
+    try {
+      const url = new URL(link.href);
+      return hostIsAllowed(url.hostname, "MXGP") && /\.pdf(?:$|\?)/i.test(url.href);
+    } catch { return false; }
+  });
+  return links.find(link => /download\s+result\s+as\s+pdf/i.test(link.linkText || link.text || ""))
+    || links.find(link => /raceclassification|classification/i.test(link.href))
+    || links[0]
+    || null;
+}
+
+async function parseMxgpPageWithPdfFallback(page, context = {}) {
+  const parseOptions = { ...context, series: "MXGP", url: page.finalUrl.href };
+  try {
+    return {
+      parsed: parseHtml(page.body, page.title, parseOptions),
+      url: page.finalUrl.href
+    };
+  } catch (htmlError) {
+    // If the portal returns a page shell / div-based response rather than a
+    // parseable <table>, inspect its visible classification caption first.
+    // A wrong session must be rejected before attempting any PDF fallback.
+    const exposedHeading = mxgpClassificationHeadingFromText(page.body);
+    if (exposedHeading) {
+      validateMxgpClassification({ title: page.title, rows: [], tableHeading: exposedHeading }, parseOptions);
+    }
+
+    const pdfLink = findMxgpClassificationPdfLink(page.body, page.finalUrl.href);
+    if (!pdfLink) {
+      const contentHint = page.contentType ? ` Response type: ${page.contentType}.` : "";
+      throw new Error(`${htmlError.message}${contentHint} The official page did not expose a classification table or a downloadable classification PDF for this exact selection. ${mxgpSourceDetails(page.finalUrl.href)}`);
+    }
+
+    const pdf = await readMxgpClassificationPdf(pdfLink.href, page.finalUrl.href);
+    const pdfOptions = { ...parseOptions, url: pdf.finalUrl.href };
+    const parsed = parseMxgpClassificationPdfText(pdf.text, "Official MXGP classification PDF", pdfOptions);
+    parsed.pdfSourceUrl = pdf.finalUrl.href;
+    return { parsed, url: pdf.finalUrl.href };
+  }
 }
 
 async function readMotoGPResourcePdf(url) {
@@ -2347,8 +2475,20 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
   const page = resolved?.page || await readOfficialPage(resolved ? new URL(resolved.url) : url, series);
   const parseOptions = { ...options, url: page.finalUrl.href };
   const title = page.title || page.finalUrl.hostname;
+  let directMxgpParsed = null;
+  let directMxgpUrl = "";
+  if (series === "MXGP" && !resolved?.parsed) {
+    const directClassified = await parseMxgpPageWithPdfFallback(page, { division, phase });
+    directMxgpParsed = directClassified.parsed;
+    directMxgpUrl = directClassified.url;
+  }
   let result;
-  if (series === "Triple Crown Series") {
+  if (series === "MXGP" && (resolved?.parsed || directMxgpParsed)) {
+    // The official result adapter has already validated the selected filters
+    // and may have parsed the official PDF when HTML was unavailable. Reusing
+    // those verified rows avoids reparsing the page shell in this outer layer.
+    result = resolved?.parsed || directMxgpParsed;
+  } else if (series === "Triple Crown Series") {
     result = parseTcsEventResults(page.body, title, context);
     result.eventTitle = resolved?.eventTitle || extractEventHeading(page);
     result.sessionTitle = result.sessionTitle || (String(phase || "Moto 1").includes("2") ? "Moto 2" : "Moto 1");
@@ -2364,7 +2504,7 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     throw new Error("The official source format isn't readable by this importer. Try its HTML result page or an official CSV export.");
   }
 
-  const fetchedUrl = page.finalUrl.href;
+  const fetchedUrl = resolved?.url || directMxgpUrl || page.finalUrl.href;
   let fastestLap = null;
   let fastestQualifier = null;
   let fastestQualifierSessionTitle = "";
@@ -2442,6 +2582,10 @@ module.exports = {
   mxgpSessionOptionMatches,
   resolveMxgpOfficialPage,
   parseMxgpLapTime,
+  parseMxgpClassificationPdfText,
+  mxgpClassificationHeadingFromText,
+  findMxgpClassificationPdfLink,
+  parseMxgpPageWithPdfFallback,
   motogpClassificationRows,
   collectMotoGPClassificationItems,
   motogpSessionMatches,
