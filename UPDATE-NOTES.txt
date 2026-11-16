@@ -129,3 +129,10 @@ MotoGP 403 diagnostics update:
 - Previously saved ct/c/e/type values are ignored for MXGP so an old event/session (including Motocross of Nations Race 3) cannot bypass current Commissioner selections.
 - The importer always reselects Championship -> Class -> Grand Prix round -> Session, then fetches and validates that exact classification.
 - Regression tests now use the reported stale URL ct=1&c=9&e=4113&type=351&y=2026 and assert it is never fetched directly.
+
+
+2026-11-16 MXGP final request correction:
+- Fixed a concrete request-construction issue: the importer rebuilt the final `reslists.aspx` URL after the four filter selections but discarded non-framework hidden view parameters from the filter form, including `view=classification` when present.
+- The final URL now preserves those hidden classification-view parameters while replacing only the selected championship, class, event, session, and year filters.
+- Added regression assertions that fail when `view=classification` is missing from the final request, including the WebForms postback path.
+- MXGP classification mismatch errors now report the exact dropdown text and option value selected at each level, alongside the final URL.

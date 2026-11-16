@@ -280,6 +280,16 @@ function mxgpSourceDetails(urlValue) {
   }
 }
 
+function mxgpSelectionTrace(selections = {}) {
+  const ordered = [
+    ["Championship", selections.championship],
+    ["Class", selections.classification],
+    ["Round", selections.round],
+    ["Session", selections.session]
+  ];
+  return ordered.map(([label, option]) => `${label}="${String(option?.text || "(missing)").replace(/"/g, '\\"')}" [value=${String(option?.value ?? "(missing)")}]`).join("; ");
+}
+
 function parseHtmlTable(tableHtml, sourceTitle, options = {}) {
   const rawRows = extractHtmlTableRows(tableHtml);
   if (!rawRows.length) return null;
@@ -356,7 +366,7 @@ function parseHtml(html, sourceTitle = "Official race results", options = {}) {
   }
   if (/\b(position|pos)\b.{0,80}\b(rider|driver|name)\b/i.test(source) && source.includes(",")) return parseCsv(source, sourceTitle, options);
   if (options.series === "MXGP") {
-    throw new Error(`The official MXGP page returned no readable classification table after the importer selected ${options.division || "class"} ${options.phase || "session"}. ${mxgpSourceDetails(options.url)} The selected event, class, and session filters were requested automatically; the source did not return a readable result table.`);
+    throw new Error(`The official MXGP page returned no readable classification table after the importer selected ${options.division || "class"} ${options.phase || "session"}. ${mxgpSourceDetails(options.url)}${options.selectionTrace ? ` Dropdown selections: ${options.selectionTrace}.` : ""} The selected event, class, and session filters were requested automatically; the source did not return a readable result table.`);
   }
   throw new Error("The official page did not expose a readable results table. Try its direct session-results link or upload the official CSV export.");
 }
@@ -724,10 +734,41 @@ async function submitMxgpSelectChoice(page, series, selectedControl, selectedOpt
   return readPage(action, series, requestOptions);
 }
 
+function mxgpClassificationViewParameters(page) {
+  // The official reslists form carries hidden view parameters alongside the
+  // four dropdown values. In particular, `view=classification` is required by
+  // some portal responses to keep the classification view active after a
+  // filtered request. Do not discard these when constructing the final URL.
+  const preserved = new URLSearchParams();
+  const currentUrl = new URL(page.finalUrl.href);
+  const filterNames = new Set(["ct", "c", "e", "type", "y"]);
+  for (const [name, value] of currentUrl.searchParams.entries()) {
+    if (!filterNames.has(name.toLowerCase()) && !name.startsWith("__")) preserved.set(name, value);
+  }
+
+  // ASP.NET POST responses may keep hidden fields in the form body rather
+  // than in the response URL. Copy non-framework hidden fields into the
+  // direct classification URL while excluding viewstate/event tokens.
+  const inputRegex = /<input\b([^>]*)>/gi;
+  let match;
+  while ((match = inputRegex.exec(String(page.body || "")))) {
+    const attrs = parseHtmlAttributes(match[1]);
+    const name = String(attrs.name || attrs.id || "");
+    const type = String(attrs.type || "text").toLowerCase();
+    if (type !== "hidden" || !name || name.startsWith("__") || filterNames.has(name.toLowerCase())) continue;
+    if (attrs.value !== undefined) preserved.set(name, attrs.value);
+  }
+
+  // The results app's hidden field is normally present; set the documented
+  // classification view as a safe default for pages that omit the field.
+  if (!preserved.has("view")) preserved.set("view", "classification");
+  return preserved;
+}
+
 function buildMxgpDirectSessionUrl(page, selections, context = {}) {
   const url = new URL(page.finalUrl.href);
   url.pathname = "/reslists.aspx";
-  url.search = "";
+  url.search = mxgpClassificationViewParameters(page).toString();
   const canonical = {
     ct: selections.championship?.value,
     c: selections.classification?.value,
@@ -852,7 +893,8 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   // used by the official results portal (ct, c, e, type, and season y).
   const directSessionUrl = buildMxgpDirectSessionUrl(page, selectedOptions, context);
   page = await readMxgpPage(directSessionUrl, "MXGP", { headers: { Referer: page.finalUrl.href } });
-  const parseOptions = { series: "MXGP", division: targetClass, phase: phaseLabel, url: page.finalUrl.href };
+  const selectionTrace = mxgpSelectionTrace(selectedOptions);
+  const parseOptions = { series: "MXGP", division: targetClass, phase: phaseLabel, url: page.finalUrl.href, selectionTrace };
   const classified = await parseMxgpPageWithPdfFallback(page, parseOptions);
   const parsed = validateMxgpClassification(classified.parsed, parseOptions);
   const classificationUrl = classified.url;
@@ -862,7 +904,7 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   parsed.fastestLap = parsed.fastestLap || parsed.rows.filter(row => row.bestLap && /^\d{1,2}:\d{2}\.\d{2,3}$/.test(String(row.bestLap).trim()))
     .sort((a, b) => parseMxgpLapTime(a.bestLap) - parseMxgpLapTime(b.bestLap))[0] || null;
   if (parsed.fastestLap) parsed.fastestLap.sourceUrl = classificationUrl;
-  return { page, url: classificationUrl, eventTitle: roundOption.text, sessionTitle: sessionOption.text, selections, parsed };
+  return { page, url: classificationUrl, eventTitle: roundOption.text, sessionTitle: sessionOption.text, selections, selectionTrace, parsed };
 }
 
 function parseMxgpLapTime(value) {
@@ -1166,6 +1208,7 @@ function validateMxgpClassification(parsed, context = {}) {
   const series = context.series;
   const heading = String(parsed.tableHeading || "");
   const normalizedHeading = normalizeHeader(heading);
+  const traceText = context.selectionTrace ? ` Dropdown selections: ${context.selectionTrace}.` : "";
   const raceMatch = heading.match(/(?:race|moto)\s*([123])\b/i);
   const isQualifyingHeading = /qualifying/i.test(heading);
   if (series === "MXGP") {
@@ -1180,10 +1223,10 @@ function validateMxgpClassification(parsed, context = {}) {
         : phase.includes("moto1") || phase.includes("grandprixrace1") || phase === "race1" ? "1" : "";
       const isQualifying = phase.includes("qualifying");
       if (isQualifying && !isQualifyingHeading) {
-        throw new Error(`The official MXGP page is ${heading || "not labelled as a qualifying classification"}, not the selected Qualifying Race. ${mxgpSourceDetails(context.url)} Choose the correct session in the results page and fetch again.`);
+        throw new Error(`The official MXGP page is ${heading || "not labelled as a qualifying classification"}, not the selected Qualifying Race. ${mxgpSourceDetails(context.url)}${traceText} The importer selected the options shown above; this trace identifies the exact displayed labels and submitted values.`);
       }
       if (raceNumber && (isQualifyingHeading || !raceMatch || raceMatch[1] !== raceNumber)) {
-        throw new Error(`The official MXGP page is ${heading || "not labelled with a Grand Prix race number"}, not Moto ${raceNumber}. ${mxgpSourceDetails(context.url)} Choose the correct session in the results page and fetch again.`);
+        throw new Error(`The official MXGP page is ${heading || "not labelled with a Grand Prix race number"}, not Moto ${raceNumber}. ${mxgpSourceDetails(context.url)}${traceText} The importer selected the options shown above; this trace identifies the exact displayed labels and submitted values.`);
       }
     }
   }
@@ -2550,6 +2593,7 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     eventTitle: result.eventTitle || resolved?.eventTitle || "",
     sessionTitle: result.sessionTitle || resolved?.sessionTitle || result.tableHeading || "",
     filterSelections: resolved?.selections || result.filterSelections || [],
+    selectionTrace: resolved?.selectionTrace || "",
     fastestLap,
     fastestQualifier,
     fastestQualifierSessionTitle,

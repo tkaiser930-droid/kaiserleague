@@ -114,3 +114,8 @@ OFFICIAL RACE RESULTS IMPORT
 The Commissioner > Scoring tab supports a preview-first official race-results importer. Paste an official result-table URL or upload an official CSV export. It matches rider names/numbers to the selected series and division, then loads matched finishing positions into the existing scoring grid for review. It never posts scores automatically. CSV files need Position and Rider (or Driver) columns; Number, Team, and Best Lap are optional.
 
 URL fetching is handled by the Node server, so run the site with `npm start` rather than VS Code Live Server. The importer allowlists official domains per series and will refuse unrelated URLs. Some official sites require a sign-in or render their result tables dynamically; for those, download an official CSV export and upload it. The official MotoGP Fast Lap Rider PDF linked from the selected RAC / SPR session is a supported special case and is parsed server-side using `pdfjs-dist`; arbitrary PDF and Excel imports are not supported. See RESULTS-IMPORT-SETUP.txt for the source-domain list and details.
+
+
+MXGP importer request correction (November 16, 2026)
+- The final `reslists.aspx` request now retains hidden non-framework view parameters from the dropdown form when present, including `view=classification`. The previous final-URL builder cleared the whole query string and dropped this state after the dropdown selections; the corrected builder no longer strips it.
+- Mismatch errors now include the exact selected dropdown labels and option values (Championship, Class, Round, Session) alongside the final source URL. This is intended to identify the actual portal option-value mapping if the live source still returns a different classification.
