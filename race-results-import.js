@@ -694,15 +694,10 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   selections.push(championshipOption.text);
   if (!mxgpOptionExact(championshipOption.text, "FIM Motocross World Championship")) throw new Error("MXGP championship selection verification failed.");
 
-  forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
-  const round = mxgpFindSelect(forms, "Round", text => /^grand\s+prix\s+of\b/i.test(text));
-  const roundOption = chooseMxgpRoundOption(round.control, context);
-  page = await submitMxgpSelectChoice(page, "MXGP", round, roundOption, selectedValues, readMxgpPage);
-  selectedValues[round.control.name] = roundOption.value;
-  if (round.control.id) selectedValues[round.control.id] = roundOption.value;
-  selections.push(roundOption.text);
-  if (!/^grand\s+prix\s+of\b/i.test(roundOption.text)) throw new Error("MXGP round selection verification failed: the selected event must begin with ‘Grand Prix of’. ");
-
+  // The official results portal exposes the Class filter before the Grand
+  // Prix filter. Keep this exact order: Championship -> Class -> Round ->
+  // Session. Selecting the round first can leave the class list in its
+  // default state and the subsequent response may silently reset the round.
   forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
   const targetClass = mxgpDivisionKey(context.division);
   if (!targetClass) throw new Error("Choose MXGP or MX2 in the Commissioner Class / Division field before importing MXGP results.");
@@ -713,6 +708,15 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   if (classSelection.control.id) selectedValues[classSelection.control.id] = classOption.value;
   selections.push(classOption.text);
   if (!mxgpOptionExact(classOption.text, targetClass)) throw new Error(`MXGP class selection verification failed: expected ${targetClass}.`);
+
+  forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
+  const round = mxgpFindSelect(forms, "Round", text => /^grand\s+prix\s+of\b/i.test(text));
+  const roundOption = chooseMxgpRoundOption(round.control, context);
+  page = await submitMxgpSelectChoice(page, "MXGP", round, roundOption, selectedValues, readMxgpPage);
+  selectedValues[round.control.name] = roundOption.value;
+  if (round.control.id) selectedValues[round.control.id] = roundOption.value;
+  selections.push(roundOption.text);
+  if (!/^grand\s+prix\s+of\b/i.test(roundOption.text)) throw new Error("MXGP round selection verification failed: the selected event must begin with ‘Grand Prix of’. ");
 
   forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
   const phaseLabel = String(context.phase || "").trim();
