@@ -60,3 +60,12 @@ Official results importer additions (restored F1 NC / Qualifying baseline):
 - Added MotoGP official results API resolver behind motogp.com/en/gp-results/ for season/event/category/session lookup, RAC vs SPR classification and Q2 fastest-qualifier matching.
 - Left existing SMX class filtering and F1 NC / Qualifying / Sprint Qualifying behavior intact.
 - Added regression tests in tests/race-results-import-series.test.js and included them in npm run check / npm run test:results.
+
+
+MOTOGP FAST LAP RIDER PDF BONUS UPDATE
+- MotoGP RAC and SPR session lookups now inspect the selected session metadata for its Fast Lap Rider file link and prefer that exact hyperlink when available.
+- When the API only exposes the paired Classification.pdf URL, the importer derives FastLapRider.pdf in the same session folder.
+- The linked PDF is downloaded from resources.motogp.com and parsed server-side with pdfjs-dist.
+- The first rider in the official Fastest Lap of Each Rider ranking is returned as fastestLap and the existing +1 Fastest Lap checkbox is preselected for that rider on both Grand Prix and Sprint scoring tabs.
+- The parser accepts the official table row layout even when the PDF text extractor omits the report heading.
+- Q2 remains the source for the +3 Fastest Qualifier bonus. F1 and all other series parsing are unchanged.

@@ -6,7 +6,9 @@ const {
   parseHtml,
   hostIsAllowed,
   OFFICIAL_HOSTS_BY_SERIES,
-  MOTOGP_API_BASE
+  MOTOGP_API_BASE,
+  motogpFastLapRiderPdfUrl,
+  parseMotoGPFastLapRiderText
 } = require("../race-results-import");
 
 async function withMockFetch(map, callback) {
@@ -57,6 +59,27 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(hostIsAllowed("api.motogp.pulselive.com", "MotoGP"), true);
   assert.equal(hostIsAllowed("example.com", "MotoGP"), false);
   assert.ok(OFFICIAL_HOSTS_BY_SERIES.MotoGP.includes("api.motogp.pulselive.com"));
+  assert.equal(hostIsAllowed("resources.motogp.com", "MotoGP"), true, "MotoGP Fast Lap Rider PDFs are served from the official resources host");
+
+  // The Fast Lap Rider PDF is a ranked table; some official PDF exports omit
+  // the heading from their extractable text, so row structure is authoritative.
+  const fastLapText = [
+    "1 73 Alex MARQUEZ SPA Gresini Racing MotoGP DUCATI 2'10.415 3 10",
+    "2 72 Marco BEZZECCHI ITA Mooney VR46 Racing Team DUCATI 2'10.453 9 10 0.038 0.038",
+    "3 5 Johann ZARCO FRA Prima Pramac Racing DUCATI 2'10.735 8 10 0.320 0.282"
+  ].join("\n");
+  const parsedFastLap = parseMotoGPFastLapRiderText(fastLapText, "British GP Sprint Fast Lap Rider");
+  assert.deepEqual(parsedFastLap.rows.map(row => [row.position, row.number, row.name, row.bestLap]), [
+    [1, "73", "Alex MARQUEZ", "2'10.415"],
+    [2, "72", "Marco BEZZECCHI", "2'10.453"],
+    [3, "5", "Johann ZARCO", "2'10.735"]
+  ]);
+  assert.equal(motogpFastLapRiderPdfUrl({ file: "https://resources.motogp.com/files/results/2023/GBR/MotoGP/SPR/Classification.pdf" }).href,
+    "https://resources.motogp.com/files/results/2023/GBR/MotoGP/SPR/FastLapRider.pdf", "SPR classification resolves to the Fast Lap Rider PDF in the same session folder");
+  assert.equal(motogpFastLapRiderPdfUrl({ files: [{ label: "Fast Lap Rider", href: "https://resources.motogp.com/files/results/2023/GBR/MotoGP/RAC/FastLapRider.pdf" }] }).href,
+    "https://resources.motogp.com/files/results/2023/GBR/MotoGP/RAC/FastLapRider.pdf", "a directly published Fast Lap Rider hyperlink is preferred when present");
+  assert.equal(motogpFastLapRiderPdfUrl({ session_files: [{ name: "Fast Lap Rider", path: "/files/results/2023/GBR/MotoGP/SPR/FastLapRider.pdf" }] }).href,
+    "https://resources.motogp.com/files/results/2023/GBR/MotoGP/SPR/FastLapRider.pdf", "relative Fast Lap Rider file paths are resolved against the official resources host");
 
   // TCS root archive follows the selected season / round to the archived event page.
   const tcsRoot = "https://triplecrownseries.ca/results";
@@ -135,34 +158,45 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   const raceUrl = `${api}/results/session/race-qatar/classification?seasonYear=2026&test=false`;
   const sprintUrl = `${api}/results/session/sprint-qatar/classification?seasonYear=2026&test=false`;
   const q2Url = `${api}/results/session/q2-qatar/classification?seasonYear=2026&test=false`;
+  const raceFastLapUrl = "https://resources.motogp.com/files/results/2026/QAT/MotoGP/RAC/FastLapRider.pdf";
+  const sprintFastLapUrl = "https://resources.motogp.com/files/results/2026/QAT/MotoGP/SPR/FastLapRider.pdf";
+  const pdfStub = { body: Buffer.from("%PDF-1.4 mock pdf"), type: "application/pdf" };
   const apiMap = {
     [seasonUrl]: json([{ id: "season-2026", year: 2026, current: true }]),
     [eventsUrl]: json([{ id: "event-qatar", name: "Qatar Grand Prix", date: "2026-11-08", round: 20, circuit: { name: "Lusail International Circuit" } }]),
     [categoriesUrl]: json([{ id: "category-motogp", name: "MotoGP" }]),
-    [sessionsUrl]: json([{ id: "race-qatar", type: "RAC", name: "Grand Prix" }, { id: "sprint-qatar", type: "SPR", name: "Sprint" }, { id: "q2-qatar", type: "Q2", name: "Qualifying 2" }]),
-    [raceUrl]: json([{ position: 1, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" }, best_lap: { time: "1:52.123" } }, { position: 2, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" }, best_lap: { time: "1:52.245" } }]),
-    [sprintUrl]: json([{ position: 1, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" } }, { position: 2, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" } }]),
+    [sessionsUrl]: json([
+      { id: "race-qatar", type: "RAC", name: "Grand Prix", session_files: [{ name: "Fast Lap Rider", href: raceFastLapUrl }] },
+      { id: "sprint-qatar", type: "SPR", name: "Sprint", session_files: [{ name: "Fast Lap Rider", href: sprintFastLapUrl }] },
+      { id: "q2-qatar", type: "Q2", name: "Qualifying 2" }
+    ]),
+    [raceUrl]: json({ file: raceFastLapUrl.replace("FastLapRider.pdf", "Classification.pdf"), classification: [{ position: 1, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" }, best_lap: { time: "1:52.123" } }, { position: 2, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" }, best_lap: { time: "1:52.245" } }] }),
+    [sprintUrl]: json({ file: sprintFastLapUrl.replace("FastLapRider.pdf", "Classification.pdf"), classification: [{ position: 1, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" } }, { position: 2, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" } }] }),
+    [raceFastLapUrl]: pdfStub,
+    [sprintFastLapUrl]: pdfStub,
     [q2Url]: json([{ position: 1, rider: { full_name: "Francesco Bagnaia", number: 63 }, team: { name: "Ducati Lenovo Team" } }, { position: 2, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" } }])
   };
   const motogpRace = await withMockFetch(apiMap, async calls => {
     const result = await fetchOfficialResults({ url: "https://www.motogp.com/en/gp-results/", series: "MotoGP", event: "Qatar Grand Prix", round: 20, eventDate: "2026-11-08", phase: "Grand Prix" });
-    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, raceUrl, q2Url]);
+    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, raceUrl, raceFastLapUrl, q2Url]);
     return result;
   });
   assert.equal(motogpRace.rows[0].name, "Marco Bezzecchi");
   assert.equal(motogpRace.rows[0].number, "72");
   assert.equal(motogpRace.rows[0].bestLap, "1:52.123");
   assert.equal(motogpRace.fastestQualifier.name, "Francesco Bagnaia");
+  assert.equal(motogpRace.fastestLap, null, "a malformed mocked PDF should not invent a fastest-lap rider");
+  assert.ok(motogpRace.fastestLapError, "PDF parsing failures are returned as an explicit importer warning");
   assert.equal(motogpRace.fastestQualifierSessionTitle, "Qualifying 2");
   assert.equal(motogpRace.sessionTitle, "Grand Prix");
 
   const motogpSprint = await withMockFetch(apiMap, async calls => {
     const result = await fetchOfficialResults({ url: "https://www.motogp.com/en/gp-results/", series: "MotoGP", event: "Qatar Grand Prix", round: 20, eventDate: "2026-11-08", phase: "Sprint" });
-    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, sprintUrl, q2Url]);
+    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, sprintUrl, sprintFastLapUrl, q2Url]);
     return result;
   });
   assert.equal(motogpSprint.sessionTitle, "Sprint");
   assert.equal(motogpSprint.rows[0].name, "Marc Marquez", "Sprint selection uses the SPR classification, not the RAC classification");
 
-  console.log("TCS / MXGP / MXON / MotoGP importer tests passed: year-specific TCS event selection, strict TCS class and moto filtering, MXGP/MXON class/session validation, rider-number/best-lap parsing, and MotoGP RAC/SPR/Q2 routing.");
+  console.log("TCS / MXGP / MXON / MotoGP importer tests passed: year-specific TCS event selection, strict TCS class and moto filtering, MXGP/MXON class/session validation, rider-number/best-lap parsing, MotoGP RAC/SPR/Q2 routing, and session-specific Fast Lap Rider PDF resolution/parsing.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

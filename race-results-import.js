@@ -14,7 +14,7 @@ const OFFICIAL_HOSTS_BY_SERIES = {
   MXGP: ["mxgp.com", "results.mxgp.com", "docs.mxgp.com", "fim-moto.com"],
   MXON: ["mxgp.com", "results.mxgp.com", "docs.mxgp.com", "fim-moto.com"],
   F1: ["formula1.com"],
-  MotoGP: ["motogp.com", "stats.motogp.com", "api.motogp.pulselive.com"]
+  MotoGP: ["motogp.com", "stats.motogp.com", "api.motogp.pulselive.com", "resources.motogp.com"]
 };
 
 function hostIsAllowed(hostname, series) {
@@ -357,7 +357,7 @@ async function fetchApprovedUrl(initialUrl, series) {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: {
         "User-Agent": "KaiserFamilyFantasySMXResultsImporter/1.1 (+official-results preview)",
-        "Accept": "text/html,text/csv,application/json;q=0.9,text/plain;q=0.8,*/*;q=0.5",
+        "Accept": "text/html,text/csv,application/json,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.5",
         ...(series === "MotoGP" ? { "Origin": "https://www.motogp.com", "Referer": "https://www.motogp.com/", "x-origin": "2" } : {})
       }
     });
@@ -696,6 +696,83 @@ async function readOfficialJson(url, series) {
   return { json, finalUrl };
 }
 
+async function readLimitedBuffer(response) {
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > MAX_SOURCE_BYTES) throw new Error("The official results PDF is larger than the 5 MB import limit.");
+    return buffer;
+  }
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_SOURCE_BYTES) { await reader.cancel(); throw new Error("The official results PDF is larger than the 5 MB import limit."); }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
+
+async function extractMotoGPPdfText(buffer) {
+  let pdfjs;
+  try {
+    pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  } catch (error) {
+    throw new Error("The MotoGP Fast Lap Rider PDF parser is unavailable. Reinstall the project dependencies and redeploy so pdfjs-dist is installed.");
+  }
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    disableFontFace: true,
+    useSystemFonts: true,
+    isEvalSupported: false,
+    stopAtErrors: true
+  });
+  const document = await loadingTask.promise;
+  const lines = [];
+  try {
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber++) {
+      const page = await document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const items = (content.items || []).filter(item => typeof item.str === "string" && item.str.trim()).map(item => ({
+        text: item.str.trim(),
+        x: Number(item.transform?.[4] || 0),
+        y: Number(item.transform?.[5] || 0)
+      })).sort((a, b) => b.y - a.y || a.x - b.x);
+      const pageLines = [];
+      for (const item of items) {
+        let line = pageLines[pageLines.length - 1];
+        if (!line || Math.abs(line.y - item.y) > 1.5) {
+          line = { y: item.y, items: [] };
+          pageLines.push(line);
+        }
+        line.items.push(item);
+      }
+      for (const line of pageLines) {
+        line.items.sort((a, b) => a.x - b.x);
+        const text = line.items.map(item => item.text).join(" ").replace(/\s+/g, " ").trim();
+        if (text) lines.push(text);
+      }
+      page.cleanup?.();
+    }
+  } finally {
+    await document.destroy();
+  }
+  return lines.join("\n");
+}
+
+async function readOfficialPdf(url, series) {
+  const { response, finalUrl } = await fetchApprovedUrl(url, series);
+  if (!response.ok) throw new Error(`The official MotoGP Fast Lap Rider PDF returned HTTP ${response.status}.`);
+  const buffer = await readLimitedBuffer(response);
+  if (buffer.length < 5 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+    throw new Error("The official Fast Lap Rider link did not return a valid PDF file.");
+  }
+  const text = await extractMotoGPPdfText(buffer);
+  return { text, finalUrl };
+}
+
 function arrayFromPayload(payload, keys = []) {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return [];
@@ -759,6 +836,84 @@ function motogpClassificationRows(payload, sourceTitle) {
   mapped.sort((a, b) => a.position - b.position || a.sourceOrder - b.sourceOrder);
   if (!mapped.length) throw new Error("The official MotoGP classification had no classified riders.");
   return { title: sourceTitle, rows: mapped };
+}
+
+function motogpFastLapRiderPdfUrl(classificationPayload) {
+  const candidateUrls = [];
+  const labelledUrls = [];
+  const seen = new Set();
+  const addUrl = value => {
+    if (typeof value !== "string" || seen.has(value)) return;
+    let candidate = value.trim();
+    if (!/^https:\/\//i.test(candidate)) {
+      if (!/\/(?:FastLapRider|Classification)\.pdf(?:$|[?#])/i.test(candidate)) return;
+      candidate = new URL(candidate, "https://resources.motogp.com").href;
+    }
+    seen.add(candidate);
+    candidateUrls.push(candidate);
+  };
+  const visit = (value, depth = 0) => {
+    if (depth > 7 || value == null) return;
+    if (typeof value === "string") {
+      addUrl(value);
+    } else if (Array.isArray(value)) {
+      value.forEach(item => visit(item, depth + 1));
+    } else if (typeof value === "object") {
+      const label = [value.label, value.title, value.name, value.description, value.type, value.file_name, value.fileName, value.filename, value.file_title, value.fileTitle].filter(Boolean).join(" ");
+      const href = value.href || value.url || value.uri || value.file || value.path || value.download_url || value.downloadUrl || value.file_url || value.fileUrl;
+      if (/fast\s*lap\s*rider/i.test(label) && typeof href === "string") labelledUrls.push(href);
+      Object.values(value).forEach(item => visit(item, depth + 1));
+    }
+  };
+  visit(classificationPayload);
+  const direct = [...labelledUrls, ...candidateUrls].find(value => /\/FastLapRider\.pdf(?:$|[?#])/i.test(value));
+  if (direct) {
+    const directUrl = new URL(direct, "https://resources.motogp.com");
+    if (!hostIsAllowed(directUrl.hostname, "MotoGP")) throw new Error("The official MotoGP Fast Lap Rider link points to an unapproved host.");
+    return directUrl;
+  }
+  const classificationFile = candidateUrls.find(value => /\/Classification\.pdf(?:$|[?#])/i.test(value));
+  if (!classificationFile) throw new Error("The selected official MotoGP session did not expose its Fast Lap Rider PDF link or paired Classification PDF URL.");
+  const url = new URL(classificationFile);
+  if (!hostIsAllowed(url.hostname, "MotoGP")) throw new Error("The official MotoGP classification PDF points to an unapproved host.");
+  url.pathname = url.pathname.replace(/Classification\.pdf$/i, "FastLapRider.pdf");
+  return url;
+}
+
+function parseMotoGPFastLapRiderText(text, sourceTitle = "MotoGP Fast Lap Rider") {
+  const source = String(text || "");
+  // The official PDF is reached through the session's dedicated Fast Lap Rider
+  // hyperlink. Some PDF exports omit the report heading from extracted text,
+  // so identify the document by its ranked row structure rather than requiring
+  // a heading string that is not present in every export.
+  const rows = [];
+  for (const [sourceOrder, line] of source.split(/\r?\n/).entries()) {
+    const tokens = line.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length < 8 || !/^\d{1,2}$/.test(tokens[0]) || !/^\d{1,3}$/.test(tokens[1])) continue;
+    const timeIndex = tokens.findIndex((token, index) => index >= 4 && /^\d{1,2}[’']\d{2}\.\d{3}$/.test(token));
+    if (timeIndex < 7) continue;
+    const nationIndex = tokens.findIndex((token, index) => index >= 3 && index < timeIndex - 2 && /^[A-Z]{3}$/.test(token));
+    if (nationIndex <= 2 || nationIndex >= timeIndex - 2) continue;
+    const position = Number(tokens[0]);
+    const number = cleanNumber(tokens[1]);
+    const name = normalizeSeriesRiderName(tokens.slice(2, nationIndex).join(" "), "MotoGP");
+    const team = tokens.slice(nationIndex + 1, timeIndex - 1).join(" ");
+    const bestLap = tokens[timeIndex].replace(/[’]/g, "'");
+    if (!position || !number || !name || !/^\d{1,2}'\d{2}\.\d{3}$/.test(bestLap)) continue;
+    rows.push({
+      position,
+      displayPosition: String(position),
+      status: "",
+      sourceOrder,
+      number,
+      name,
+      team,
+      bestLap
+    });
+  }
+  rows.sort((a, b) => a.position - b.position || a.sourceOrder - b.sourceOrder);
+  if (!rows.length) throw new Error("The MotoGP Fast Lap Rider PDF did not contain readable ranked rider rows.");
+  return { title: sourceTitle, rows };
 }
 
 function chooseMotoGPEvent(events, context = {}, year = "") {
@@ -843,6 +998,24 @@ async function resolveMotoGPResults(context = {}) {
   const sessionTitle = sprint ? "Sprint" : "Grand Prix";
   const result = motogpClassificationRows(classificationResponse.json, `${eventTitle} — ${sessionTitle}`);
 
+  let fastestLap = null;
+  let fastestLapError = "";
+  let fastestLapSourceUrl = "";
+  try {
+    // Prefer the selected session's own "Fast Lap Rider" link from its
+    // session metadata. If only the paired Classification.pdf is present,
+    // the official FastLapRider.pdf lives in the same session folder.
+    const fastLapPdfUrl = motogpFastLapRiderPdfUrl({ session: raceSession, classification: classificationResponse.json });
+    const fastLapPdf = await readOfficialPdf(fastLapPdfUrl, "MotoGP");
+    const fastLapResults = parseMotoGPFastLapRiderText(fastLapPdf.text, `${eventTitle} — ${sessionTitle} Fast Lap Rider`);
+    fastestLapSourceUrl = fastLapPdf.finalUrl.href;
+    fastestLap = fastLapResults.rows[0] || null;
+    if (fastestLap) fastestLap.sourceUrl = fastestLapSourceUrl;
+    if (!fastestLap) fastestLapError = "The official Fast Lap Rider PDF did not identify a fastest rider.";
+  } catch (error) {
+    fastestLapError = error.message || "Could not read the official MotoGP Fast Lap Rider PDF.";
+  }
+
   let fastestQualifier = null;
   let fastestQualifierError = "";
   const q2Session = sessions.find(item => motogpSessionCode(item).includes("q2"))
@@ -868,7 +1041,9 @@ async function resolveMotoGPResults(context = {}) {
     division: "MotoGP",
     eventTitle,
     sessionTitle,
-    fastestLap: null,
+    fastestLap,
+    fastestLapSourceUrl,
+    fastestLapError,
     fastestQualifier,
     fastestQualifierSessionTitle: "Qualifying 2",
     fastestQualifierError
@@ -1368,6 +1543,9 @@ module.exports = {
   resolveTcsEventPage,
   validateMxgpClassification,
   motogpClassificationRows,
+  motogpFastLapRiderPdfUrl,
+  parseMotoGPFastLapRiderText,
+  extractMotoGPPdfText,
   resolveMotoGPResults,
   normalizeSeriesRiderName
 };
