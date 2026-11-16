@@ -139,6 +139,12 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
       }
       if (requestUrl.pathname !== "/reslists.aspx") throw new Error(`Unexpected MXGP test URL: ${requestUrl.href}`);
       if (method === "GET") {
+        if (requestUrl.searchParams.has("type")) {
+          return new Response(mxgpPage("MXGP - Grand Prix Race 2 - Classification", [
+            { pos: 1, number: 243, name: "Guillem Farres", bestLap: "1:55.113" },
+            { pos: 2, number: 26, name: "Liam Everts", bestLap: "1:56.075" }
+          ]), { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+        }
         return new Response(mxgpFilterPage(0), { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
       }
       const posted = new URLSearchParams(String(init.body || ""));
@@ -338,7 +344,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     "a 250-active result table must never be imported as 450");
 
   // MXGP/MX2 official reslists.aspx classification headings are used to enforce both class and session.
-  const mx2Url = "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7";
+  const mx2Url = "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=13";
   const mx2Html = mxgpPage("MX2 - Grand Prix Race 2 - Classification", [
     { pos: 1, number: 99, name: "Farres, Guillem", bestLap: "1:55.113", bike: "Triumph" },
     { pos: 2, number: 26, name: "Everts, Liam", bestLap: "1:56.075", bike: "Husqvarna" }
@@ -352,10 +358,14 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(mx2Result.rows[0].number, "99");
   assert.equal(mx2Result.rows[0].bestLap, "1:55.113");
   assert.equal(mx2Result.division, "MX2");
+  // The live Infront page can render the session caption in a DIV rather than
+  // an H2/H3; session verification must still read that actual page caption.
+  const mxgpDivHeadingHtml = mx2Html.replace("<h2>MX2 - Grand Prix Race 2 - Classification</h2>", "<div class=\"session-title\">MX2 - Grand Prix Race 2 - Classification</div>");
+  assert.equal(parseHtml(mxgpDivHeadingHtml, "MXGP results", { series: "MXGP", division: "MX2", phase: "Moto 2" }).rows[0].name, "Guillem Farres");
   assert.throws(() => parseHtml(mx2Html, "MXGP results", { series: "MXGP", division: "MXGP", phase: "Moto 2" }), /selected MXGP.*labelled MX2/i);
   assert.throws(() => parseHtml(mx2Html, "MXGP results", { series: "MXGP", division: "MX2", phase: "Moto 1" }), /not Moto 1/i);
 
-  const mxgpQualUrl = "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9";
+  const mxgpQualUrl = "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=11";
   const mxgpQualHtml = mxgpPage("MXGP - Qualifying Race - Classification", [
     { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
     { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187", bike: "Kawasaki" }
@@ -372,9 +382,9 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   const mxgpPortalUrl = "https://results.mxgp.com/";
   const mxgpFilterForm = `<!doctype html><html><body><form action="/reslists.aspx" method="get">
     <select id="championship" name="ct"><option value="">Select Championship</option><option value="1">FIM Motocross World Championship</option><option value="2">FIM Motocross of Nations</option></select>
-    <select id="round" name="e"><option value="">Select Round</option><option value="4104">Grand Prix of Argentina</option><option value="4105">Grand Prix of Spain</option></select>
     <select id="class" name="c"><option value="">Select Class</option><option value="9">MXGP</option><option value="7">MX2</option></select>
-    <select id="session" name="s"><option value="">Select Session</option><option value="11">Qualifying Race</option><option value="12">Grand Prix Race 1</option><option value="13">Grand Prix Race 2</option></select>
+    <select id="round" name="e"><option value="">Select Round</option><option value="4104">Grand Prix of Argentina</option><option value="4105">Grand Prix of Spain</option></select>
+    <select id="session" name="type"><option value="">Select Session</option><option value="11">Qualifying Race</option><option value="12">Grand Prix Race 1</option><option value="13">Grand Prix Race 2</option></select>
     <input type="hidden" name="view" value="classification">
   </form></body></html>`;
   const mxgpFilteredResult = mxgpPage("MX2 - Grand Prix Race 2 - Classification", [
@@ -384,10 +394,11 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   await withMockFetch({
     "https://results.mxgp.com/mxgp/standings.aspx": '<html><iframe src="/reslists.aspx"></iframe></html>',
     "https://results.mxgp.com/reslists.aspx": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=7&s=&view=classification": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=&view=classification": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=13&view=classification": mxgpFilteredResult
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=&e=&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=13&view=classification": mxgpFilteredResult,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=13&y=2026": mxgpFilteredResult
   }, async calls => {
     const result = await fetchOfficialResults({
       url: mxgpPortalUrl, series: "MXGP", division: "MX2", event: "Grand Prix of Argentina",
@@ -401,20 +412,25 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     assert.deepEqual(calls, [
       "https://results.mxgp.com/mxgp/standings.aspx",
       "https://results.mxgp.com/reslists.aspx",
-      "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification",
-      "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=7&s=&view=classification",
-      "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=&view=classification",
-      "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=13&view=classification"
+      "https://results.mxgp.com/reslists.aspx?ct=1&c=&e=&type=&view=classification",
+      "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=&type=&view=classification",
+      "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=&view=classification",
+      "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=13&view=classification",
+      "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=13&y=2026"
     ], "the importer submits all four official dropdown selections in the requested order");
   });
 
   await withMockFetch({
     "https://results.mxgp.com/mxgp/standings.aspx": '<html><iframe src="/reslists.aspx"></iframe></html>',
     "https://results.mxgp.com/reslists.aspx": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=9&s=&view=classification": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=&view=classification": mxgpFilterForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=11&view=classification": mxgpPage("MXGP - Qualifying Race - Classification", [
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=&e=&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=11&view=classification": mxgpPage("MXGP - Qualifying Race - Classification", [
+      { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
+      { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187" }
+    ]),
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=11": mxgpPage("MXGP - Qualifying Race - Classification", [
       { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
       { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187" }
     ])
@@ -425,7 +441,8 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     });
     assert.equal(result.rows[0].name, "Jeffrey Herlings");
     assert.equal(result.fastestLap.name, "Jeffrey Herlings");
-    assert.deepEqual(calls.map(url => new URL(url).searchParams.get("s")), [null, null, "", "", "", "11"]);
+    assert.ok(calls.every(url => !new URL(url).searchParams.has("s")), "the old unrecognized `s` session parameter is never sent");
+    assert.equal(new URL(calls.at(-1)).searchParams.get("type"), "11");
   });
 
   // Short-form portal session labels must resolve to the requested race,
@@ -434,10 +451,13 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   await withMockFetch({
     "https://results.mxgp.com/mxgp/standings.aspx": '<html><iframe src="/reslists.aspx"></iframe></html>',
     "https://results.mxgp.com/reslists.aspx": shortSessionForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": shortSessionForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=9&s=&view=classification": shortSessionForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=&view=classification": shortSessionForm,
-    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=13&view=classification": mxgpPage("MXGP - Grand Prix Race 2 - Classification", [
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=&e=&type=&view=classification": shortSessionForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=&type=&view=classification": shortSessionForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=&view=classification": shortSessionForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=13&view=classification": mxgpPage("MXGP - Grand Prix Race 2 - Classification", [
+      { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" }
+    ]),
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=13": mxgpPage("MXGP - Grand Prix Race 2 - Classification", [
       { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" }
     ])
   }, async () => {
@@ -466,8 +486,8 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
         return new Response(mxgpWebForms, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "set-cookie": "ASP.NET_SessionId=mxgp-test-session; path=/; HttpOnly" } });
       }
       const body = new URLSearchParams(String(init.body || ""));
-      mxgpPostRequests.push({ method: init.method, url: url.href, body, headers: init.headers });
-      if (body.get("ctl00$filters$session") === "3") {
+      mxgpPostRequests.push({ method: init.method || "GET", url: url.href, body, headers: init.headers });
+      if (url.searchParams.get("type") === "3" || body.get("ctl00$filters$session") === "3") {
         return new Response(mxgpPage("MXGP - Grand Prix Race 2 - Classification", [
           { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
           { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187" }
@@ -481,12 +501,14 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     });
     assert.equal(result.rows[0].name, "Jeffrey Herlings");
     assert.equal(result.fastestLap.name, "Jeffrey Herlings");
-    assert.equal(mxgpPostRequests.length, 4, "four filter changes are submitted to the official WebForms page");
-    assert.deepEqual(mxgpPostRequests.map(request => request.body.get("__EVENTTARGET")), [
+    assert.equal(mxgpPostRequests.filter(request => request.method === "POST").length, 4, "four filter changes are submitted to the official WebForms page");
+    assert.equal(mxgpPostRequests.at(-1).url, "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=5101&type=3", "the final verified direct session URL uses the official query names");
+    const webFormsPosts = mxgpPostRequests.filter(request => request.method === "POST");
+    assert.deepEqual(webFormsPosts.map(request => request.body.get("__EVENTTARGET")), [
       "ctl00$filters$championship", "ctl00$filters$class", "ctl00$filters$round", "ctl00$filters$session"
     ]);
-    assert.ok(mxgpPostRequests.every(request => request.method === "POST" && request.body.get("__VIEWSTATE") === "viewstate-v1"));
-    assert.ok(mxgpPostRequests.every(request => String(request.headers.Cookie || "").includes("ASP.NET_SessionId=mxgp-test-session")), "session cookies are retained across dropdown postbacks");
+    assert.ok(webFormsPosts.every(request => request.body.get("__VIEWSTATE") === "viewstate-v1"));
+    assert.ok(webFormsPosts.every(request => String(request.headers.Cookie || "").includes("ASP.NET_SessionId=mxgp-test-session")), "session cookies are retained across dropdown postbacks");
   } finally {
     global.fetch = originalMxgpFetch;
   }

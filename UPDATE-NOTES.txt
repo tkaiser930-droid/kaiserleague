@@ -114,3 +114,11 @@ MotoGP 403 diagnostics update:
 - Corrected the official Standings / `reslists.aspx` selection order to Championship = `FIM Motocross World Championship` -> Class = `MXGP` / `MX2` -> Round = the scheduled `Grand Prix of …` -> Session = Qualifying Race / Grand Prix Race 1 / Grand Prix Race 2.
 - Class is now posted before the Grand Prix round because the round options depend on the selected class. The previous round-before-class order could leave the class filter at its default and return a different classification.
 - Added regression coverage that withholds class choices until Championship is selected and Grand Prix choices until Class is selected, and asserts the exact postback order for both GET-style filters and ASP.NET WebForms postbacks.
+
+
+2026-11-16 MXGP direct-session URL correction:
+- Identified that the prior MXGP regression fixtures used a synthetic `s` parameter for the session dropdown. Official `reslists.aspx` links expose the session filter as `type`; public links also use `ct`, `c`, `e`, and the season field `y` where applicable.
+- After selecting Championship -> Class -> Grand Prix round -> Session, the importer now builds and fetches a final direct `reslists.aspx` URL using the dropdown's actual option values and canonical Infront query names.
+- Direct filtered MXGP URLs are only treated as complete when `ct`, `c`, `e`, and `type` are present, preventing a default session page from bypassing the chooser.
+- Classification caption extraction now supports the session heading in ordinary page containers as well as H1-H6 elements. MXGP import errors include the final source URL and selected official filter values for troubleshooting.
+- Replaced the old `s`-based tests with `type`-based coverage, including final direct-session fetches and div-rendered session headings.
