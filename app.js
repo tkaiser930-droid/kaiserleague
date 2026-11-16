@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const K={A:"kaiserFantasyAthletes",T:"kaiserFantasyTeams",S:"kaiserFantasyScores",TR:"kaiserFantasyTrades",D:"kaiserFantasyDraftState",DS:"kaiserFantasyDraftSettings",CAL:"kaiserFantasySchedule",Y:"kaiserFantasySeasonArchives"};
+const K={A:"kaiserFantasyAthletes",T:"kaiserFantasyTeams",S:"kaiserFantasyScores",TR:"kaiserFantasyTrades",D:"kaiserFantasyDraftState",DS:"kaiserFantasyDraftSettings",CAL:"kaiserFantasySchedule"};
 const REQ={"250":3,"450":3,MXGP:3,MX2:3,"CAN 250":2,"CAN 450":2,F1:3,MotoGP:3},SERIES=Object.keys(REQ),MXON_SUB_SERIES=["MXON MXGP","MXON MX2","MXON Open"],SECONDARY_SERIES_OPTIONS=[...SERIES,...MXON_SUB_SERIES],MAX_ROSTER_SIZE=Object.values(REQ).reduce((sum,n)=>sum+n,0),SERIES_GROUPS={SMX:["250","450"],"Triple Crown Series":["CAN 250","CAN 450"],MXGP:["MXGP","MX2"],MotoGP:["MotoGP"],F1:["F1"]},SECONDARY_SERIES_GROUPS={...SERIES_GROUPS,MXON:MXON_SUB_SERIES},DRAFT_ROOMS=Object.keys(SERIES_GROUPS),SCHEDULE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SCORE_SERIES=["SMX","Triple Crown Series","MXGP","MotoGP","F1","MXON"],SERIES_REMAP={f2:"F1",f3:"F1",f1academy:"F1",moto2:"MotoGP",moto3:"MotoGP"},RETIRED_SERIES=new Set(["wmx","canwmx","usawmx","smxnext"]),$=id=>document.getElementById(id);
 const SMX_POSITION_POINTS=[25,22,20,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
 const SX_MX_POSITION_POINTS=[25,22,20,18,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
@@ -10,16 +10,8 @@ const F1_SPRINT_POSITION_POINTS=Array.from({length:22},(_,i)=>i<8?8-i:0);
 const MOTOGP_SPRINT_POSITION_POINTS=[12,9,7,6,5,4,3,2,1,...Array(13).fill(0)];
 const GRAND_PRIX_BONUSES=[["fastestQualifier","Fastest qualifier",3],["fastestLap","Fastest lap",1]];
 const SCORE_BONUSES={SMX:[["fastestQualifier","Fastest qualifier",2],["heatWinner","Heat winner",2],["moto1Winner","Moto 1 winner",5],["moto2Winner","Moto 2 winner",5],["fastestLap","Fastest lap",1]],TripleCrown:[["fastestQualifier","Fastest qualifier",2],["fastestLap","Fastest lap",1]],MXGP:[["fastestLap","Fastest lap",1]],MotoGP:GRAND_PRIX_BONUSES,F1:GRAND_PRIX_BONUSES};
-let draftOrderEditorRoom="",draftOrderEditorKeys=[],commissionerDataTabInitialized=false,commissionerSeasonYear="Current";
-const rawRead=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},rawWrite=(k,v)=>{if(window.KFStorage&&typeof window.KFStorage.write==="function")window.KFStorage.write(k,v);else localStorage.setItem(k,JSON.stringify(v))};
-const seasonDataKeys=[K.A,K.T,K.S,K.TR,K.D,K.DS,K.CAL];
-function activeCurrentSeasonYear(){return window.KFSeasonArchive?.getCurrentYear(rawRead(K.Y,{}))||2026}
-const isHistoricalCommissioner=()=>document.body?.dataset.page==="commissioner"&&/^20\d{2}$/.test(String(commissionerSeasonYear));
-function currentSeasonSnapshot(){const snapshot={};for(const k of seasonDataKeys){const fallback=k===K.A||k===K.S||k===K.TR||k===K.CAL?[]:k===K.T?[]:k===K.D?{picks:[]}:{ };snapshot[k]=rawRead(k,fallback)}return snapshot}
-function ensureHistoricalSeason(year){const archive=rawRead(K.Y,{}),result=window.KFSeasonArchive?.ensureYear(archive,year,currentSeasonSnapshot());if(!result)throw new Error("Historical season storage is unavailable. Reload the commissioner page and try again.");if(result.created||JSON.stringify(archive)!==JSON.stringify(result.archives))rawWrite(K.Y,result.archives);return result.state}
-const read=(k,d)=>{if(isHistoricalCommissioner()&&k!==K.Y){const state=ensureHistoricalSeason(commissionerSeasonYear);return Object.prototype.hasOwnProperty.call(state,k)?(state[k]??d):d}return rawRead(k,d)};
-const write=(k,v)=>{if(isHistoricalCommissioner()&&k!==K.Y){const archive=rawRead(K.Y,{}),updated=window.KFSeasonArchive?.updateYear(archive,commissionerSeasonYear,k,v,currentSeasonSnapshot());if(!updated)throw new Error("Historical season storage is unavailable.");rawWrite(K.Y,updated.archives);return}rawWrite(k,v)};
-function commissionerSeasonLabel(){return commissionerSeasonYear==="Current"?`Current season (${activeCurrentSeasonYear()})`:`${commissionerSeasonYear} archive`}
+let draftOrderEditorRoom="",draftOrderEditorKeys=[],commissionerDataTabInitialized=false;
+const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},write=(k,v)=>{if(window.KFStorage&&typeof window.KFStorage.write==="function")window.KFStorage.write(k,v);else localStorage.setItem(k,JSON.stringify(v))};
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random();
 function raceNumberValue(a){const raw=clean(a?.number??a?.riderNumber??"").replace(/^#+/,"").trim(),match=raw.match(/\d+/);return match?Number(match[0]):Number.POSITIVE_INFINITY}
 function compareRiderNumbers(a,b){const an=raceNumberValue(a),bn=raceNumberValue(b);if(an!==bn)return an<bn?-1:1;return clean(a?.number??a?.riderNumber??"").localeCompare(clean(b?.number??b?.riderNumber??""),undefined,{numeric:true,sensitivity:"base"})||cls(a).localeCompare(cls(b))||name(a).localeCompare(name(b))}
@@ -193,24 +185,16 @@ function scoreRoundKey(record){
  if(event||round!=="")return `${series}|year:${recordedYear}|event:${event}|round:${round}`;
  return `${series}|group:${clean(record?.resultGroupId)||clean(record?.recordedAt)||`${record?.division||record?.riderClass||"unknown"}-${record?.place||"unknown"}`}`;
 }
-function previousSeasonAverageForAthlete(a){
- const year=String(commissionerSeasonYear==="Current"?activeCurrentSeasonYear()-1:Number(commissionerSeasonYear)-1);
- if(!/^20\d{2}$/.test(year)||Number(year)<2016)return {year,average:0,total:0,rounds:0,records:[],matched:false};
- const archive=rawRead(K.Y,{}),state=archive?.[year];
- if(!state)return {year,average:0,total:0,rounds:0,records:[],matched:false};
- return {...window.KFSeasonArchive.athleteAverage(state,a,year),year};
-}
 function athleteScoringSummary(a){
  const records=athleteScoreRecords(a);
  const total=records.reduce((sum,record)=>sum+Number(record.points||0),0);
  const rounds=new Set(records.map(scoreRoundKey)).size;
- const previous=previousSeasonAverageForAthlete(a);
- return {records,total,rounds,average:rounds?total/rounds:0,previous};
+ return {records,total,rounds,average:rounds?total/rounds:0};
 }
 function ordinalPlace(value){const place=Number(value);if(!Number.isFinite(place)||place<1)return "—";const lastTwo=place%100,suffix=lastTwo>=11&&lastTwo<=13?"th":({1:"st",2:"nd",3:"rd"}[place%10]||"th");return `${place}${suffix}`}
 function openAthleteDetail(athleteId){
  const a=athletes().find(item=>id(item)===String(athleteId));if(!a)return;
- const {records,total,rounds,average,previous}=athleteScoringSummary(a);
+ const {records,total,rounds,average}=athleteScoringSummary(a);
  let dialog=$("athleteDetailDialog");
  if(!dialog){dialog=document.createElement("dialog");dialog.id="athleteDetailDialog";dialog.className="athlete-detail-dialog";document.body.append(dialog);dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close()})}
  const sorted=records.slice().sort((left,right)=>String(right.recordedAt||"").localeCompare(String(left.recordedAt||""))||String(left.event||"").localeCompare(String(right.event||""))||Number(left.place||999)-Number(right.place||999));
@@ -221,7 +205,7 @@ function openAthleteDetail(athleteId){
   return `<tr><td>${esc(series||"—")}</td><td>${esc(segment)}</td><td>${scoreEventLabel(record)}</td><td>${esc(ordinalPlace(record.place))}</td><td>${bonusText(record)}</td><td class="points">${Number(record.points||0).toLocaleString()}</td><td>${esc(record.teamName||"Unrostered / Free Agent")}</td><td>${esc(recorded)}</td></tr>`;
  });
  const currentOwner=owner(a);
- dialog.innerHTML=`<div class="athlete-detail-shell">${athleteBannerHTML(a)}<header class="athlete-detail-header"><div><p class="eyebrow">ATHLETE PROFILE</p><h2>${athleteNameHTML(a)}</h2><p class="athlete-detail-affiliations">${seriesDisplayHTML(a)}</p></div><button type="button" class="athlete-detail-close" data-close-athlete-detail aria-label="Close athlete profile">Close ✕</button></header><div class="athlete-detail-meta"><span>${esc(currentOwner?`Current fantasy team: ${tname(currentOwner)}`:"Currently a free agent")}</span></div><div class="athlete-detail-stats"><div><strong>${total.toLocaleString()}</strong><span>Current-year points</span></div><div><strong>${average.toFixed(2)}</strong><span>Current-year avg / round</span></div><div><strong>${previous.rounds?previous.average.toFixed(2):"—"}</strong><span>${previous.year} avg / round</span></div><div><strong>${rounds}</strong><span>Current-year rounds</span></div><div><strong>${records.length}</strong><span>Current-year segments</span></div></div><section class="athlete-detail-results"><div class="athlete-detail-results-heading"><h3>Previously Scored Results</h3><span>${records.length} result${records.length===1?"":"s"}</span></div>${records.length?`<div class="table">${table(["Series","Division / Segment","Event / Round","Finish","Bonuses","Points","Team at Scoring","Recorded"],resultRows)}</div>`:`<p class="muted">No race results have been recorded for this rider yet.</p>`}<p class="athlete-detail-footnote">Current-year average = current season points divided by unique event rounds. The ${previous.year} average is calculated independently from that archived season's results; qualifying races and multiple motos at the same event count as one round.</p></section></div>`;
+ dialog.innerHTML=`<div class="athlete-detail-shell">${athleteBannerHTML(a)}<header class="athlete-detail-header"><div><p class="eyebrow">ATHLETE PROFILE</p><h2>${athleteNameHTML(a)}</h2><p class="athlete-detail-affiliations">${seriesDisplayHTML(a)}</p></div><button type="button" class="athlete-detail-close" data-close-athlete-detail aria-label="Close athlete profile">Close ✕</button></header><div class="athlete-detail-meta"><span>${esc(currentOwner?`Current fantasy team: ${tname(currentOwner)}`:"Currently a free agent")}</span></div><div class="athlete-detail-stats"><div><strong>${total.toLocaleString()}</strong><span>Total scored points</span></div><div><strong>${average.toFixed(2)}</strong><span>Average points per round</span></div><div><strong>${rounds}</strong><span>Rounds with results</span></div><div><strong>${records.length}</strong><span>Scored segments</span></div></div><section class="athlete-detail-results"><div class="athlete-detail-results-heading"><h3>Previously Scored Results</h3><span>${records.length} result${records.length===1?"":"s"}</span></div>${records.length?`<div class="table">${table(["Series","Division / Segment","Event / Round","Finish","Bonuses","Points","Team at Scoring","Recorded"],resultRows)}</div>`:`<p class="muted">No race results have been recorded for this rider yet.</p>`}<p class="athlete-detail-footnote">Average points per round = total recorded points divided by unique event rounds with results. Qualifying races and multiple motos at the same event count as one round.</p></section></div>`;
  const close=dialog.querySelector("[data-close-athlete-detail]");if(close)close.onclick=()=>dialog.close();
  if(typeof dialog.showModal==="function"){if(!dialog.open)dialog.showModal()}else dialog.setAttribute("open","");
 }
@@ -850,47 +834,20 @@ function renderOfficialSourceHelp(){
  }
 }
 function normalizeImportedRiderName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"")}
-function importedAthleteNumber(value){
- const raw=String(value??"").normalize("NFKC").trim().toUpperCase().replace(/^#+/,"").replace(/\s+/g,"");
- const numeric=raw.match(/^0*(\d+)([A-Z]?)$/);
- return numeric?`${Number(numeric[1])}${numeric[2]}`:raw.replace(/[^A-Z0-9]/g,"");
-}
+function importedAthleteNumber(value){return String(value??"").replace(/[^0-9]/g,"").replace(/^0+(?=\d)/,"")}
 function matchOfficialResultAthlete(row){
  const series=$("scoreSeries")?.value||"SMX",division=$("scoreClass")?.value||"",eligible=athletes().filter(a=>athleteEligibleForScoring(a,series,division));
  const sourceName=normalizeImportedRiderName(row.name),sourceNumber=importedAthleteNumber(row.number);
  const byName=sourceName?eligible.filter(a=>normalizeImportedRiderName(name(a))===sourceName):[];
  const byNumber=sourceNumber?eligible.filter(a=>importedAthleteNumber(a.number)===sourceNumber):[];
- let match=null,matchedByNumber=false,nameDiffers=false,numberDiffers=false;
- // A unique exact name match takes priority over the race number. Official
- // numbers can be stale, mistyped, or changed between seasons; when the name
- // identifies exactly one eligible league athlete, keep that athlete and flag
- // the number discrepancy for review instead of dropping the result.
- if(byName.length===1){
-  match=byName[0];
-  numberDiffers=!!sourceNumber&&importedAthleteNumber(match.number)!==sourceNumber;
- }else if(byName.length>1&&sourceNumber){
-  // If duplicate athlete names exist, use the number only to disambiguate
-  // among those same-name candidates. Never let a conflicting number redirect
-  // a clearly matched name to a different athlete.
-  const exact=byName.filter(a=>importedAthleteNumber(a.number)===sourceNumber);
-  if(exact.length===1)match=exact[0];
- }else if(!byName.length&&sourceNumber&&byNumber.length===1){
-  // Fall back to a unique number only when the official name did not match an
-  // eligible athlete (or was omitted). This keeps number-only/variant-name
-  // result rows importable without overriding a valid exact name match.
-  match=byNumber[0];matchedByNumber=true;
-  nameDiffers=!!sourceName&&normalizeImportedRiderName(name(match))!==sourceName;
- }
+ let match=null,conflict=false,smxPlateDiffers=false;
+ if(byName.length===1){match=byName[0];if(sourceNumber&&importedAthleteNumber(match.number)!==sourceNumber){if(series!=="SMX"){match=null;conflict=true}else smxPlateDiffers=true}}
+ else if(byName.length>1&&sourceNumber){const exact=byName.filter(a=>importedAthleteNumber(a.number)===sourceNumber);if(exact.length===1)match=exact[0]}
+ else if(!byName.length&&byNumber.length===1)match=byNumber[0];
  const blocked=alreadyScoredAthleteIds(currentScoringScope(),editingScoreGroupKey||"");
  if(match&&blocked.has(id(match)))return {athlete:match,status:"Already scored in this segment",state:"blocked"};
- if(match){
-  const label=matchedByNumber
-   ?`Matched by number #${clean(row.number)}: ${name(match)}${!sourceName?" (official name not supplied)":nameDiffers?` (official name differs: ${clean(row.name)})`:""}`
-   :numberDiffers?`Matched by name: ${name(match)}; official #${clean(row.number)} differs from league #${clean(match.number)||"—"}`
-   :`Matched: #${clean(match.number)||"—"} ${name(match)}`;
-  return {athlete:match,status:label,state:"matched",matchedByNumber,numberDiffers};
- }
- return {athlete:null,status:byName.length>1?"Name is ambiguous":byNumber.length>1?"Number is ambiguous":"No matching league athlete",state:"unmatched"};
+ if(match)return {athlete:match,status:smxPlateDiffers?`Matched by name: official plate #${clean(row.number)}; roster #${clean(match.number)||"—"}`:`Matched: #${clean(match.number)||"—"} ${name(match)}`,state:"matched"};
+ return {athlete:null,status:conflict?"Name / number conflict":byNumber.length>1?"Number is ambiguous":"No matching league athlete",state:"unmatched"};
 }
 function renderOfficialResultsPreview(){
  const preview=$("officialResultsImportPreview"),summary=$("officialResultsImportSummary"),el=$("officialResultsImportTable");if(!preview||!el)return;
@@ -905,7 +862,7 @@ function renderOfficialResultsPreview(){
  const fastestLapLabel=officialImportMeta?.fastestLap?`<span class="official-import-match">Official fastest lap: ${esc(officialImportMeta.fastestLap.name)}${officialImportMeta.fastestLap.number?` (#${esc(officialImportMeta.fastestLap.number)})`:""}</span>`:"";
  const ncCount=officialImportRows.filter(row=>row.status==="NC"||String(row.displayPosition||"").toUpperCase()==="NC").length;
  summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span>${divisionLabel?`<span class="official-import-match">Class: ${esc(divisionLabel)}</span>`:""}${sessionLabel?`<span>Session: ${esc(sessionLabel)}</span>`:""}${fastestQualifierLabel}${fastestQualifierWarning}${fastestLapLabel}<span>${officialImportRows.length} official rows</span>${ncCount?`<span class="official-import-match">${ncCount} NC driver${ncCount===1?"":"s"} retained in official order</span>`:""}<span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
- el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.displayPosition||row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name||"Name not supplied — number match")}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
+ el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.displayPosition||row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name)}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
 }
 function rematchOfficialResults(){if(!officialImportRows.length)return;officialImportRows=officialImportRows.map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();renderOfficialResultsPreview()}
 async function previewOfficialResults(){
@@ -1079,7 +1036,7 @@ function saveEditedAthlete(e){
  saveAthletes(all.map(a=>id(a)===oldId?updated:a));
  saveTeams(currentTeams.map(t=>({...t,roster:roster(t).map(r=>matchesCurrent(r)?{...r,...updated}:r)})));
  renderComm();refresh();
- msg.textContent=isHistoricalCommissioner()?`Rider changes saved to the ${commissionerSeasonYear} archive. Current-season riders and rosters are unchanged.`:"Rider changes saved. The current athlete list and any current roster copies are updated; recorded scores are unchanged.";
+ msg.textContent="Rider changes saved. The athlete list and any current roster copies are updated; historical scores are unchanged.";
 }
 function draftOrderKeysValid(order,list=teams()){const keys=list.map(key),candidate=Array.isArray(order)?order.map(String):[];return candidate.length===keys.length&&new Set(candidate).size===keys.length&&keys.every(k=>candidate.includes(k))}
 function draftOrderEditorLocked(room,settings){const current=settings||read(K.DS,{})[room]||{status:"Not started"};return (current.status||"Not started")!=="Not started"||draftRoomPicks(room).length>0}
@@ -1135,7 +1092,7 @@ async function runYearlyRosterReset(){
   if(message)message.textContent="The yearly reset is already complete. All team rosters are empty, no rider or team scoring points remain, and no trade proposals are saved.";
   return;
  }
- const confirmed=confirm(`YEARLY RESET — ${commissionerSeasonLabel()}\n\nThis will permanently reset only the selected season (${commissionerSeasonYear}) and will not change other archived seasons or the live current season.\n\nThis will permanently:\n• Remove ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}.\n• Reset ${teamPoints.toLocaleString()} accumulated team points.\n• Reset ${riderPoints.toLocaleString()} accumulated rider points across ${riderCount} scored athlete${riderCount===1?"":"s"} and ${currentScores.length} result record${currentScores.length===1?"":"s"}.\n• Delete ${tradeProposalCount} trade proposal${tradeProposalCount===1?"":"s"}, including pending proposals, accepted/rejected history, and their notification/viewed status.\n\nAll scoring records will be deleted. This also clears athlete profile results, averages, scoring history, and top-undrafted scoring totals.\n\nAthlete records, team names, owners and passwords, draft settings, and the event schedule will be preserved.\n\nContinue?`);
+ const confirmed=confirm(`YEARLY RESET\n\nThis will permanently:\n• Remove ${assignmentCount} athlete assignment${assignmentCount===1?"":"s"} from ${currentTeams.length} team${currentTeams.length===1?"":"s"}.\n• Reset ${teamPoints.toLocaleString()} accumulated team points.\n• Reset ${riderPoints.toLocaleString()} accumulated rider points across ${riderCount} scored athlete${riderCount===1?"":"s"} and ${currentScores.length} result record${currentScores.length===1?"":"s"}.\n• Delete ${tradeProposalCount} trade proposal${tradeProposalCount===1?"":"s"}, including pending proposals, accepted/rejected history, and their notification/viewed status.\n\nAll scoring records will be deleted. This also clears athlete profile results, averages, scoring history, and top-undrafted scoring totals.\n\nAthlete records, team names, owners and passwords, draft settings, and the event schedule will be preserved.\n\nContinue?`);
  if(!confirmed)return;
  const phrase=prompt('To confirm the yearly reset, type RESET SEASON:');
  if(phrase===null)return;
@@ -1154,102 +1111,7 @@ async function runYearlyRosterReset(){
   if(message)message.textContent=`The rosters, scoring points, and trade proposals were cleared in this browser, but the project database did not confirm the save: ${error.message||"Unknown storage error"}. Check the storage status and retry using Data & Backup if needed.`;
  }
 }
-
-function populateCommissionerSeasonOptions(){
- const select=$("commissionerSeasonYearSelect");if(!select)return;
- const helper=window.KFSeasonArchive,archives=rawRead(K.Y,{}),years=helper?.listArchivedYears(archives)||Array.from({length:activeCurrentSeasonYear()-2016},(_,i)=>activeCurrentSeasonYear()-1-i);
- const selected=commissionerSeasonYear;
- select.replaceChildren(new Option(`Current (${activeCurrentSeasonYear()})`,"Current"));
- years.forEach(year=>select.add(new Option(String(year),String(year))));
- if(selected==="Current"||years.includes(Number(selected)))select.value=selected;else select.value="Current";
-}
-function refreshCommissionerSeasonDescription(){
- const note=$("commissionerSeasonDescription");if(note)note.textContent=commissionerSeasonYear==="Current"
-  ?`You are editing the live ${activeCurrentSeasonYear()} season. Public team, athlete, standings, draft and schedule pages use this season. Start Next Season archives all ${activeCurrentSeasonYear()} data before creating ${activeCurrentSeasonYear()+1}.`
-  :`You are editing the ${commissionerSeasonYear} archive. Changes to athletes, race teams, fantasy rosters, scoring, trades, drafts and schedule are saved separately and do not change the live current season.`;
- const title=$("commissionerSeasonActiveLabel");if(title)title.textContent=commissionerSeasonLabel();
- const rolloverPanel=$("commissionerSeasonRollover");if(rolloverPanel)rolloverPanel.hidden=commissionerSeasonYear!=="Current";
-}
-function clearCommissionerYearEditors(){
- const editPanel=$("editAthletePanel");if(editPanel)editPanel.hidden=true;
- if($("editAthleteForm"))$("editAthleteForm").reset();
- if($("scoreForm"))cancelScoreEdit();
- if($("scheduleForm"))resetScheduleEditor();
- if($("addAthleteForm"))$("addAthleteForm").reset();
- if($("addMessage"))$("addMessage").textContent="";
- if($("scoreMessage"))$("scoreMessage").textContent="";
-}
-function changeCommissionerSeason(year){
- const select=$("commissionerSeasonYearSelect"),numeric=Number(year),latestArchiveYear=Math.max(2026,activeCurrentSeasonYear()-1),valid=year==="Current"||(Number.isInteger(numeric)&&numeric>=2016&&numeric<=latestArchiveYear);
- if(!valid){if(select)select.value=commissionerSeasonYear;return}
- if(String(year)===commissionerSeasonYear)return;
- commissionerSeasonYear=String(year);sessionStorage.setItem("commissionerSeasonYear",commissionerSeasonYear);
- try{
-  if(isHistoricalCommissioner())ensureHistoricalSeason(commissionerSeasonYear);
-  clearCommissionerYearEditors();
-  populateCommissionerSeasonOptions();
-  if(select)select.value=commissionerSeasonYear;
-  refreshCommissionerSeasonDescription();
-  renderComm();
-  loadDraftAdminSettings();
-  if($("commissionerSeasonMessage"))$("commissionerSeasonMessage").textContent=`Loaded ${commissionerSeasonLabel()}. All Commissioner Tools now use this season's saved data.`;
- }catch(error){
-  commissionerSeasonYear="Current";sessionStorage.setItem("commissionerSeasonYear","Current");populateCommissionerSeasonOptions();if(select)select.value="Current";refreshCommissionerSeasonDescription();renderComm();loadDraftAdminSettings();
-  if($("commissionerSeasonMessage"))$("commissionerSeasonMessage").textContent=`Could not load the selected historical season: ${error.message||"Unknown storage error"}. Returned to Current.`;
- }
-}
-async function runStartNextSeason(){
- const button=$("startNextSeason"),message=$("startNextSeasonMessage");
- if(commissionerSeasonYear!=="Current"){
-  if(message)message.textContent="Select Current before starting the next season.";
-  return;
- }
- const archiveStore=window.KFSeasonArchive;
- if(!archiveStore||typeof archiveStore.startNextSeason!=="function"){
-  if(message)message.textContent="Season rollover tools are unavailable. Reload the page after updating the project files.";
-  return;
- }
- const currentYear=activeCurrentSeasonYear(),nextYear=currentYear+1;
- const teamsNow=rawRead(K.T,[]),athletesNow=rawRead(K.A,[]),scoresNow=rawRead(K.S,[]),tradesNow=rawRead(K.TR,[]),picksNow=rawRead(K.D,{picks:[]});
- const rosterCount=teamsNow.reduce((sum,team)=>sum+(Array.isArray(team.roster)?team.roster.length:0),0);
- const confirmed=confirm(`START NEXT SEASON — ${currentYear} to ${nextYear}\n\nThe complete ${currentYear} season will be archived, including all athletes, team rosters and owners, race results and scoring input, trades and notification history, draft picks/settings, and schedule events.\n\nA new ${nextYear} Current season will then be created with the athlete list and team identities carried forward. Fantasy rosters, scores, trades, draft picks, and the event schedule will start fresh. The draft order settings and league scoring rules will be carried forward.\n\nThis does not delete the ${currentYear} season. You can select it from the Commissioner Dashboard at any time.\n\nContinue?`);
- if(!confirmed)return;
- if(button)button.disabled=true;
- if(message)message.textContent=`Archiving ${currentYear} and preparing ${nextYear}…`;
- try{
-  const snapshot=currentSeasonSnapshot();
-  const transition=archiveStore.startNextSeason(rawRead(K.Y,{}),snapshot,{timestamp:new Date().toISOString()});
-  const nextData={...transition.currentState,[K.Y]:transition.archives};
-  if(window.KFStorage&&typeof window.KFStorage.exportState==="function"&&typeof window.KFStorage.replaceState==="function"){
-   const saved=await window.KFStorage.exportState();
-   await window.KFStorage.replaceState({...saved,...nextData});
-  }else{
-   for(const [key,value] of Object.entries(nextData))rawWrite(key,value);
-   if(window.KFStorage&&typeof window.KFStorage.flush==="function")await window.KFStorage.flush();
-  }
-  commissionerSeasonYear="Current";sessionStorage.setItem("commissionerSeasonYear","Current");
-  clearCommissionerYearEditors();populateCommissionerSeasonOptions();
-  const select=$("commissionerSeasonYearSelect");if(select)select.value="Current";
-  refreshCommissionerSeasonDescription();renderComm();loadDraftAdminSettings();refresh();
-  if(message)message.textContent=`Season started successfully. All ${scoresNow.length} scoring records, ${tradesNow.length} trade records, ${rosterCount} roster assignments, ${athletesNow.length} athlete records, ${teamsNow.length} team identities, ${picksNow?.picks?.length||0} draft picks, and the ${currentYear} schedule are saved in the ${currentYear} archive. ${nextYear} is now the Current season with fresh scoring, rosters, trades, draft picks, and schedule.`;
-  if($("commissionerSeasonMessage"))$("commissionerSeasonMessage").textContent=`Current season is now ${nextYear}. The complete ${currentYear} season is available in the year selector.`;
- }catch(error){
-  if(message)message.textContent=`Could not start the next season. No successful database confirmation was received: ${error.message||"Unknown storage error"}. Check the storage banner and retry.`;
- }finally{if(button)button.disabled=false;}
-}
-function setupCommissionerSeasonSelector(){
- const select=$("commissionerSeasonYearSelect");if(!select)return;
- const currentYear=activeCurrentSeasonYear(),latestArchiveYear=Math.max(2026,currentYear-1),saved=sessionStorage.getItem("commissionerSeasonYear")||"Current";
- const validSaved=saved==="Current"||(Number.isInteger(Number(saved))&&Number(saved)>=2016&&Number(saved)<=latestArchiveYear);
- commissionerSeasonYear=validSaved?saved:"Current";
- populateCommissionerSeasonOptions();
- if(isHistoricalCommissioner())ensureHistoricalSeason(commissionerSeasonYear);
- select.value=commissionerSeasonYear;select.addEventListener("change",()=>changeCommissionerSeason(select.value));
- refreshCommissionerSeasonDescription();
-}
-
 function commInit(){
- setupCommissionerSeasonSelector();
  setupCommissionerTabs();
  populatePrimarySeriesSelect($("athClass"),"250");populatePrimarySeriesSelect($("editAthClass"),"250");populateNationalitySelect($("athNationality"));populateNationalitySelect($("editAthNationality"));populateNationalitySelect($("eventCountry"));populateRegionSelect($("athNationalityRegion"),$("athNationality"));populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));populateRegionSelect($("eventRegion"),$("eventCountry"));$("athNationality").onchange=()=>populateRegionSelect($("athNationalityRegion"),$("athNationality"));$("editAthNationality").onchange=()=>populateRegionSelect($("editAthNationalityRegion"),$("editAthNationality"));$("eventCountry").onchange=()=>populateRegionSelect($("eventRegion"),$("eventCountry"));renderSecondarySeriesChecks("athSecondarySeries",[], $("athClass").value);$("athClass").onchange=()=>renderSecondarySeriesChecks("athSecondarySeries",secondarySeriesChecked("athSecondarySeries",$("athClass").value),$("athClass").value);$("editAthClass").onchange=()=>renderSecondarySeriesChecks("editAthSecondarySeries",secondarySeriesChecked("editAthSecondarySeries",$("editAthClass").value),$("editAthClass").value);populateScheduleSeriesSelect();populateScoreSeriesSelect();populateDraftRoomSelects();setupScoreGrid();setupOfficialResultsImport();$("scoreForm").onsubmit=submitRaceResults;$("cancelScoreEdit").onclick=cancelScoreEdit;
  $("editAthleteForm").onsubmit=saveEditedAthlete;
@@ -1262,7 +1124,7 @@ function commInit(){
  $("startDraftNow").onclick=()=>{const d=read(K.DS,{}),s=$("draftSeries").value,current=d[s]||{},list=teams();if(list.length!==5||list.some(t=>!t.passwordHash)){$("draftSettingsMessage").textContent="All five teams must be claimed and have a team password before starting. Each team signs in to make its own pick.";return}const savedOrder=Array.isArray(current.orderTeamKeys)?current.orderTeamKeys.map(String):[];if(!draftOrderKeysValid(savedOrder,list)){$("draftSettingsMessage").textContent="Set and save the draft order above before starting this draft.";return}if(current.status==="Open"){$("draftSettingsMessage").textContent=`${s} draft is already open. Existing picks and the saved snake order are unchanged.`;return}current.status="Open";current.start=current.start||new Date().toISOString();current.orderTeamKeys=savedOrder;current.scheduledStart=$("draftStart").value||current.scheduledStart||"";d[s]=current;write(K.DS,d);$("draftSettingsMessage").textContent=`${s} draft started. Round 1: ${savedOrder.map(k=>tname(list.find(t=>key(t)===k))).join(" → ")}. Round 2 will reverse the order. Teams can now sign in on the Draft page.`;loadDraftAdminSettings()};
  $("pauseDraft").onclick=()=>setDraftAdminStatus("Paused");$("completeDraft").onclick=()=>setDraftAdminStatus("Complete");
  $("eventDate").addEventListener("change",()=>{$("eventEndDate").min=$("eventDate").value});$("eventSeries").addEventListener("change",()=>updateEventTypeFields($("eventSeries").value));$("eventSubType").addEventListener("change",()=>updateEventTypeFields($("eventSeries").value,$("eventSubType").value));updateEventTypeFields($("eventSeries").value||"SMX");$("scheduleForm").onsubmit=saveScheduleEvent;$("scheduledEventToEdit").onchange=()=>{$("loadScheduledEventEdit").disabled=!$("scheduledEventToEdit").value};$("loadScheduledEventEdit").onclick=()=>{const eventId=$("scheduledEventToEdit").value;if(eventId)beginEditEvent(eventId)};$("cancelEditEvent").onclick=()=>{resetScheduleEditor();$("scheduleMessage").textContent="Event edit cancelled."};
- $("startNextSeason").onclick=runStartNextSeason;$("yearlyReset").onclick=runYearlyRosterReset;
+ $("yearlyReset").onclick=runYearlyRosterReset;
  $("resetData").onclick=()=>{if(confirm("Delete all league data from the local project database and this browser? This cannot be undone.")){const finish=()=>{sessionStorage.clear();location.reload()};if(window.KFStorage&&typeof window.KFStorage.clearAll==="function")window.KFStorage.clearAll().then(finish).catch(err=>alert("Could not clear saved data: "+err.message));else{Object.values(K).forEach(k=>localStorage.removeItem(k));sessionStorage.clear();location.reload()}}}
 }
 function renderCommSchedule(){
@@ -1319,32 +1181,9 @@ function scheduleDailyRosterLockRefresh(){const page=document.body.dataset.page;
 function dataInit(){
  const status=$("dataModeDetail"),message=$("dataMessage");
  const mode=window.KFStorage?.mode||"browser";
- const storageMode=window.KFStorage?.serverMode||"local";
- const backup=window.KFStorage?.githubBackup||{};
- if(status){
-  if(mode!=="server"){
-   status.textContent="Browser-only mode: changes on this page are not being saved to Render or GitHub. Open the Render-hosted website for shared Render + GitHub saving, or stop Live Server and run npm start for local project storage.";
-   status.className="storage-detail warn";
-  }else if(backup.automaticSaveEnabled){
-   status.textContent=storageMode==="render"?`Connected to Render persistent disk. Automatic GitHub backup is configured for ${backup.repository}.`:`Connected to local project-file storage. Automatic GitHub backup is configured for ${backup.repository}. This local server does not write to the Render disk.`;
-   status.className="storage-detail good";
-  }else{
-   status.textContent=`Connected to ${storageMode==="render"?"Render persistent disk":"local project-file storage"}, but automatic GitHub backup is not active. Configure GITHUB_TOKEN and GITHUB_AUTO_BACKUP=true on the server.`;
-   status.className="storage-detail warn";
-  }
- }
- const showCount=()=>{const target=$("dataCategoryCount");if(!target)return;const keys=["kaiserFantasyAthletes","kaiserFantasyTeams","kaiserFantasyScores","kaiserFantasyTrades","kaiserFantasyDraftState","kaiserFantasyDraftSettings","kaiserFantasySchedule","kaiserFantasySeasonArchives"];const count=keys.filter(k=>localStorage.getItem(k)!==null).length;target.textContent=`${count} of ${keys.length} data categories currently have saved records, including archived seasons.`};showCount();
- $("saveDataNow")?.addEventListener("click",async()=>{
-  if(!window.KFStorage){message.textContent="Storage helper is unavailable. Refresh this page.";return}
-  const button=$("saveDataNow");if(button)button.disabled=true;
-  message.textContent="Saving the primary database and confirming the GitHub backup…";
-  try{
-   const result=await window.KFStorage.flushBoth();
-   message.textContent=`Confirmed: saved to ${result.primaryStorage} and GitHub repository ${result.githubRepository} (${result.githubCommit?.shortSha||result.githubCommit?.sha?.slice(0,7)||"already current"}).`;
-   await refreshGithubStatus();showCount();
-  }catch(err){message.textContent="Dual save could not be confirmed: "+err.message+" Check the storage and GitHub status above."}
-  finally{if(button)button.disabled=false}
- });
+ if(status){status.textContent=mode==="server"?`Connected: changes are saved to ${window.KFStorage?.location||"server storage"}.`:"Browser-only mode: start with npm start locally, or deploy to Render with the included persistent disk configuration, to save outside this browser.";status.className=mode==="server"?"storage-detail good":"storage-detail warn";}
+ const showCount=()=>{const target=$("dataCategoryCount");if(!target)return;const keys=["kaiserFantasyAthletes","kaiserFantasyTeams","kaiserFantasyScores","kaiserFantasyTrades","kaiserFantasyDraftState","kaiserFantasyDraftSettings","kaiserFantasySchedule"];const count=keys.filter(k=>localStorage.getItem(k)!==null).length;target.textContent=`${count} of ${keys.length} data categories currently have saved records.`};showCount();
+ $("saveDataNow")?.addEventListener("click",async()=>{if(!window.KFStorage){message.textContent="Storage helper is unavailable. Refresh this page.";return}try{await window.KFStorage.flush();message.textContent=window.KFStorage.mode==="server"?`All pending changes have been saved to ${window.KFStorage.location||"server storage"}.`:"Browser data is saved, but this page is not connected to server storage. Start locally with npm start or deploy to Render.";showCount()}catch(err){message.textContent="Save failed: "+err.message}});
  $("exportData")?.addEventListener("click",async()=>{try{const state=await window.KFStorage.exportState();const backup={format:"kaiser-family-fantasy-smx-backup-v1",exportedAt:new Date().toISOString(),state};const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`kaiser-fantasy-backup-${localDateISO()}.json`;a.click();URL.revokeObjectURL(url);message.textContent="Backup downloaded."}catch(err){message.textContent="Could not create backup: "+err.message}});
  $("importData")?.addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;try{const parsed=JSON.parse(await file.text()),state=parsed.state||parsed;if(!state||typeof state!=="object"||Array.isArray(state))throw new Error("This file is not a valid league backup.");if(!confirm("Replace the current league data with this backup? The current data will be overwritten.")){e.target.value="";return}await window.KFStorage.replaceState(state);message.textContent="Backup restored. Reloading the website…";setTimeout(()=>location.reload(),250)}catch(err){message.textContent="Import failed: "+err.message}finally{e.target.value=""}});
 
@@ -1358,7 +1197,7 @@ function dataInit(){
    const response=await fetch("/api/github/status",{cache:"no-store"});
    if(!response.ok)throw new Error("The Node.js server does not expose GitHub league-data sync. Use npm start or your Render-hosted site.");
    const info=await response.json();
-   if(!info.configured){githubStatus.textContent=`GitHub backup is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;githubStatus.className="storage-detail warn";githubLatest.textContent="The primary server database remains available. GitHub sync starts after the token is configured.";saveGithubButton.disabled=true;syncButton.disabled=true;return;}
+   if(!info.configured){githubStatus.textContent=`GitHub backup is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;githubStatus.className="storage-detail warn";githubLatest.textContent="Render/local JSON saving remains available. GitHub sync starts after the token is configured.";saveGithubButton.disabled=true;syncButton.disabled=true;return;}
    const autoText=info.automaticSave?"Automatic GitHub JSON saves are enabled.":"Automatic GitHub JSON saves are disabled by server configuration.";
    if(info.error){githubStatus.textContent=`GitHub connection problem for ${info.repository}: ${info.error}`;githubStatus.className="storage-detail warn";}
    else if(info.repositoryReadyForFirstSave){githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). Repository has no first commit yet; the first league save will initialize it. ${autoText}`;githubStatus.className="storage-detail good";}
@@ -1367,8 +1206,7 @@ function dataInit(){
    const localWhen=info.localSavedAt?formatVancouverDateTime(info.localSavedAt):"not yet saved";
    const gh=info.latestGitHubSave;const githubWhen=gh?.savedAt?formatVancouverDateTime(gh.savedAt):"no GitHub JSON save yet";
    const source=info.lastSync?.source?` Last startup/manual selection: ${info.lastSync.source}.`:"";
-   const primaryLabel=info.localStorage||"Server database";
-   githubLatest.textContent=`${primaryLabel} save: ${localWhen}. GitHub JSON save: ${githubWhen}. File: ${info.dataPath||"league-data/league-data.json"}.${source}`;
+   githubLatest.textContent=`Render/local save: ${localWhen}. GitHub JSON save: ${githubWhen}. File: ${info.dataPath||"league-data/league-data.json"}.${source}`;
    saveGithubButton.disabled=!info.writeReady;syncButton.disabled=!info.writeReady;
    if(info.autoSaveLastError)githubMessage.textContent="Last automatic GitHub JSON save failed: "+info.autoSaveLastError;
    else if(info.autoSaveLastAt)githubMessage.textContent="Last automatic GitHub save check: "+formatVancouverDateTime(info.autoSaveLastAt);

@@ -293,19 +293,7 @@ function createGithubBackup(root) {
     getLatestLeagueData,
     saveLeagueData,
     getStatus,
-    getConfigSummary: () => {
-      const cfg = config();
-      const tokenConfigured = !!cfg.token;
-      return {
-        repository: cfg.repository,
-        branch: cfg.branchOverride || "repository default (auto-detect)",
-        dataPath: cfg.dataPath,
-        tokenConfigured,
-        automaticSaveEnabled: !!(cfg.autoEnabled && tokenConfigured),
-        autoBackupEnabled: cfg.autoEnabled,
-        backupPasswordConfigured: !!cfg.backupPassword
-      };
-    }
+    getConfigSummary: () => ({ repository: config().repository, branch: config().branchOverride || "repository default (auto-detect)", dataPath: config().dataPath })
   };
 }
 

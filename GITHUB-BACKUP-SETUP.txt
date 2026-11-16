@@ -5,7 +5,6 @@ PURPOSE
 - GitHub stores a second copy of that same JSON file, by default at league-data/league-data.json in the configured repository.
 - On server startup, the server checks both files and loads whichever has the newer savedAt timestamp.
 - Whenever the live JSON file changes through the website or a direct file edit, the server automatically commits the updated JSON to GitHub after a short debounce.
-- Data & Backup includes an explicit dual-save action: it confirms the primary disk/file write, then waits for GitHub to confirm the same JSON backup.
 - The GitHub copy is a backup of league data, not a backup of website source code.
 
 GITHUB SETUP
@@ -24,15 +23,12 @@ GITHUB SETUP
 LOCAL DEVELOPMENT
 1) Copy .env.example to .env.
 2) Fill in the same variables.
-3) Stop VS Code Live Server.
-4) Run npm start in a terminal opened at the project folder.
-5) Open http://localhost:10000.
-6) This saves to the local project database and mirrors to GitHub; it does not write to the Render disk. Open the Render-hosted website when you need shared Render + GitHub saving.
+3) Run npm start.
 
 HOW SAVING WORKS
 - Startup scan: the server reads Render/local league-data.json and the GitHub JSON copy. It compares savedAt timestamps. If GitHub is newer, it loads GitHub into the live data directory. If Render/local is newer (or GitHub has no file), it keeps the live file and updates GitHub when automatic backup is enabled. Render wins exact timestamp ties.
 - Automatic GitHub save: a change to league-data.json through the app is written to Render/local storage first, then the updated JSON is committed to GitHub. A file watcher also catches direct edits to the JSON file.
-- Confirmed dual save: use Save to Primary Storage + GitHub on the Data & Backup page. It waits for the Render/local file write, then makes a GitHub API save and only reports success when GitHub confirms the matching JSON backup.
+- Manual Render/local save: use Save / Flush to Render or Local Server on the Data & Backup page.
 - Manual GitHub save: enter GITHUB_BACKUP_PASSWORD and use Save Current League JSON to GitHub.
 - Manual comparison: enter GITHUB_BACKUP_PASSWORD and use Scan GitHub & Render — Load Newest Save. The selected save is loaded and the page reloads.
 - Manual portable backup: Download League Backup and Restore a Backup (.json) remain available and unchanged.

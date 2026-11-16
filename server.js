@@ -18,7 +18,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const KEYS = new Set([
   "kaiserFantasyAthletes", "kaiserFantasyTeams", "kaiserFantasyScores",
   "kaiserFantasyTrades", "kaiserFantasyDraftState", "kaiserFantasyDraftSettings",
-  "kaiserFantasySchedule", "kaiserFantasySeasonArchives"
+  "kaiserFantasySchedule"
 ]);
 let db = { version: 1, state: {}, keyUpdatedAt: {}, savedAt: 0 };
 let writeChain = Promise.resolve();
@@ -199,46 +199,6 @@ async function handleApi(req, res, url) {
     });
     return send(res, 200, result);
   }
-  if (url.pathname === "/api/storage/flush" && req.method === "POST") {
-    await readBody(req);
-    // The normal autosave already writes to the primary disk. This endpoint
-    // confirms that write, then synchronously mirrors the exact same JSON to GitHub.
-    await writeChain;
-    const local = await currentDiskDatabase();
-    const primaryStorage = DATA_DIR === "/var/data" ? "Render persistent disk" : "local project database";
-    if (!githubBackup.configured()) {
-      return send(res, 503, {
-        ok: false,
-        primarySaved: true,
-        primaryStorage,
-        error: `The ${primaryStorage} save succeeded, but GitHub backup is not configured. Set GITHUB_TOKEN for tkaiser930-droid/LeagueSave.`
-      });
-    }
-    if (githubAutoTimer) { clearTimeout(githubAutoTimer); githubAutoTimer = null; }
-    try {
-      const result = await queueGithubOperation(() => githubBackup.saveLeagueData(local.data, "Kaiser Family Fantasy SMX: manual flush to primary storage and GitHub backup"));
-      githubAutoLastAt = new Date().toISOString();
-      githubAutoLastError = "";
-      githubLastSync = { source: primaryStorage, at: githubAutoLastAt, message: `Saved the primary database and confirmed the GitHub mirror in ${githubBackup.getConfigSummary().repository}.` };
-      return send(res, 200, {
-        ok: true,
-        primarySaved: true,
-        primaryStorage,
-        primarySavedAt: local.data.savedAt,
-        githubSaved: true,
-        githubChanged: !!result.changed,
-        githubRepository: githubBackup.getConfigSummary().repository,
-        githubPath: result.path,
-        githubCommit: result.commit || null,
-        message: `Saved to ${primaryStorage} and confirmed the GitHub backup.`
-      });
-    } catch (error) {
-      githubAutoLastAt = new Date().toISOString();
-      githubAutoLastError = error.message || "GitHub backup failed.";
-      console.error("Manual dual-destination save failed:", githubAutoLastError);
-      return send(res, 502, { ok: false, primarySaved: true, primaryStorage, error: `The ${primaryStorage} save succeeded, but the GitHub backup failed: ${githubAutoLastError}` });
-    }
-  }
   if (url.pathname === "/api/github/status" && req.method === "GET") {
     const local = await currentDiskDatabase().catch(() => ({ data: db, stat: null }));
     const localSavedAt = databaseTimestamp(local.data, local.stat?.mtimeMs || 0);
@@ -272,8 +232,7 @@ async function handleApi(req, res, url) {
     return send(res, 200, {
       version: db.version, state: db.state, keyUpdatedAt: db.keyUpdatedAt, savedAt: db.savedAt,
       storageMode: DATA_DIR === "/var/data" ? "render" : "local",
-      storageLabel: DATA_DIR === "/var/data" ? "Render persistent disk (/var/data/league-data.json)" : (DATA_DIR === path.join(ROOT, "data") ? "project file data/league-data.json" : `server directory ${DATA_DIR}/league-data.json`),
-      githubBackup: (() => { try { return githubBackup.getConfigSummary(); } catch (error) { return { tokenConfigured: false, automaticSaveEnabled: false, error: error.message }; } })()
+      storageLabel: DATA_DIR === "/var/data" ? "Render persistent disk (/var/data/league-data.json)" : (DATA_DIR === path.join(ROOT, "data") ? "project file data/league-data.json" : `server directory ${DATA_DIR}/league-data.json`)
     });
   }
   if (url.pathname === "/api/state" && req.method === "PUT") {
@@ -407,8 +366,7 @@ async function main() {
     process.exitCode = 1;
   });
   server.listen(PORT, HOST, () => {
-    const githubSummary = (() => { try { return githubBackup.getConfigSummary(); } catch (error) { return { automaticSaveEnabled: false, error: error.message }; } })();
-    console.log(`Kaiser Family Fantasy SMX is listening on ${HOST}:${PORT}/\nPrimary league database: ${DB_FILE}\nGitHub backup repository: ${githubSummary.repository || "tkaiser930-droid/LeagueSave"}\nAutomatic GitHub backup: ${githubSummary.automaticSaveEnabled ? "enabled" : "NOT ACTIVE — configure GITHUB_TOKEN and GITHUB_AUTO_BACKUP=true"}\nPress Ctrl+C to stop the server.`);
+    console.log(`Kaiser Family Fantasy SMX is listening on ${HOST}:${PORT}/\nLeague data saves to: ${DB_FILE}\nGitHub JSON backup: ${githubBackup.configured() ? "connected" : "not configured"}\nPress Ctrl+C to stop the server.`);
   });
 }
 main().catch(err => { console.error("Server startup failed:", err); process.exit(1); });
