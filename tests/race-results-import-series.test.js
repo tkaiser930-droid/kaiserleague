@@ -8,7 +8,12 @@ const {
   OFFICIAL_HOSTS_BY_SERIES,
   MOTOGP_API_BASE,
   motogpFastLapRiderPdfUrl,
-  parseMotoGPFastLapRiderText
+  parseMotoGPFastLapRiderText,
+  motogpSessionMatches,
+  motogpPositionNumber,
+  motogpStatsClassificationUrl,
+  parseMotoGPStatsClassificationHtml,
+  motogpFastestQualifierFromRows
 } = require("../race-results-import");
 
 async function withMockFetch(map, callback) {
@@ -80,6 +85,52 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     "https://resources.motogp.com/files/results/2023/GBR/MotoGP/RAC/FastLapRider.pdf", "a directly published Fast Lap Rider hyperlink is preferred when present");
   assert.equal(motogpFastLapRiderPdfUrl({ session_files: [{ name: "Fast Lap Rider", path: "/files/results/2023/GBR/MotoGP/SPR/FastLapRider.pdf" }] }).href,
     "https://resources.motogp.com/files/results/2023/GBR/MotoGP/SPR/FastLapRider.pdf", "relative Fast Lap Rider file paths are resolved against the official resources host");
+
+  // The official session list may identify Q2 as type Q + a descriptive label,
+  // rather than using Q2 as the raw type code. Race / sprint codes must remain exact.
+  assert.equal(motogpSessionMatches({ id: "q2", type: "Q", name: "Qualifying 2", number: 2 }, "Q2"), true);
+  assert.equal(motogpSessionMatches({ id: "q2", session_shortname: "Q2" }, "Q2"), true);
+  assert.equal(motogpSessionMatches({ id: "q1", type: "Q", name: "Qualifying 1", number: 1 }, "Q2"), false);
+  assert.equal(motogpPositionNumber("01:52.345"), 0, "lap times must never be converted into race positions");
+  assert.equal(motogpPositionNumber("1'52.345"), 0, "apostrophe-formatted lap times must never become race positions");
+  assert.equal(motogpPositionNumber("12"), 12);
+  assert.equal(motogpPositionNumber({ value: "3" }), 3);
+  const unresolvedRaceRows = require("../race-results-import").motogpClassificationRows([
+    { position: "01:52.345", status: "INSTND", rider: { full_name: "Test Rider", number: 11 }, best_lap: { time: "01:52.345" } }
+  ], "Test RAC", "RAC").rows;
+  assert.equal(unresolvedRaceRows[0].position, 0, "a lap time is not a race finishing position");
+  assert.equal(unresolvedRaceRows[0].status, "", "an unresolved rank is not falsely labelled NC");
+  assert.equal(unresolvedRaceRows[0].requiresPositionFallback, true, "incomplete positions trigger official Stats classification fallback");
+  const unresolvedWithoutNumber = require("../race-results-import").motogpClassificationRows([
+    { position: "01:53.001", status: "INSTND", rider: { full_name: "Rider Missing Number" } }
+  ], "Test RAC", "RAC").rows;
+  assert.equal(unresolvedWithoutNumber.length, 1, "a named official rider row is retained even when the API omits its race number");
+  assert.equal(unresolvedWithoutNumber[0].requiresPositionFallback, true);
+  assert.equal(motogpStatsClassificationUrl({ file: "https://resources.motogp.com/files/results/2026/QAT/MotoGP/RAC/Classification.pdf" }).href,
+    "https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/RAC/Classification");
+  assert.equal(motogpStatsClassificationUrl({}, { session: { session_files: [{ name: "Fast Lap Rider", href: "https://resources.motogp.com/files/results/2026/QAT/MotoGP/RAC/FastLapRider.pdf" }] } }).href,
+    "https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/RAC/Classification", "session metadata Fast Lap Rider links can identify the paired Stats classification route");
+  assert.equal(motogpStatsClassificationUrl({}, { event: { short_name: "QAT" }, year: 2026, sessionCode: "Q2" }).href,
+    "https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/Q2/Classification", "event short code can identify the selected session Stats page when no file URL is attached");
+
+  const motoGpStatsHtml = `<!doctype html><html><body><table>
+    <tr><th>Pos.</th><th>Points</th><th>Rider</th><th>Nation</th><th>Team</th><th>Bike</th><th>Km/h</th><th>Time/Gap</th></tr>
+    <tr><td>1</td><td>25</td><td><span>72</span> <a>Marco Bezzecchi</a></td><td>IT</td><td>Aprilia Racing</td><td>Aprilia</td><td>171.1</td><td>41'29.173</td></tr>
+    <tr><td>2</td><td>20</td><td><span>93</span> <a>Marc Marquez</a></td><td>ES</td><td>Ducati Lenovo Team</td><td>Ducati</td><td>170.9</td><td>+3.083</td></tr>
+    <tr><td colspan="8">Non-classified riders</td></tr>
+    <tr><td></td><td></td><td><span>33</span> <a>Brad Binder</a></td><td>ZA</td><td>Red Bull KTM Factory Racing</td><td>KTM</td><td>166.4</td><td>31'01.657</td></tr>
+  </table></body></html>`;
+  const parsedMotoGpStats = parseMotoGPStatsClassificationHtml(motoGpStatsHtml, "Qatar RAC", "RAC");
+  assert.deepEqual(parsedMotoGpStats.rows.map(row => [row.position, row.displayPosition, row.name, row.status]), [
+    [1, "1", "Marco Bezzecchi", ""], [2, "2", "Marc Marquez", ""], [3, "NC", "Brad Binder", "NC"]
+  ], "official Stats table positions are read from Pos. and unclassified riders stay in source order");
+  const q2Html = `<!doctype html><html><body><table>
+    <tr><th>Pos.</th><th>Rider</th><th>Team</th><th>Time/Gap</th></tr>
+    <tr><td>1</td><td>93 Marc Marquez</td><td>Ducati Lenovo Team</td><td>01:31.432</td></tr>
+    <tr><td>2</td><td>72 Marco Bezzecchi</td><td>Aprilia Racing</td><td>01:31.201</td></tr>
+  </table></body></html>`;
+  const parsedQ2Html = parseMotoGPStatsClassificationHtml(q2Html, "Qatar Q2", "Q2");
+  assert.equal(motogpFastestQualifierFromRows(parsedQ2Html.rows).name, "Marco Bezzecchi", "Q2 fastest qualifier is selected from the lowest Q2 lap time");
 
   // TCS root archive follows the selected season / round to the archived event page.
   const tcsRoot = "https://triplecrownseries.ca/results";
@@ -163,18 +214,21 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   const pdfStub = { body: Buffer.from("%PDF-1.4 mock pdf"), type: "application/pdf" };
   const apiMap = {
     [seasonUrl]: json([{ id: "season-2026", year: 2026, current: true }]),
-    [eventsUrl]: json([{ id: "event-qatar", name: "Qatar Grand Prix", date: "2026-11-08", round: 20, circuit: { name: "Lusail International Circuit" } }]),
+    [eventsUrl]: json([{ id: "event-qatar", name: "Qatar Grand Prix", short_name: "QAT", date: "2026-11-08", round: 20, circuit: { name: "Lusail International Circuit" } }]),
     [categoriesUrl]: json([{ id: "category-motogp", name: "MotoGP" }]),
     [sessionsUrl]: json([
       { id: "race-qatar", type: "RAC", name: "Grand Prix", session_files: [{ name: "Fast Lap Rider", href: raceFastLapUrl }] },
       { id: "sprint-qatar", type: "SPR", name: "Sprint", session_files: [{ name: "Fast Lap Rider", href: sprintFastLapUrl }] },
-      { id: "q2-qatar", type: "Q2", name: "Qualifying 2" }
+      { id: "q2-qatar", type: "Q", name: "Qualifying 2", number: 2,
+        session_files: [{ name: "Fast Lap Rider", href: "https://resources.motogp.com/files/results/2026/QAT/MotoGP/Q2/FastLapRider.pdf" }] }
     ]),
     [raceUrl]: json({
-      file: raceFastLapUrl.replace("FastLapRider.pdf", "Classification.pdf"),
+      // Regression case: the JSON provider sometimes exposes a lap-time string
+      // where the importer expects a numeric position. The Stats page must be
+      // used for the actual race order instead of converting these rows to NC.
       classification: [
-        { position: 1, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" }, best_lap: { time: "1:52.123" } },
-        { position: 2, rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" }, best_lap: { time: "1:52.245" } }
+        { position: "01:52.123", status: "INSTND", rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" }, best_lap: { time: "01:52.123" } },
+        { position: "01:52.245", status: "INSTND", rider: { full_name: "Marc Marquez", number: 93 }, team: { name: "Ducati Lenovo Team" }, best_lap: { time: "01:52.245" } }
       ],
       sections: [
         { title: "Non-classified riders", rows: [
@@ -198,16 +252,36 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     }),
     [raceFastLapUrl]: pdfStub,
     [sprintFastLapUrl]: pdfStub,
-    [q2Url]: json([{ position: 1, rider: { full_name: "Francesco Bagnaia", number: 63 }, team: { name: "Ducati Lenovo Team" } }, { position: 2, rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" } }])
+    ["https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/RAC/Classification"]: `<!doctype html><table>
+      <tr><th>Pos.</th><th>Points</th><th>Rider</th><th>Nation</th><th>Team</th><th>Bike</th><th>Km/h</th><th>Time/Gap</th></tr>
+      <tr><td>1</td><td>25</td><td><span>72</span> <a>Marco Bezzecchi</a></td><td>IT</td><td>Aprilia Racing</td><td>Aprilia</td><td>171.1</td><td>41'29.173</td></tr>
+      <tr><td>2</td><td>20</td><td><span>93</span> <a>Marc Marquez</a></td><td>ES</td><td>Ducati Lenovo Team</td><td>Ducati</td><td>170.9</td><td>+3.083</td></tr>
+      <tr><td colspan="8">Non-classified riders</td></tr>
+      <tr><td></td><td></td><td><span>7</span> <a>Toprak Razgatlioglu</a></td><td>TR</td><td>Prima Pramac Yamaha MotoGP</td><td>Yamaha</td><td>166.4</td><td>31'01.657</td></tr>
+      <tr><td></td><td></td><td><span>25</span> <a>Raul Fernandez</a></td><td>ES</td><td>Trackhouse MotoGP Team</td><td>Aprilia</td><td>166.2</td><td>31'02.000</td></tr>
+      <tr><td colspan="8">Riders who did not finish first lap</td></tr>
+      <tr><td></td><td></td><td><span>21</span> <a>Franco Morbidelli</a></td><td>IT</td><td>Pertamina Enduro VR46 Racing Team</td><td>Ducati</td><td>0</td><td>—</td></tr>
+    </table>`,
+    [q2Url]: json([
+      { position: "01:31.500", rider: { full_name: "Francesco Bagnaia", number: 63 }, team: { name: "Ducati Lenovo Team" }, time: "01:31.500" },
+      { position: "01:31.200", rider: { full_name: "Marco Bezzecchi", number: 72 }, team: { name: "Aprilia Racing" }, time: "01:31.200" }
+    ]),
+    ["https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/Q2/Classification"]: `<!doctype html><table>
+      <tr><th>Pos.</th><th>Rider</th><th>Team</th><th>Time</th></tr>
+      <tr><td>1</td><td>72 Marco Bezzecchi</td><td>Aprilia Racing</td><td>01:31.200</td></tr>
+      <tr><td>2</td><td>63 Francesco Bagnaia</td><td>Ducati Lenovo Team</td><td>01:31.500</td></tr>
+    </table>`
   };
   const motogpRace = await withMockFetch(apiMap, async calls => {
     const result = await fetchOfficialResults({ url: "https://www.motogp.com/en/gp-results/", series: "MotoGP", event: "Qatar Grand Prix", round: 20, eventDate: "2026-11-08", phase: "Grand Prix" });
-    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, raceUrl, raceFastLapUrl, q2Url]);
+    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, raceUrl,
+      "https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/RAC/Classification", raceFastLapUrl, q2Url,
+      "https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/Q2/Classification"]);
     return result;
   });
   assert.equal(motogpRace.rows[0].name, "Marco Bezzecchi");
   assert.equal(motogpRace.rows[0].number, "72");
-  assert.equal(motogpRace.rows[0].bestLap, "1:52.123");
+  assert.equal(motogpRace.rows[0].bestLap, "", "race time/gap cells must not be mistaken for lap times");
   assert.deepEqual(motogpRace.rows.map(row => [row.position, row.displayPosition, row.name, row.status]), [
     [1, "1", "Marco Bezzecchi", ""],
     [2, "2", "Marc Marquez", ""],
@@ -215,8 +289,8 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     [4, "NC", "Raul Fernandez", "NC"],
     [5, "DNF", "Franco Morbidelli", "DNF"]
   ], "RAC retains every non-classified rider in the order displayed after the classified finishers");
-  assert.equal(motogpRace.fastestQualifier.name, "Francesco Bagnaia");
-  assert.equal(motogpRace.fastestQualifier.sourceUrl, q2Url, "fastest qualifier is sourced from the event's Q2 session endpoint");
+  assert.equal(motogpRace.fastestQualifier.name, "Marco Bezzecchi", "Q2 fastest qualifier follows the best Q2 lap, even if a row's displayed position does not match the time order");
+  assert.equal(motogpRace.fastestQualifier.sourceUrl, "https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/Q2/Classification", "fastest qualifier is sourced from the Q2 session classification, not RAC/SPR laps");
   assert.equal(motogpRace.fastestLap, null, "a malformed mocked PDF should not invent a fastest-lap rider");
   assert.ok(motogpRace.fastestLapError, "PDF parsing failures are returned as an explicit importer warning");
   assert.equal(motogpRace.fastestQualifierSessionTitle, "Qualifying 2");
@@ -224,7 +298,8 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
 
   const motogpSprint = await withMockFetch(apiMap, async calls => {
     const result = await fetchOfficialResults({ url: "https://www.motogp.com/en/gp-results/", series: "MotoGP", event: "Qatar Grand Prix", round: 20, eventDate: "2026-11-08", phase: "Sprint" });
-    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, sprintUrl, sprintFastLapUrl, q2Url]);
+    assert.deepEqual(calls, [seasonUrl, eventsUrl, categoriesUrl, sessionsUrl, sprintUrl, sprintFastLapUrl, q2Url,
+      "https://stats.motogp.com/en/gp-results/2026/QAT/MotoGP/Q2/Classification"]);
     return result;
   });
   assert.equal(motogpSprint.sessionTitle, "Sprint");

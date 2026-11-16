@@ -76,3 +76,12 @@ MotoGP classification retention update:
 - Non-classified / NC, DNF (including first-lap non-finishers), DNS, DSQ and withdrawn rows are included after the classified finishers in the official source order. They receive sequential internal scoring positions so they can be loaded into the scoring grid, while the import preview displays their official status.
 - Classification parsing handles both per-rider status fields and separate grouped arrays (for example `non_classified_riders` and `riders_who_did_not_finish_first_lap`).
 - Fastest Qualifier continues to come from the event's separate `Q2` session classification (P1 in Q2); it is not inferred from RAC / SPR or from a general pole-position summary. The Fast Lap Rider PDF remains the source for Fastest Lap.
+
+
+2026-11-15 MotoGP classification / Q2 import correction:
+- Race and Sprint result rows no longer treat a time-like API `position` value (for example `01:52.123`) as a finishing rank or automatically label it NC. Incomplete ranking data triggers a lookup of the exact selected session's official Stats classification.
+- The fallback resolves the Stats classification from the API's `Classification.pdf` / `Fast Lap Rider` session-file links, or from the event's official short code plus `RAC`, `SPR`, or `Q2` session code.
+- The Stats table parser reads the numeric `Pos.` and `Rider` columns and retains single-cell section headings, so classified riders and the following NC / DNF groups stay in official order. Unclassified riders receive sequential internal scoring positions after the classified finishers.
+- Q2 is fetched as its own event session. If its API result has time values instead of numeric positions, the Q2 Stats classification is parsed and the smallest valid Q2 lap time determines the +3 Fastest Qualifier rider.
+- Race `Time/Gap` values are not treated as rider lap times or positions. The separate `Fast Lap Rider` PDF remains the source for the +1 fastest-lap bonus on RAC / SPR.
+- Added regression tests reproducing lap-time-in-position API responses, session-metadata URL fallback, Q2 fastest-lap comparison, and grouped NC / first-lap DNF rows. Full `npm run check` passes.
