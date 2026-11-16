@@ -584,16 +584,17 @@ function chooseMxgpRoundOption(control, context = {}) {
 function mxgpSessionOptionMatches(text, phase) {
   const label = normalizeHeader(text);
   const requested = normalizeHeader(phase || "");
-  // The results portal has used both descriptive labels ("Grand Prix Race 2")
-  // and shorter labels ("Race 2" / "Moto 2") for the same session. Match the
-  // requested session explicitly so a Race 2 option can never satisfy Moto 1.
+  // The official dropdown has appeared with both "Race Qualifying" and
+  // "Qualifying Race" wording. Treat these as the same dedicated session.
   if (requested.includes("qualifying")) {
     return label.includes("qualifying") && (label.includes("race") || label === "qualifying");
   }
+  // Never use a loose substring test here: Race 1 and Race 2 must remain
+  // mutually exclusive even when the portal shortens its option labels.
   const wantsMoto1 = requested.includes("moto1") || requested.includes("grandprixrace1") || requested === "race1";
   const wantsMoto2 = requested.includes("moto2") || requested.includes("grandprixrace2") || requested === "race2";
-  if (wantsMoto1) return label.includes("grandprixrace1") || label === "race1" || label === "moto1";
-  if (wantsMoto2) return label.includes("grandprixrace2") || label === "race2" || label === "moto2";
+  if (wantsMoto1) return label === "grandprixrace1" || label === "race1" || label === "moto1";
+  if (wantsMoto2) return label === "grandprixrace2" || label === "race2" || label === "moto2";
   return false;
 }
 
@@ -691,6 +692,7 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   selectedValues[championship.control.name] = championshipOption.value;
   if (championship.control.id) selectedValues[championship.control.id] = championshipOption.value;
   selections.push(championshipOption.text);
+  if (!mxgpOptionExact(championshipOption.text, "FIM Motocross World Championship")) throw new Error("MXGP championship selection verification failed.");
 
   forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
   const round = mxgpFindSelect(forms, "Round", text => /^grand\s+prix\s+of\b/i.test(text));
@@ -699,6 +701,7 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   selectedValues[round.control.name] = roundOption.value;
   if (round.control.id) selectedValues[round.control.id] = roundOption.value;
   selections.push(roundOption.text);
+  if (!/^grand\s+prix\s+of\b/i.test(roundOption.text)) throw new Error("MXGP round selection verification failed: the selected event must begin with ‘Grand Prix of’. ");
 
   forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
   const targetClass = mxgpDivisionKey(context.division);
@@ -709,6 +712,7 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   selectedValues[classSelection.control.name] = classOption.value;
   if (classSelection.control.id) selectedValues[classSelection.control.id] = classOption.value;
   selections.push(classOption.text);
+  if (!mxgpOptionExact(classOption.text, targetClass)) throw new Error(`MXGP class selection verification failed: expected ${targetClass}.`);
 
   forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
   const phaseLabel = String(context.phase || "").trim();
@@ -720,6 +724,7 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
   selectedValues[session.control.name] = sessionOption.value;
   if (session.control.id) selectedValues[session.control.id] = sessionOption.value;
   selections.push(sessionOption.text);
+  if (!mxgpSessionOptionMatches(sessionOption.text, phaseLabel)) throw new Error(`MXGP session selection verification failed: expected ${phaseLabel}.`);
 
   const parsed = parseHtml(page.body, page.title, { series: "MXGP", division: targetClass, phase: phaseLabel, url: page.finalUrl.href });
   parsed.eventTitle = roundOption.text;
@@ -986,13 +991,14 @@ function validateMxgpClassification(parsed, context = {}) {
     }
     const phase = normalizeHeader(context.phase || "");
     if (phase) {
-      const raceNumber = phase.includes("moto2") ? "2" : phase.includes("moto1") ? "1" : "";
-      const isQualifying = phase.includes("qualifyingrace");
+      const raceNumber = phase.includes("moto2") || phase.includes("grandprixrace2") || phase === "race2" ? "2"
+        : phase.includes("moto1") || phase.includes("grandprixrace1") || phase === "race1" ? "1" : "";
+      const isQualifying = phase.includes("qualifying");
       if (isQualifying && !isQualifyingHeading) {
         throw new Error(`The official MXGP page is ${heading || "not labelled as a qualifying classification"}, not the selected Qualifying Race. Choose the correct session in the results page and fetch again.`);
       }
-      if (raceNumber && (isQualifyingHeading || (raceMatch && raceMatch[1] !== raceNumber))) {
-        throw new Error(`The official MXGP page is ${heading}, not Moto ${raceNumber}. Choose the correct session in the results page and fetch again.`);
+      if (raceNumber && (isQualifyingHeading || !raceMatch || raceMatch[1] !== raceNumber)) {
+        throw new Error(`The official MXGP page is ${heading || "not labelled with a Grand Prix race number"}, not Moto ${raceNumber}. Choose the correct session in the results page and fetch again.`);
       }
     }
   }

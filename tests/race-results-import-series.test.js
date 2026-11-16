@@ -75,6 +75,8 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(hostIsAllowed("resources.motogp.com", "MotoGP"), true, "MotoGP result PDFs are served from the official resources host");
   assert.equal(hostIsAllowed("resources.motogp.pulselive.com", "MotoGP"), true, "current MotoGP resources host is allow-listed");
   assert.equal(mxgpSessionOptionMatches("Qualifying Race", "Qualifying Race"), true);
+  assert.equal(mxgpSessionOptionMatches("Race Qualifying", "Qualifying Race"), true);
+  assert.equal(mxgpSessionOptionMatches("Race Qualifying", "Race Qualifying"), true);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 1", "Moto 1"), true);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 2", "Moto 2"), true);
   assert.equal(mxgpSessionOptionMatches("Race 2", "Moto 2"), true);
@@ -82,6 +84,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(mxgpSessionOptionMatches("Race 2", "Moto 1"), false);
   assert.equal(mxgpSessionOptionMatches("Qualifying", "Qualifying Race"), true);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 2", "Moto 1"), false);
+  assert.equal(mxgpSessionOptionMatches("Grand Prix Race 1", "Moto 2"), false);
   assert.equal(MOTOGP_API_BASE, "https://api.motogp.pulselive.com/motogp/v1");
   assert.equal(MOTOGP_API_BASES[1], "https://api.pulselive.motogp.com/motogp/v1");
   await withMockFetch({
@@ -264,6 +267,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   const mxgpQual = parseHtml(mxgpQualHtml, "MXGP qualifying", { series: "MXGP", division: "MXGP", phase: "Qualifying Race" });
   assert.equal(mxgpQual.rows[0].name, "Jeffrey Herlings");
   assert.throws(() => parseHtml(mxgpQualHtml, "MXGP qualifying", { series: "MXGP", division: "MXGP", phase: "Moto 1" }), /not Moto 1/i);
+  assert.equal(parseHtml(mxgpQualHtml, "MXGP qualifying", { series: "MXGP", division: "MXGP", phase: "Race Qualifying" }).rows[0].name, "Jeffrey Herlings");
 
   // The MXGP importer must navigate the official four-filter workflow in
   // order: championship -> Grand Prix of round -> class -> session. Explicit
