@@ -77,6 +77,10 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(mxgpSessionOptionMatches("Qualifying Race", "Qualifying Race"), true);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 1", "Moto 1"), true);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 2", "Moto 2"), true);
+  assert.equal(mxgpSessionOptionMatches("Race 2", "Moto 2"), true);
+  assert.equal(mxgpSessionOptionMatches("Moto 2", "Moto 2"), true);
+  assert.equal(mxgpSessionOptionMatches("Race 2", "Moto 1"), false);
+  assert.equal(mxgpSessionOptionMatches("Qualifying", "Qualifying Race"), true);
   assert.equal(mxgpSessionOptionMatches("Grand Prix Race 2", "Moto 1"), false);
   assert.equal(MOTOGP_API_BASE, "https://api.motogp.pulselive.com/motogp/v1");
   assert.equal(MOTOGP_API_BASES[1], "https://api.pulselive.motogp.com/motogp/v1");
@@ -278,6 +282,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     { pos: 2, number: 26, name: "Everts, Liam", bestLap: "1:54.912", bike: "Husqvarna" }
   ]);
   await withMockFetch({
+    "https://results.mxgp.com/mxgp/standings.aspx": '<html><iframe src="/reslists.aspx"></iframe></html>',
     "https://results.mxgp.com/reslists.aspx": mxgpFilterForm,
     "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": mxgpFilterForm,
     "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=&s=&view=classification": mxgpFilterForm,
@@ -294,6 +299,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     assert.equal(result.rows[0].name, "Guillem Farres");
     assert.equal(result.fastestLap.name, "Liam Everts", "the minimum Bestlaptime in the selected MX2 race is identified for the fastest-lap bonus");
     assert.deepEqual(calls, [
+      "https://results.mxgp.com/mxgp/standings.aspx",
       "https://results.mxgp.com/reslists.aspx",
       "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification",
       "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=&s=&view=classification",
@@ -303,6 +309,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   });
 
   await withMockFetch({
+    "https://results.mxgp.com/mxgp/standings.aspx": '<html><iframe src="/reslists.aspx"></iframe></html>',
     "https://results.mxgp.com/reslists.aspx": mxgpFilterForm,
     "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": mxgpFilterForm,
     "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=&s=&view=classification": mxgpFilterForm,
@@ -318,7 +325,25 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     });
     assert.equal(result.rows[0].name, "Jeffrey Herlings");
     assert.equal(result.fastestLap.name, "Jeffrey Herlings");
-    assert.deepEqual(calls.map(url => new URL(url).searchParams.get("s")), [null, "", "", "", "11"]);
+    assert.deepEqual(calls.map(url => new URL(url).searchParams.get("s")), [null, null, "", "", "", "11"]);
+  });
+
+  // Short-form portal session labels must resolve to the requested race,
+  // including Moto 2, without accidentally selecting Race 1.
+  const shortSessionForm = mxgpFilterForm.replace('<option value="11">Qualifying Race</option><option value="12">Grand Prix Race 1</option><option value="13">Grand Prix Race 2</option>', '<option value="11">Qualifying</option><option value="12">Race 1</option><option value="13">Race 2</option>');
+  await withMockFetch({
+    "https://results.mxgp.com/mxgp/standings.aspx": '<html><iframe src="/reslists.aspx"></iframe></html>',
+    "https://results.mxgp.com/reslists.aspx": shortSessionForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": shortSessionForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=&s=&view=classification": shortSessionForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=&view=classification": shortSessionForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=13&view=classification": mxgpPage("MXGP - Grand Prix Race 2 - Classification", [
+      { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" }
+    ])
+  }, async () => {
+    const result = await fetchOfficialResults({ url: mxgpPortalUrl, series: "MXGP", division: "MXGP", event: "Grand Prix of Argentina", phase: "Moto 2" });
+    assert.equal(result.sessionTitle, "Race 2");
+    assert.equal(result.rows[0].name, "Jeffrey Herlings");
   });
 
   // The portal may use ASP.NET WebForms postbacks. Retain viewstate + the

@@ -584,10 +584,30 @@ function chooseMxgpRoundOption(control, context = {}) {
 function mxgpSessionOptionMatches(text, phase) {
   const label = normalizeHeader(text);
   const requested = normalizeHeader(phase || "");
-  if (requested.includes("qualifyingrace")) return label.includes("qualifyingrace");
-  if (requested.includes("moto1") || requested.includes("grandprixrace1") || requested.includes("race1")) return label.includes("grandprixrace1");
-  if (requested.includes("moto2") || requested.includes("grandprixrace2") || requested.includes("race2")) return label.includes("grandprixrace2");
+  // The results portal has used both descriptive labels ("Grand Prix Race 2")
+  // and shorter labels ("Race 2" / "Moto 2") for the same session. Match the
+  // requested session explicitly so a Race 2 option can never satisfy Moto 1.
+  if (requested.includes("qualifying")) {
+    return label.includes("qualifying") && (label.includes("race") || label === "qualifying");
+  }
+  const wantsMoto1 = requested.includes("moto1") || requested.includes("grandprixrace1") || requested === "race1";
+  const wantsMoto2 = requested.includes("moto2") || requested.includes("grandprixrace2") || requested === "race2";
+  if (wantsMoto1) return label.includes("grandprixrace1") || label === "race1" || label === "moto1";
+  if (wantsMoto2) return label.includes("grandprixrace2") || label === "race2" || label === "moto2";
   return false;
+}
+
+function mxgpResultsFrameUrl(html, pageUrl) {
+  const source = String(html || "");
+  const frames = [...source.matchAll(/<iframe\b([^>]*)>/gi)];
+  for (const match of frames) {
+    const attrs = parseHtmlAttributes(match[1]);
+    const src = attrs.src || attrs["data-src"] || "";
+    if (!src) continue;
+    const candidate = new URL(src, pageUrl);
+    if (candidate.hostname.toLowerCase() === "results.mxgp.com" && /reslists\.aspx/i.test(candidate.pathname)) return candidate;
+  }
+  return null;
 }
 
 async function submitMxgpSelectChoice(page, series, selectedControl, selectedOption, selectedValues = {}, readPage = readOfficialPage) {
@@ -621,7 +641,8 @@ async function submitMxgpSelectChoice(page, series, selectedControl, selectedOpt
 }
 
 async function resolveMxgpOfficialPage(inputUrl, context = {}) {
-  const baseUrl = new URL("https://results.mxgp.com/reslists.aspx");
+  const standingsUrl = new URL("https://results.mxgp.com/mxgp/standings.aspx");
+  const resultsUrl = new URL("https://results.mxgp.com/reslists.aspx");
   // Always start at the official chooser when the supplied URL is a landing
   // page or only a partially filtered reslists URL. The selected event, class
   // and scoring phase are derived from the Commissioner scoring controls.
@@ -643,8 +664,19 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
     previousPage = fetched;
     return fetched;
   };
-  const initialPage = await readMxgpPage(baseUrl, "MXGP");
-  let page = initialPage;
+  // Start from the requested official Standings page. Its iframe contains the
+  // four-filter results application; follow that frame so the importer uses
+  // the same entry point as a browser user. Keep reslists.aspx as a fallback
+  // for direct links and older portal responses without an iframe.
+  const startUrl = inputUrl && /\/mxgp\/standings\.aspx$/i.test(new URL(inputUrl).pathname)
+    ? new URL(inputUrl)
+    : standingsUrl;
+  const landingPage = await readMxgpPage(startUrl, "MXGP");
+  const frameUrl = mxgpResultsFrameUrl(landingPage.body, landingPage.finalUrl.href);
+  let page = frameUrl ? await readMxgpPage(frameUrl, "MXGP") : landingPage;
+  if (!parseMxgpSelectControls(page.body, page.finalUrl.href).some(form => form.controls.length >= 4)) {
+    page = await readMxgpPage(resultsUrl, "MXGP");
+  }
   // Keep filter choices explicitly between requests. Some portal responses do
   // not mark prior <option> values as selected, so relying only on markup can
   // silently reset the championship or round when the next dropdown is posted.
