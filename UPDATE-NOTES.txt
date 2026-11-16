@@ -52,3 +52,11 @@ F1 importer refinements (November 15, 2026)
 - For Sprint scoring, fetches the event's official /sprint-qualifying page and identifies the P1 driver for the existing Fastest Qualifier bonus.
 - Automatically preselects the +3 Fastest Qualifier checkbox when the top qualifier matches a driver row loaded into the race/sprint scoring table.
 - Grand Prix fastest-lap fetching remains unchanged; Sprint scoring does not use the Grand Prix fastest-laps page.
+
+
+Official results importer additions (restored F1 NC / Qualifying baseline):
+- Added dedicated Triple Crown Series archive/event parser for year-specific event pages, CAN 250/CAN 450 class filtering, Moto 1 and Moto 2 result columns.
+- Added strict MXGP/MXON Infront classification checks for class, qualifying and moto selection using the selected official reslists.aspx URL.
+- Added MotoGP official results API resolver behind motogp.com/en/gp-results/ for season/event/category/session lookup, RAC vs SPR classification and Q2 fastest-qualifier matching.
+- Left existing SMX class filtering and F1 NC / Qualifying / Sprint Qualifying behavior intact.
+- Added regression tests in tests/race-results-import-series.test.js and included them in npm run check / npm run test:results.

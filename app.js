@@ -809,11 +809,11 @@ function renderScoreEntryTable(){
 function updateScoreRow(row){if(!row)return;const bonus=[...row.querySelectorAll('[data-bonus]:checked')].reduce((sum,input)=>sum+Number(input.dataset.points||2),0)*Number(row.dataset.multiplier||1),base=Number(row.dataset.basePoints||0);const bp=row.querySelector('.score-bonus-points'),total=row.querySelector('.score-total');if(bp)bp.textContent=String(bonus);if(total)total.textContent=String(base+bonus);row.classList.toggle('score-row-selected',!!row.querySelector('.score-rider-select')?.value)}
 const OFFICIAL_RESULT_SOURCES={
  SMX:{url:"https://www.supermotocross.com/results",help:"Use the official SuperMotocross results archive. Select the scheduled event, 250 or 450 class, and scoring segment first. Pasting this archive link follows the selected event to its exact class/session results; direct class-specific results links also work. A 250 selection imports 250 results only, and a 450 selection imports 450 results only."},
- "Triple Crown Series":{url:"https://triplecrownseries.ca/results/",help:"Open the official Triple Crown Series results archive or its Live Timing page. Paste a direct result table link, or download an official CSV export from the timing provider and upload it here."},
- MXGP:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP result files. If the classification is supplied as PDF or Excel only, export/save it as CSV with Position and Rider columns before uploading; direct PDF/Excel parsing is not enabled yet."},
- MXON:{url:"https://docs.mxgp.com/resultservice/resultfiles.aspx",help:"Open the official MXGP / Motocross of Nations result files. Paste a readable official results-table URL or upload an official CSV classification."},
+ "Triple Crown Series":{url:"https://triplecrownseries.ca/results",help:"Use the official Triple Crown Series results archive. The importer matches the selected scheduled event, year, round and venue, then reads its Full Event Results table. Choose CAN 250 or CAN 450 and Moto 1 or Moto 2; the importer ranks riders from the matching Moto column, not the overall-round position or championship standings."},
+ MXGP:{url:"https://results.mxgp.com/reslists.aspx",help:"Use the official Infront Moto Racing results portal. On the source page, choose the Grand Prix, MXGP or MX2 class, and the exact Qualifying Race / Race 1 / Race 2 classification. Then copy the resulting reslists.aspx URL, including its query string, into this field before fetching. The importer checks the classification heading against your selected class/session."},
+ MXON:{url:"https://results.mxgp.com/reslists.aspx",help:"Use the official Infront Moto Racing results portal. Select the Motocross of Nations event and exact classification (MX2 / MXGP / Open Qualifying Race or Moto 1 / 2 / 3). Copy the resulting reslists.aspx URL, including its query string, into this field before fetching. The importer checks the official classification heading against the selected class/session where the source provides it."},
  F1:{url:"https://www.formula1.com/en/results",help:"Use the official Formula 1 season results archive. Select the scheduled Grand Prix and the Grand Prix or Sprint scoring tab first. Pasting this archive link follows the selected event to its Race Result or Sprint page, then fetches the matching Qualifying or Sprint Qualifying page to identify the fastest qualifier. Grand Prix imports also fetch the official Fastest Laps page. Drivers marked NC are retained in the official displayed order after classified drivers."},
- MotoGP:{url:"https://stats.motogp.com/en/gp-results",help:"Open the official MotoGP Results archive and copy the direct Grand Prix or Sprint classification URL. If the page requires sign-in or blocks automated reading, download an official CSV export and upload it."}
+ MotoGP:{url:"https://www.motogp.com/en/gp-results/",help:"Use the official MotoGP results archive. The importer matches the scheduled Grand Prix by season, round, event name and date, then reads the official MotoGP Race (RAC) or Sprint (SPR) classification according to the selected scoring tab. It also reads Qualifying 2 (Q2) for the fastest-qualifier bonus and imports each rider's best-lap time when supplied."}
 };
 let officialImportRows=[],officialImportMeta=null,officialImportScopeSnapshot=null;
 function officialImportScope(){return JSON.stringify(currentScoringScope())}
@@ -822,12 +822,12 @@ function renderOfficialSourceHelp(){
  const series=$("scoreSeries")?.value||"SMX",source=officialSourceInfo(),link=$("officialResultsSourceLink"),help=$("officialResultsSourceHelp"),urlInput=$("officialResultsUrl");
  if(link){link.href=source.url;link.textContent="Open official results source ↗"}
  if(help)help.textContent=source.help+" CSV columns required: Position and Rider (or Driver); Number, Team and Best Lap are optional.";
- if(urlInput)urlInput.placeholder=series==="F1"?"https://www.formula1.com/en/results or a direct F1 session result link":series==="SMX"?"https://www.supermotocross.com/results or a direct class/session result link":"Paste a direct official results-page URL";
- // Keep the SMX archive prefilled, but don't overwrite a URL the commissioner typed.
+ if(urlInput)urlInput.placeholder=series==="F1"?"https://www.formula1.com/en/results or a direct F1 session result link":series==="SMX"?"https://www.supermotocross.com/results or a direct class/session result link":series==="Triple Crown Series"?"https://triplecrownseries.ca/results or a direct year/event page":series==="MXGP"||series==="MXON"?"https://results.mxgp.com/reslists.aspx?… (copy the filtered result URL)":"https://www.motogp.com/en/gp-results/";
+ // Prefill each series with its official source, without overwriting a URL typed by the commissioner.
  if(urlInput){
   const previousAuto=clean(urlInput.dataset.autoSourceUrl),current=clean(urlInput.value);
   if(!current||current===previousAuto){
-   const next=["SMX","F1"].includes(series)?source.url:"";
+   const next=source.url;
    urlInput.value=next;
    urlInput.dataset.autoSourceUrl=next;
   }
@@ -877,8 +877,9 @@ async function previewOfficialResults(){
    event:clean($("scoreEvent")?.value||scheduled?.name),
    round:clean($("scoreRound")?.value||scheduled?.round),
    eventDate:scheduled?.date||"",
+   eventLocation:clean(scheduled?.location||scheduled?.venue||""),
    eventType:series==="SMX"?currentSmxEventType():series==="F1"?clean(scheduled?.eventType):"",
-   phase:["SMX","F1"].includes(series)?scoringPhase:"",
+   phase:scoringPhase,
    supercrossFormat:series==="SMX"?$("scoreSmxSupercrossFormat")?.value||"Standard":""
   };
   if(file){if(file.size>5*1024*1024)throw new Error("CSV files must be 5 MB or smaller.");body.csv=await file.text();body.csvName=file.name||"Official CSV results"}else body.url=url;
@@ -912,12 +913,10 @@ function applyOfficialResults(){
  const parseLapTime=value=>{const match=String(value||"").trim().match(/^(\d{1,2}:)?\d{1,2}(?:\.\d+)?/);if(!match)return Infinity;const token=match[0],parts=token.split(":").map(Number);if(parts.some(value=>!Number.isFinite(value)))return Infinity;return parts.length===2?parts[0]*60000+parts[1]*1000:parts[0]*1000};
  let fastestLapPreselected=false;
  if(fastestLapBonus){const lapRows=importedRows.filter(row=>row.match?.athlete&&row.match.state==="matched"&&row.bestLap&&Number.isFinite(parseLapTime(row.bestLap))).sort((a,b)=>parseLapTime(a.bestLap)-parseLapTime(b.bestLap));const fastest=lapRows[0];if(fastest&&gridRows.has(fastest.position)){const check=gridRows.get(fastest.position).querySelector(`[data-bonus="${fastestLapBonus[0]}"]`);if(check){check.checked=true;updateScoreRow(gridRows.get(fastest.position));fastestLapPreselected=true}}}
- // Formula 1 publishes Qualifying and Sprint Qualifying classifications separately.
- // Award the existing +3 fastest-qualifier bonus to the driver who topped the
- // matching session, but only on a row already present in this race/sprint grid.
+ // F1 and MotoGP publish separate qualifying classifications. Award the existing +3 fastest-qualifier bonus to the driver who topped the official session, but only on a row already present in this race/sprint grid.
  const fastestQualifierBonus=config.bonuses.find(([key])=>key==="fastestQualifier");
  let fastestQualifierPreselected=false;
- if($("scoreSeries")?.value==="F1"&&officialImportMeta?.fastestQualifier&&fastestQualifierBonus){
+ if(["F1","MotoGP"].includes($("scoreSeries")?.value)&&officialImportMeta?.fastestQualifier&&fastestQualifierBonus){
   const qualifierMatch=matchOfficialResultAthlete(officialImportMeta.fastestQualifier);
   if(qualifierMatch.athlete&&qualifierMatch.state==="matched"){
    const qualifierId=id(qualifierMatch.athlete);

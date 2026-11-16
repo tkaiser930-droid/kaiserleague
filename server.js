@@ -194,7 +194,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const result = await fetchOfficialResults({
       url: body.url, series: body.series, division: body.division, csv: body.csv, csvName: body.csvName,
-      event: body.event, round: body.round, eventDate: body.eventDate, eventType: body.eventType,
+      event: body.event, round: body.round, eventDate: body.eventDate, eventLocation: body.eventLocation, eventType: body.eventType,
       phase: body.phase, supercrossFormat: body.supercrossFormat
     });
     return send(res, 200, result);
