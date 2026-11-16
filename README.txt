@@ -114,3 +114,11 @@ OFFICIAL RACE RESULTS IMPORT
 The Commissioner > Scoring tab supports a preview-first official race-results importer. Paste an official result-table URL or upload an official CSV export. It matches rider names/numbers to the selected series and division, then loads matched finishing positions into the existing scoring grid for review. It never posts scores automatically. CSV files need Position and Rider (or Driver) columns; Number, Team, and Best Lap are optional.
 
 URL fetching is handled by the Node server, so run the site with `npm start` rather than VS Code Live Server. The importer allowlists official domains per series and will refuse unrelated URLs. Some official sites require a sign-in or render their result tables dynamically; for those, download an official CSV export and upload it. Direct PDF and Excel imports are not supported yet. See RESULTS-IMPORT-SETUP.txt for the source-domain list and details.
+
+COMMISSIONER SEASON ARCHIVES (2016–2026)
+- Sign in to Commissioner Dashboard. Directly below the heading, use the season selector to choose Current or a historical year from 2026 through 2016.
+- The selected year controls the Commissioner Athletes, Scoring, Draft, and Schedule tools, including the Yearly Reset. Each historical year is saved independently.
+- A year is initialized the first time it is selected. It starts with a copy of the current athlete catalogue and team identities, but empty fantasy rosters, scores, trades, draft picks/settings, and schedule. Add/edit athletes and populate that season using the same Commissioner forms as the current season.
+- Historical athlete, race-team, manufacturer, roster, scoring, draft, and schedule edits do not change the live Current season or public-facing team pages.
+- Rider profiles show the previous season's average points per round when that year's archive contains matching athlete and scoring records. Athletes match by permanent ID first, then normalized name plus primary series. Multiple race segments at one event count as one round.
+- All archives are stored inside kaiserFantasySeasonArchives, saved in the normal Render/local database, and included in whole-league JSON backups and GitHub backup sync. Use Data & Backup to export a full backup before any bulk archive setup.

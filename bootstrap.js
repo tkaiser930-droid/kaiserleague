@@ -3,7 +3,7 @@
   const KEYS = [
     "kaiserFantasyAthletes", "kaiserFantasyTeams", "kaiserFantasyScores",
     "kaiserFantasyTrades", "kaiserFantasyDraftState", "kaiserFantasyDraftSettings",
-    "kaiserFantasySchedule"
+    "kaiserFantasySchedule", "kaiserFantasySeasonArchives"
   ];
   const TS_PREFIX = "__kf_saved_at__";
   let mode = "browser";
@@ -175,10 +175,16 @@
       mode = "browser";
       setStatus("Browser-only storage is active. To save data inside the project folder, stop Live Server and start this project with npm start.", "warn");
     }
-    const script = document.createElement("script");
-    script.src = "app.js";
-    script.onerror = () => setStatus("Could not load app.js. Make sure this page is opened from the project folder.", "error");
-    document.body.appendChild(script);
+    const seasonHelper = document.createElement("script");
+    seasonHelper.src = "season-archive-store.js";
+    seasonHelper.onload = () => {
+      const script = document.createElement("script");
+      script.src = "app.js";
+      script.onerror = () => setStatus("Could not load app.js. Make sure this page is opened from the project folder.", "error");
+      document.body.appendChild(script);
+    };
+    seasonHelper.onerror = () => setStatus("Could not load season-archive-store.js. Refresh the project files and try again.", "error");
+    document.body.appendChild(seasonHelper);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });

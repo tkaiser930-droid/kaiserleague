@@ -58,3 +58,13 @@ Official result athlete-matching correction (November 15, 2026)
 - When the name matches but the official number differs from the league athlete's number, the row remains matched and can be loaded; the preview clearly flags the official and league numbers for commissioner review.
 - Race number remains a fallback when the official name is missing or does not match an eligible league athlete. Number is only used to disambiguate duplicate exact names and cannot redirect a clear name match to a different athlete.
 - Added regression tests covering name-first matching, number-only fallback, duplicate-name conflicts, all supported series and already-scored protection.
+
+2026-11-16 Commissioner season archive support:
+- Added a commissioner-only season selector directly below the Commissioner Dashboard heading, with Current and historical seasons 2026 through 2016.
+- Each historical year lazily creates an independent archive containing its own athlete catalogue, fantasy team roster copies, score records, trade proposals/notification state, draft picks, draft settings, and event schedule.
+- All Commissioner Tools read and write the selected season: athlete add/edit/delete and team assignment, scoring/results and scoring history, draft order/status/settings, schedule management, and Yearly Reset.
+- Historical athlete/race-team/manufacturer edits update only the selected archived athlete and roster records; they do not change the current live athlete catalogue, race-team assignments, or fantasy rosters.
+- Historical season data is stored under kaiserFantasySeasonArchives, persisted by the Node server and included in Render/GitHub JSON backups and Data & Backup export/restore.
+- Current public pages remain connected to the Current season only; archived rosters and schedules are only accessed through the Commissioner dashboard.
+- Athlete profiles now show the previous season's average points per round alongside current-season average. Average points use total archived score points divided by unique event rounds; multiple motos/segments in one round count as one round.
+- Selecting Current uses the 2026 archive as the previous-season source; selecting a historical year uses the preceding year (2016 has no prior archive in the configured range).

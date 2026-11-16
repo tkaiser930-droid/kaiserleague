@@ -250,7 +250,7 @@ body[data-page="home"] #topUndraftedAthletes {
 .athlete-detail-close{flex:0 0 auto;border:1px solid #5b566b;border-radius:8px;background:#242431;color:#fff;padding:9px 12px;font-weight:800;cursor:pointer}
 .athlete-detail-close:hover{background:#383448}
 .athlete-detail-meta{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0;color:#c4c5d0;font-size:12px}
-.athlete-detail-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0 22px}
+.athlete-detail-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:16px 0 22px}
 .athlete-detail-stats>div{min-width:0;padding:13px 15px;border:1px solid #393b4b;border-radius:10px;background:#1a1d29}
 .athlete-detail-stats strong{display:block;color:var(--gold);font:900 25px 'Barlow Condensed',Impact,sans-serif;font-variant-numeric:tabular-nums}
 .athlete-detail-stats span{display:block;margin-top:2px;color:#b8bac7;font-size:11px;font-weight:700}
@@ -404,3 +404,14 @@ body[data-page="home"] #topUndraftedAthletes {
 .official-import-preview table{min-width:640px}
 .official-import-preview td,.official-import-preview th{padding:7px 9px}
 @media(max-width:680px){.official-import-heading{display:block}.official-import-heading .official-source-link{display:inline-block;margin-top:10px}.official-import-controls{grid-template-columns:1fr}.official-import-panel{padding:12px}}
+
+
+/* Commissioner year archive selector */
+.commissioner-season-panel{display:grid;grid-template-columns:minmax(180px,1fr) minmax(190px,280px);align-items:center;gap:8px 22px;margin:0 0 18px;border-color:rgba(221,184,89,.42);background:linear-gradient(115deg,rgba(142,103,242,.13),rgba(221,184,89,.08));}
+.commissioner-season-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;grid-column:1/-1;}
+.commissioner-season-heading h2{margin:0;font-size:20px;}
+.season-active-pill{display:inline-flex;align-items:center;padding:6px 11px;border:1px solid rgba(221,184,89,.55);border-radius:999px;color:var(--gold);font-size:12px;font-weight:900;white-space:nowrap;}
+.commissioner-season-panel>label{margin:0;}
+.commissioner-season-panel select{border-color:rgba(221,184,89,.7);font-weight:800;}
+.commissioner-season-panel>p{grid-column:1/-1;margin:0;}
+@media(max-width:640px){.commissioner-season-panel{grid-template-columns:1fr}.commissioner-season-heading{align-items:flex-start;flex-direction:column}}

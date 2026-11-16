@@ -18,7 +18,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const KEYS = new Set([
   "kaiserFantasyAthletes", "kaiserFantasyTeams", "kaiserFantasyScores",
   "kaiserFantasyTrades", "kaiserFantasyDraftState", "kaiserFantasyDraftSettings",
-  "kaiserFantasySchedule"
+  "kaiserFantasySchedule", "kaiserFantasySeasonArchives"
 ]);
 let db = { version: 1, state: {}, keyUpdatedAt: {}, savedAt: 0 };
 let writeChain = Promise.resolve();
