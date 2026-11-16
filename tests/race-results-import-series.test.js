@@ -6,6 +6,7 @@ const {
   fetchOfficialResults,
   parseTcsEventResults,
   parseHtml,
+  mxgpSessionOptionMatches,
   hostIsAllowed,
   OFFICIAL_HOSTS_BY_SERIES,
   MOTOGP_API_BASE,
@@ -73,6 +74,10 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.ok(OFFICIAL_HOSTS_BY_SERIES.MotoGP.includes("api.pulselive.motogp.com"));
   assert.equal(hostIsAllowed("resources.motogp.com", "MotoGP"), true, "MotoGP result PDFs are served from the official resources host");
   assert.equal(hostIsAllowed("resources.motogp.pulselive.com", "MotoGP"), true, "current MotoGP resources host is allow-listed");
+  assert.equal(mxgpSessionOptionMatches("Qualifying Race", "Qualifying Race"), true);
+  assert.equal(mxgpSessionOptionMatches("Grand Prix Race 1", "Moto 1"), true);
+  assert.equal(mxgpSessionOptionMatches("Grand Prix Race 2", "Moto 2"), true);
+  assert.equal(mxgpSessionOptionMatches("Grand Prix Race 2", "Moto 1"), false);
   assert.equal(MOTOGP_API_BASE, "https://api.motogp.pulselive.com/motogp/v1");
   assert.equal(MOTOGP_API_BASES[1], "https://api.pulselive.motogp.com/motogp/v1");
   await withMockFetch({
@@ -230,7 +235,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     "a 250-active result table must never be imported as 450");
 
   // MXGP/MX2 official reslists.aspx classification headings are used to enforce both class and session.
-  const mx2Url = "https://results.mxgp.com/reslists.aspx?c=7&ct=1";
+  const mx2Url = "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7";
   const mx2Html = mxgpPage("MX2 - Grand Prix Race 2 - Classification", [
     { pos: 1, number: 99, name: "Farres, Guillem", bestLap: "1:55.113", bike: "Triumph" },
     { pos: 2, number: 26, name: "Everts, Liam", bestLap: "1:56.075", bike: "Husqvarna" }
@@ -247,7 +252,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.throws(() => parseHtml(mx2Html, "MXGP results", { series: "MXGP", division: "MXGP", phase: "Moto 2" }), /selected MXGP.*labelled MX2/i);
   assert.throws(() => parseHtml(mx2Html, "MXGP results", { series: "MXGP", division: "MX2", phase: "Moto 1" }), /not Moto 1/i);
 
-  const mxgpQualUrl = "https://results.mxgp.com/reslists.aspx?c=1&ct=7";
+  const mxgpQualUrl = "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9";
   const mxgpQualHtml = mxgpPage("MXGP - Qualifying Race - Classification", [
     { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
     { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187", bike: "Kawasaki" }
@@ -256,6 +261,112 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   assert.equal(mxgpQual.rows[0].name, "Jeffrey Herlings");
   assert.throws(() => parseHtml(mxgpQualHtml, "MXGP qualifying", { series: "MXGP", division: "MXGP", phase: "Moto 1" }), /not Moto 1/i);
 
+  // The MXGP importer must navigate the official four-filter workflow in
+  // order: championship -> Grand Prix of round -> class -> session. Explicit
+  // selectedValues are carried between requests even if the source HTML omits
+  // selected attributes on previously chosen dropdowns.
+  const mxgpPortalUrl = "https://results.mxgp.com/";
+  const mxgpFilterForm = `<!doctype html><html><body><form action="/reslists.aspx" method="get">
+    <select id="championship" name="ct"><option value="">Select Championship</option><option value="1">FIM Motocross World Championship</option><option value="2">FIM Motocross of Nations</option></select>
+    <select id="round" name="e"><option value="">Select Round</option><option value="4104">Grand Prix of Argentina</option><option value="4105">Grand Prix of Spain</option></select>
+    <select id="class" name="c"><option value="">Select Class</option><option value="9">MXGP</option><option value="7">MX2</option></select>
+    <select id="session" name="s"><option value="">Select Session</option><option value="11">Qualifying Race</option><option value="12">Grand Prix Race 1</option><option value="13">Grand Prix Race 2</option></select>
+    <input type="hidden" name="view" value="classification">
+  </form></body></html>`;
+  const mxgpFilteredResult = mxgpPage("MX2 - Grand Prix Race 2 - Classification", [
+    { pos: 1, number: 99, name: "Farres, Guillem", bestLap: "1:55.113", bike: "Triumph" },
+    { pos: 2, number: 26, name: "Everts, Liam", bestLap: "1:54.912", bike: "Husqvarna" }
+  ]);
+  await withMockFetch({
+    "https://results.mxgp.com/reslists.aspx": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=&s=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=13&view=classification": mxgpFilteredResult
+  }, async calls => {
+    const result = await fetchOfficialResults({
+      url: mxgpPortalUrl, series: "MXGP", division: "MX2", event: "Grand Prix of Argentina",
+      eventLocation: "Villa La Angostura, Argentina", round: 3, eventDate: "2026-04-12", phase: "Moto 2"
+    });
+    assert.equal(result.eventTitle, "Grand Prix of Argentina");
+    assert.equal(result.sessionTitle, "Grand Prix Race 2");
+    assert.deepEqual(result.filterSelections, ["FIM Motocross World Championship", "Grand Prix of Argentina", "MX2", "Grand Prix Race 2"]);
+    assert.equal(result.rows[0].name, "Guillem Farres");
+    assert.equal(result.fastestLap.name, "Liam Everts", "the minimum Bestlaptime in the selected MX2 race is identified for the fastest-lap bonus");
+    assert.deepEqual(calls, [
+      "https://results.mxgp.com/reslists.aspx",
+      "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification",
+      "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=&s=&view=classification",
+      "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=&view=classification",
+      "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=7&s=13&view=classification"
+    ], "the importer submits all four official dropdown selections in the requested order");
+  });
+
+  await withMockFetch({
+    "https://results.mxgp.com/reslists.aspx": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=&c=&s=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=&s=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&e=4104&c=9&s=11&view=classification": mxgpPage("MXGP - Qualifying Race - Classification", [
+      { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
+      { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187" }
+    ])
+  }, async calls => {
+    const result = await fetchOfficialResults({
+      url: mxgpPortalUrl, series: "MXGP", division: "MXGP", event: "Grand Prix of Argentina",
+      eventLocation: "Argentina", round: 3, phase: "Qualifying Race"
+    });
+    assert.equal(result.rows[0].name, "Jeffrey Herlings");
+    assert.equal(result.fastestLap.name, "Jeffrey Herlings");
+    assert.deepEqual(calls.map(url => new URL(url).searchParams.get("s")), [null, "", "", "", "11"]);
+  });
+
+  // The portal may use ASP.NET WebForms postbacks. Retain viewstate + the
+  // ASP.NET session cookie, and submit __EVENTTARGET for each dropdown change.
+  const mxgpWebForms = `<!doctype html><html><body><form action="/reslists.aspx" method="post">
+    <input type="hidden" name="__VIEWSTATE" value="viewstate-v1">
+    <select id="ctl00$filters$championship" name="ctl00$filters$championship" onchange="javascript:__doPostBack('ctl00$filters$championship','')"><option value="">Select Championship</option><option value="1">FIM Motocross World Championship</option></select>
+    <select id="ctl00$filters$round" name="ctl00$filters$round" onchange="javascript:__doPostBack('ctl00$filters$round','')"><option value="">Select Round</option><option value="5101">Grand Prix of France</option></select>
+    <select id="ctl00$filters$class" name="ctl00$filters$class" onchange="javascript:__doPostBack('ctl00$filters$class','')"><option value="">Select Class</option><option value="9">MXGP</option><option value="7">MX2</option></select>
+    <select id="ctl00$filters$session" name="ctl00$filters$session" onchange="javascript:__doPostBack('ctl00$filters$session','')"><option value="">Select Session</option><option value="1">Qualifying Race</option><option value="2">Grand Prix Race 1</option><option value="3">Grand Prix Race 2</option></select>
+  </form></body></html>`;
+  const originalMxgpFetch = global.fetch;
+  const mxgpPostRequests = [];
+  let mxgpInitialRequestDone = false;
+  try {
+    global.fetch = async (input, init = {}) => {
+      const url = new URL(String(input));
+      if (!mxgpInitialRequestDone) {
+        mxgpInitialRequestDone = true;
+        return new Response(mxgpWebForms, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "set-cookie": "ASP.NET_SessionId=mxgp-test-session; path=/; HttpOnly" } });
+      }
+      const body = new URLSearchParams(String(init.body || ""));
+      mxgpPostRequests.push({ method: init.method, url: url.href, body, headers: init.headers });
+      if (body.get("ctl00$filters$session") === "3") {
+        return new Response(mxgpPage("MXGP - Grand Prix Race 2 - Classification", [
+          { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
+          { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187" }
+        ]), { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+      return new Response(mxgpWebForms, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+    };
+    const result = await fetchOfficialResults({
+      url: "https://results.mxgp.com/", series: "MXGP", division: "MXGP", event: "MXGP of France",
+      eventLocation: "Ernee, France", round: 8, phase: "Moto 2"
+    });
+    assert.equal(result.rows[0].name, "Jeffrey Herlings");
+    assert.equal(result.fastestLap.name, "Jeffrey Herlings");
+    assert.equal(mxgpPostRequests.length, 4, "four filter changes are submitted to the official WebForms page");
+    assert.deepEqual(mxgpPostRequests.map(request => request.body.get("__EVENTTARGET")), [
+      "ctl00$filters$championship", "ctl00$filters$round", "ctl00$filters$class", "ctl00$filters$session"
+    ]);
+    assert.ok(mxgpPostRequests.every(request => request.method === "POST" && request.body.get("__VIEWSTATE") === "viewstate-v1"));
+    assert.ok(mxgpPostRequests.every(request => String(request.headers.Cookie || "").includes("ASP.NET_SessionId=mxgp-test-session")), "session cookies are retained across dropdown postbacks");
+  } finally {
+    global.fetch = originalMxgpFetch;
+  }
+
+  // A direct filtered reslists URL remains supported as a manual override.
   // MXON shares the official result system but uses Nation/combined-class event titles.
   const mxonHtml = mxgpPage("Race 2 (MXGP + Open) - Classification", [
     { pos: 1, number: 84, name: "Herlings, Jeffrey" },
@@ -369,5 +480,5 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     console.warn("MotoGP live PDF integration test skipped locally because pdfjs-dist is not installed. The dependency is declared in package.json and is installed by npm install on Render.");
   }
 
-  console.log("TCS / MXGP / MXON / MotoGP importer tests passed: year-specific TCS event selection, strict TCS class and moto filtering, MXGP/MXON class/session validation, rider-number/best-lap parsing, MotoGP RAC/SPR ordering including NC/DNF riders, Q2 fastest-qualifier routing, and session-specific Fast Lap Rider PDF resolution/parsing.");
+  console.log("TCS / MXGP / MXON / MotoGP importer tests passed: year-specific TCS event selection, strict TCS class and moto filtering, MXGP four-dropdown navigation (championship, round, class, session), strict class/session validation, Bestlaptime bonus extraction, MXON class/session validation, rider-number parsing, MotoGP RAC/SPR ordering including NC/DNF riders, Q2 fastest-qualifier routing, and session-specific Fast Lap Rider PDF resolution/parsing.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

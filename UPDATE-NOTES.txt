@@ -99,3 +99,13 @@ MotoGP 403 diagnostics update:
 - An HTTP 403 from the primary API host triggers a short pause and a retry against the alternate published API hostname.
 - HTTP errors include the exact hostname/path, response server/request ID where available, and a short upstream response-body excerpt to distinguish an API-edge 403 from a resource-PDF 403.
 - MotoGP PDF fetch errors likewise include the exact resource host and path, so a remaining access block can be isolated without guessing.
+
+
+2026-11-15 MXGP official dropdown navigation update:
+- Changed the MXGP importer to start from the official `https://results.mxgp.com/` portal and navigate the official filter flow in sequence: Championship = `FIM Motocross World Championship`, Round = scheduled `Grand Prix of …`, Class = `MXGP` / `MX2`, Session = `Qualifying Race` / `Grand Prix Race 1` / `Grand Prix Race 2`.
+- Scheduled GP matching now prioritizes event-title tokens separately from venue/location tokens, so additional venue words do not drown out the GP match.
+- Carries selected dropdown values explicitly between requests even if the returned HTML omits `selected` attributes.
+- Supports both GET query-based filters and ASP.NET WebForms POST / `__doPostBack` filters, preserving hidden viewstate fields, referer headers and session cookies between dropdown changes.
+- Reads `Bestlaptime` from the exact selected classification and identifies the rider with the quickest valid lap for the existing +1 Fastest Lap bonus.
+- Preserves MXON's existing direct filtered `reslists.aspx` workflow and leaves F1, SMX, TCS and MotoGP parsing unchanged.
+- Added regression coverage for each dropdown choice, strict session mapping, fastest-lap selection, event-vs-venue round matching, and both GET and WebForms POST workflows.

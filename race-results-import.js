@@ -350,34 +350,44 @@ async function readLimitedResponse(response) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function fetchApprovedUrl(initialUrl, series) {
+async function fetchApprovedUrl(initialUrl, series, requestOptions = {}) {
   let current = new URL(initialUrl.href);
+  let method = String(requestOptions.method || "GET").toUpperCase();
+  let body = requestOptions.body;
+  const extraHeaders = requestOptions.headers || {};
   for (let hop = 0; hop <= 4; hop++) {
     if (current.protocol !== "https:" || current.username || current.password || (current.port && current.port !== "443") || !hostIsAllowed(current.hostname, series)) {
       throw new Error("The official source redirected outside its approved HTTPS domain list.");
     }
+    const headers = {
+      "User-Agent": series === "MotoGP"
+        ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        : "KaiserFamilyFantasySMXResultsImporter/1.2 (+official-results preview)",
+      "Accept": series === "MotoGP"
+        ? "application/json, text/plain, application/pdf;q=0.9, */*;q=0.8"
+        : "text/html,text/csv,application/json,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.5",
+      ...(series === "MotoGP" ? {
+        "Origin": "https://www.motogp.com",
+        "Referer": "https://www.motogp.com/",
+        "x-origin": "2"
+      } : {}),
+      ...extraHeaders
+    };
     const response = await fetch(current, {
-      method: "GET",
+      method,
+      ...(body !== undefined && method !== "GET" && method !== "HEAD" ? { body } : {}),
       redirect: "manual",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: {
-        "User-Agent": series === "MotoGP"
-          ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-          : "KaiserFamilyFantasySMXResultsImporter/1.2 (+official-results preview)",
-        "Accept": series === "MotoGP"
-          ? "application/json, text/plain, application/pdf;q=0.9, */*;q=0.8"
-          : "text/html,text/csv,application/json,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.5",
-        ...(series === "MotoGP" ? {
-          "Origin": "https://www.motogp.com",
-          "Referer": "https://www.motogp.com/",
-          "x-origin": "2"
-        } : {})
-      }
+      headers
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location");
       if (!location) throw new Error("The official results source returned a redirect without a destination.");
       if (hop === 4) throw new Error("The official source redirected too many times.");
+      if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === "POST")) {
+        method = "GET";
+        body = undefined;
+      }
       current = new URL(location, current);
       continue;
     }
@@ -386,13 +396,16 @@ async function fetchApprovedUrl(initialUrl, series) {
   throw new Error("The official results source could not be reached safely.");
 }
 
-async function readOfficialPage(url, series) {
-  const { response, finalUrl } = await fetchApprovedUrl(url, series);
+async function readOfficialPage(url, series, requestOptions = {}) {
+  const { response, finalUrl } = await fetchApprovedUrl(url, series, requestOptions);
   if (!response.ok) throw new Error(`The official source returned HTTP ${response.status}. Check that the event results are published and the URL is correct.`);
   const contentType = String(response.headers.get("content-type") || "").toLowerCase();
   const body = await readLimitedResponse(response);
   const sourceTitle = (body.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1];
-  return { body, contentType, finalUrl, title: sourceTitle ? stripHtml(sourceTitle) : finalUrl.hostname };
+  const setCookies = typeof response.headers.getSetCookie === "function"
+    ? response.headers.getSetCookie()
+    : [response.headers.get("set-cookie")].filter(Boolean);
+  return { body, contentType, finalUrl, title: sourceTitle ? stripHtml(sourceTitle) : finalUrl.hostname, setCookies };
 }
 
 
@@ -419,6 +432,276 @@ function mxgpDivisionKey(value) {
   if (text.includes("mx2")) return "MX2";
   if (text.includes("mxgp")) return "MXGP";
   return "";
+}
+
+function parseHtmlAttributes(source) {
+  const attrs = {};
+  const text = String(source || "");
+  const regex = /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+  let match;
+  while ((match = regex.exec(text))) {
+    const name = String(match[1] || "").toLowerCase();
+    if (!name) continue;
+    attrs[name] = decodeEntities(match[2] ?? match[3] ?? match[4] ?? "");
+  }
+  return attrs;
+}
+
+function parseMxgpSelectControls(html, baseUrl, selectedValues = {}) {
+  const source = String(html || "");
+  const forms = [...source.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)];
+  const containers = forms.length
+    ? forms.map(match => ({ attrs: parseHtmlAttributes(match[1]), html: match[2] }))
+    : [{ attrs: { method: "get", action: baseUrl }, html: source }];
+  return containers.map((container, formIndex) => {
+    const controls = [];
+    const fields = [];
+    const selectRegex = /<select\b([^>]*)>([\s\S]*?)<\/select>/gi;
+    let selectMatch;
+    while ((selectMatch = selectRegex.exec(container.html))) {
+      const attrs = parseHtmlAttributes(selectMatch[1]);
+      const name = attrs.name || attrs.id || "";
+      if (!name) continue;
+      const options = [];
+      const optionRegex = /<option\b([^>]*)>([\s\S]*?)<\/option>/gi;
+      let optionMatch;
+      while ((optionMatch = optionRegex.exec(selectMatch[2]))) {
+        const optionAttrs = parseHtmlAttributes(optionMatch[1]);
+        const text = stripHtml(optionMatch[2]);
+        const value = optionAttrs.value !== undefined ? optionAttrs.value : text;
+        options.push({ value: String(value), text, selected: Object.prototype.hasOwnProperty.call(optionAttrs, "selected"), disabled: Object.prototype.hasOwnProperty.call(optionAttrs, "disabled") });
+      }
+      const override = Object.prototype.hasOwnProperty.call(selectedValues, name)
+        ? selectedValues[name]
+        : (attrs.id && Object.prototype.hasOwnProperty.call(selectedValues, attrs.id) ? selectedValues[attrs.id] : undefined);
+      const selected = override !== undefined
+        ? options.find(option => option.value === String(override)) || null
+        : options.find(option => option.selected && !option.disabled) || options.find(option => !option.disabled) || null;
+      const control = { name, id: attrs.id || "", attrs, options, selectedValue: selected?.value ?? (override !== undefined ? String(override) : ""), formIndex };
+      controls.push(control);
+      fields.push({ name, value: control.selectedValue, kind: "select", control });
+    }
+
+    const inputRegex = /<input\b([^>]*)>/gi;
+    let inputMatch;
+    while ((inputMatch = inputRegex.exec(container.html))) {
+      const attrs = parseHtmlAttributes(inputMatch[1]);
+      const name = attrs.name || attrs.id || "";
+      const type = String(attrs.type || "text").toLowerCase();
+      if (!name || ["submit", "button", "reset", "image", "file"].includes(type)) continue;
+      if (["checkbox", "radio"].includes(type) && !Object.prototype.hasOwnProperty.call(attrs, "checked")) continue;
+      fields.push({ name, value: attrs.value ?? "", kind: "input" });
+    }
+    const textareaRegex = /<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/gi;
+    let textareaMatch;
+    while ((textareaMatch = textareaRegex.exec(container.html))) {
+      const attrs = parseHtmlAttributes(textareaMatch[1]);
+      const name = attrs.name || attrs.id || "";
+      if (name) fields.push({ name, value: stripHtml(textareaMatch[2]), kind: "textarea" });
+    }
+    const action = new URL(container.attrs.action || baseUrl, baseUrl).href;
+    return { action, method: String(container.attrs.method || "GET").toUpperCase(), attrs: container.attrs, controls, fields, formIndex };
+  });
+}
+
+function mxgpFindSelect(forms, label, optionPredicate) {
+  for (const form of forms) {
+    for (const control of form.controls) {
+      if (control.options.some(option => optionPredicate(option.text))) return { form, control, label };
+    }
+  }
+  const available = forms.flatMap(form => form.controls.flatMap(control => control.options.map(option => option.text).filter(Boolean))).slice(0, 35);
+  throw new Error(`The official MXGP results page did not expose the ${label} dropdown. Available options: ${available.join("; ") || "none"}. Open https://results.mxgp.com/ and check that the results filters have loaded.`);
+}
+
+function mxgpOptionExact(text, expected) {
+  return normalizeHeader(text) === normalizeHeader(expected);
+}
+
+function mxgpRoundTokens(value) {
+  const ignored = new Set(["mxgp", "mx2", "fim", "motocross", "world", "championship", "grand", "prix", "of", "the", "round", "event", "gp"]);
+  return [...new Set((String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().match(/[a-z]+|\d+/g) || []).filter(token => !ignored.has(token)))];
+}
+
+function chooseMxgpRoundOption(control, context = {}) {
+  const candidates = control.options.filter(option => /^grand\s+prix\s+of\b/i.test(option.text));
+  if (!candidates.length) throw new Error("The official MXGP Round dropdown did not contain any options beginning with ‘Grand Prix of’. Make sure the FIM Motocross World Championship selection has loaded.");
+  const eventTokens = mxgpRoundTokens(context.event || "");
+  const locationTokens = mxgpRoundTokens(context.eventLocation || "");
+  const targetTokens = [...new Set([...eventTokens, ...locationTokens])];
+  const requestedRound = Number(context.round || 0);
+  const scored = candidates.map((option, index) => {
+    const tokens = mxgpRoundTokens(option.text);
+    const eventOverlap = eventTokens.filter(token => tokens.includes(token)).length;
+    const locationOverlap = locationTokens.filter(token => tokens.includes(token)).length;
+    const score = (eventTokens.length ? eventOverlap / eventTokens.length : 0) * 3
+      + (locationTokens.length ? locationOverlap / locationTokens.length : 0);
+    const explicitRound = option.text.match(/\b(?:round|rnd)\s*0?(\d+)\b/i);
+    const roundMatch = !!(requestedRound && explicitRound && Number(explicitRound[1]) === requestedRound);
+    const date = isoDate(option.text);
+    const dateMatch = !!(context.eventDate && date && date === String(context.eventDate).slice(0, 10));
+    return { option, index, score, eventOverlap, locationOverlap, roundMatch, dateMatch };
+  });
+  if (requestedRound && scored.some(item => item.roundMatch)) {
+    const roundMatches = scored.filter(item => item.roundMatch);
+    if (roundMatches.length === 1) return roundMatches[0].option;
+    if (targetTokens.length) {
+      const roundBest = Math.max(...roundMatches.map(item => item.score));
+      const best = roundMatches.filter(item => item.score === roundBest && item.score > 0);
+      if (best.length === 1) return best[0].option;
+    }
+  }
+  if (scored.some(item => item.dateMatch)) {
+    const dateMatches = scored.filter(item => item.dateMatch);
+    if (dateMatches.length === 1) return dateMatches[0].option;
+  }
+  // Prefer a unique match from the scheduled event title. Venue text often
+  // contains extra city/track tokens that do not appear in the official GP label.
+  if (eventTokens.length) {
+    const bestOverlap = Math.max(...scored.map(item => item.eventOverlap));
+    const best = scored.filter(item => item.eventOverlap === bestOverlap && bestOverlap > 0);
+    if (best.length === 1) return best[0].option;
+  }
+  if (locationTokens.length) {
+    const bestOverlap = Math.max(...scored.map(item => item.locationOverlap));
+    const best = scored.filter(item => item.locationOverlap === bestOverlap && bestOverlap > 0);
+    if (best.length === 1) return best[0].option;
+  }
+  if (targetTokens.length) {
+    const bestScore = Math.max(...scored.map(item => item.score));
+    const best = scored.filter(item => item.score === bestScore && bestScore > 0);
+    if (best.length === 1) return best[0].option;
+    if (best.length > 1) {
+      const names = best.map(item => item.option.text).join("; ");
+      throw new Error(`More than one official MXGP round could match “${context.event || context.eventLocation || "the scheduled event"}”: ${names}. Check the event name and venue on the Commissioner schedule.`);
+    }
+  }
+  if (candidates.length === 1) return candidates[0];
+  const available = candidates.slice(0, 12).map(option => option.text).join("; ");
+  throw new Error(`Couldn't match the scheduled event “${context.event || ""}”${context.round ? ` (Round ${context.round})` : ""} to the official MXGP Round dropdown. Available rounds include: ${available}. Check the scheduled event name and venue.`);
+}
+
+function mxgpSessionOptionMatches(text, phase) {
+  const label = normalizeHeader(text);
+  const requested = normalizeHeader(phase || "");
+  if (requested.includes("qualifyingrace")) return label.includes("qualifyingrace");
+  if (requested.includes("moto1") || requested.includes("grandprixrace1") || requested.includes("race1")) return label.includes("grandprixrace1");
+  if (requested.includes("moto2") || requested.includes("grandprixrace2") || requested.includes("race2")) return label.includes("grandprixrace2");
+  return false;
+}
+
+async function submitMxgpSelectChoice(page, series, selectedControl, selectedOption, selectedValues = {}, readPage = readOfficialPage) {
+  const { form, control } = selectedControl;
+  if (!control.name) throw new Error(`The official MXGP ${selectedControl.label} dropdown did not expose a form field name.`);
+  const values = new URLSearchParams();
+  let selectedFieldWritten = false;
+  for (const field of form.fields) {
+    if (field.name === control.name) {
+      values.append(field.name, selectedOption.value);
+      selectedFieldWritten = true;
+      continue;
+    }
+    const value = Object.prototype.hasOwnProperty.call(selectedValues, field.name) ? selectedValues[field.name] : field.value;
+    values.append(field.name, value);
+  }
+  if (!selectedFieldWritten) values.append(control.name, selectedOption.value);
+  const changeHandler = String(control.attrs.onchange || "");
+  if (/__doPostBack/i.test(changeHandler)) {
+    values.set("__EVENTTARGET", control.name);
+    if (!values.has("__EVENTARGUMENT")) values.set("__EVENTARGUMENT", "");
+  }
+  const action = new URL(form.action || page.finalUrl.href, page.finalUrl.href);
+  const requestOptions = form.method === "POST"
+    ? { method: "POST", body: values.toString(), headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "Referer": page.finalUrl.href } }
+    : { headers: { "Referer": page.finalUrl.href } };
+  if (form.method !== "POST") {
+    for (const [name, value] of values.entries()) action.searchParams.set(name, value);
+  }
+  return readPage(action, series, requestOptions);
+}
+
+async function resolveMxgpOfficialPage(inputUrl, context = {}) {
+  const baseUrl = new URL("https://results.mxgp.com/reslists.aspx");
+  // Always start at the official chooser when the supplied URL is a landing
+  // page or only a partially filtered reslists URL. The selected event, class
+  // and scoring phase are derived from the Commissioner scoring controls.
+  const cookieJar = new Map();
+  let previousPage = null;
+  const readMxgpPage = async (targetUrl, _series, requestOptions = {}) => {
+    const headers = { ...(requestOptions.headers || {}), Referer: requestOptions.headers?.Referer || previousPage?.finalUrl.href || "https://results.mxgp.com/" };
+    if (cookieJar.size) headers.Cookie = [...cookieJar].map(([name, value]) => `${name}=${value}`).join("; ");
+    const fetched = await readOfficialPage(targetUrl, "MXGP", { ...requestOptions, headers });
+    for (const cookie of fetched.setCookies || []) {
+      const pair = String(cookie).split(";")[0];
+      const equals = pair.indexOf("=");
+      if (equals <= 0) continue;
+      const name = pair.slice(0, equals).trim();
+      const value = pair.slice(equals + 1).trim();
+      if (/max-age=0/i.test(cookie) || /expires=Thu, 01 Jan 1970/i.test(cookie)) cookieJar.delete(name);
+      else cookieJar.set(name, value);
+    }
+    previousPage = fetched;
+    return fetched;
+  };
+  const initialPage = await readMxgpPage(baseUrl, "MXGP");
+  let page = initialPage;
+  // Keep filter choices explicitly between requests. Some portal responses do
+  // not mark prior <option> values as selected, so relying only on markup can
+  // silently reset the championship or round when the next dropdown is posted.
+  const selectedValues = Object.create(null);
+  let forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
+  const selections = [];
+
+  const championship = mxgpFindSelect(forms, "Championship", text => mxgpOptionExact(text, "FIM Motocross World Championship"));
+  const championshipOption = championship.control.options.find(option => mxgpOptionExact(option.text, "FIM Motocross World Championship"));
+  if (!championshipOption) throw new Error("The FIM Motocross World Championship option is not available on the official MXGP source.");
+  page = await submitMxgpSelectChoice(page, "MXGP", championship, championshipOption, selectedValues, readMxgpPage);
+  selectedValues[championship.control.name] = championshipOption.value;
+  if (championship.control.id) selectedValues[championship.control.id] = championshipOption.value;
+  selections.push(championshipOption.text);
+
+  forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
+  const round = mxgpFindSelect(forms, "Round", text => /^grand\s+prix\s+of\b/i.test(text));
+  const roundOption = chooseMxgpRoundOption(round.control, context);
+  page = await submitMxgpSelectChoice(page, "MXGP", round, roundOption, selectedValues, readMxgpPage);
+  selectedValues[round.control.name] = roundOption.value;
+  if (round.control.id) selectedValues[round.control.id] = roundOption.value;
+  selections.push(roundOption.text);
+
+  forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
+  const targetClass = mxgpDivisionKey(context.division);
+  if (!targetClass) throw new Error("Choose MXGP or MX2 in the Commissioner Class / Division field before importing MXGP results.");
+  const classSelection = mxgpFindSelect(forms, "Class", text => mxgpOptionExact(text, targetClass));
+  const classOption = classSelection.control.options.find(option => mxgpOptionExact(option.text, targetClass));
+  page = await submitMxgpSelectChoice(page, "MXGP", classSelection, classOption, selectedValues, readMxgpPage);
+  selectedValues[classSelection.control.name] = classOption.value;
+  if (classSelection.control.id) selectedValues[classSelection.control.id] = classOption.value;
+  selections.push(classOption.text);
+
+  forms = parseMxgpSelectControls(page.body, page.finalUrl.href, selectedValues);
+  const phaseLabel = String(context.phase || "").trim();
+  if (!phaseLabel) throw new Error("Choose Qualifying Race, Moto 1 or Moto 2 in the Commissioner scoring segment before importing MXGP results.");
+  const session = mxgpFindSelect(forms, "Session", text => mxgpSessionOptionMatches(text, phaseLabel));
+  const sessionOption = session.control.options.find(option => mxgpSessionOptionMatches(option.text, phaseLabel));
+  if (!sessionOption) throw new Error(`The official MXGP Session dropdown does not contain ${phaseLabel}.`);
+  page = await submitMxgpSelectChoice(page, "MXGP", session, sessionOption, selectedValues, readMxgpPage);
+  selectedValues[session.control.name] = sessionOption.value;
+  if (session.control.id) selectedValues[session.control.id] = sessionOption.value;
+  selections.push(sessionOption.text);
+
+  const parsed = parseHtml(page.body, page.title, { series: "MXGP", division: targetClass, phase: phaseLabel, url: page.finalUrl.href });
+  parsed.eventTitle = roundOption.text;
+  parsed.sessionTitle = sessionOption.text;
+  parsed.filterSelections = selections;
+  parsed.fastestLap = parsed.rows.filter(row => row.bestLap && /^\d{1,2}:\d{2}\.\d{2,3}$/.test(String(row.bestLap).trim()))
+    .sort((a, b) => parseMxgpLapTime(a.bestLap) - parseMxgpLapTime(b.bestLap))[0] || null;
+  if (parsed.fastestLap) parsed.fastestLap.sourceUrl = page.finalUrl.href;
+  return { page, url: page.finalUrl.href, eventTitle: roundOption.text, sessionTitle: sessionOption.text, selections, parsed };
+}
+
+function parseMxgpLapTime(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2}(?:\.\d{1,3})?)$/);
+  return match ? Number(match[1]) * 60000 + Number(match[2]) * 1000 : Infinity;
 }
 
 function resultYear(context = {}, url = null) {
@@ -1899,9 +2182,11 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
   } else if (series === "Triple Crown Series") {
     resolved = await resolveTcsEventPage(url, context);
   } else if (series === "MXGP" || series === "MXON") {
-    // The official MXGP results root opens the server-rendered classification
-    // chooser. Its selected classification is served from reslists.aspx.
-    if (url.hostname.toLowerCase() === "results.mxgp.com" && ["/", "/mxgp/", "/mxon/", "/mxgp", "/mxon"].includes(url.pathname.toLowerCase())) {
+    if (series === "MXGP") {
+      const isFilteredResult = url.hostname.toLowerCase() === "results.mxgp.com" &&
+        /\/reslists\.aspx$/i.test(url.pathname) && url.searchParams.has("ct") && url.searchParams.has("c") && url.searchParams.has("e");
+      if (!isFilteredResult) resolved = await resolveMxgpOfficialPage(url, context);
+    } else if (url.hostname.toLowerCase() === "results.mxgp.com" && ["/", "/mxgp/", "/mxon/", "/mxgp", "/mxon"].includes(url.pathname.toLowerCase())) {
       url.pathname = "/reslists.aspx";
     }
   }
@@ -1954,6 +2239,11 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
       if (fastestResults.rows[0]) fastestLap = fastestResults.rows[0];
     } catch { /* Race classification remains usable if the optional fastest-lap page is unavailable. */ }
   }
+  if (series === "MXGP") {
+    const lapRows = result.rows.filter(row => row.bestLap && Number.isFinite(parseMxgpLapTime(row.bestLap)));
+    fastestLap = lapRows.sort((a, b) => parseMxgpLapTime(a.bestLap) - parseMxgpLapTime(b.bestLap))[0] || null;
+    if (fastestLap) fastestLap.sourceUrl = fetchedUrl;
+  }
   const outputDivision = series === "Triple Crown Series" ? `CAN ${tcsDivisionKey(division)}` : (divisionKey(division) || (series === "MXGP" || series === "MXON" ? String(division || "") : ""));
   return {
     ...result,
@@ -1962,6 +2252,7 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     division: result.division || outputDivision,
     eventTitle: result.eventTitle || resolved?.eventTitle || "",
     sessionTitle: result.sessionTitle || resolved?.sessionTitle || result.tableHeading || "",
+    filterSelections: resolved?.selections || result.filterSelections || [],
     fastestLap,
     fastestQualifier,
     fastestQualifierSessionTitle,
@@ -1993,6 +2284,11 @@ module.exports = {
   parseTcsEventResults,
   resolveTcsEventPage,
   validateMxgpClassification,
+  parseMxgpSelectControls,
+  chooseMxgpRoundOption,
+  mxgpSessionOptionMatches,
+  resolveMxgpOfficialPage,
+  parseMxgpLapTime,
   motogpClassificationRows,
   collectMotoGPClassificationItems,
   motogpSessionMatches,
