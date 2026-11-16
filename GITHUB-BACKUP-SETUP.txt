@@ -45,6 +45,3 @@ IMPORTANT
 - GitHub save path is controlled by GITHUB_DATA_PATH and defaults to league-data/league-data.json. The repository is preconfigured as tkaiser930-droid/LeagueSave. The service detects the repository's default branch; set GITHUB_BRANCH only if you intentionally want a different branch.
 - If the repository has no commits/branch yet, the first automatic save creates the initial Git tree, commit, and branch. This avoids the common empty-repository failure from the Contents API.
 - If GitHub cannot be reached during startup, the server keeps the Render/local file and logs the error rather than replacing live data with an empty save.
-
-SEASON HISTORY NOTE
-The historical-season archive is stored inside the same complete `league-data.json` database under the protected `kaiserFantasyHistoricalSeasons` key. It is intentionally omitted from the public `/api/state` endpoint but is included in the full GitHub JSON mirror and commissioner backup exports. Keep the configured GitHub repository private so archived rider, team, scoring and event history remains commissioner-only.

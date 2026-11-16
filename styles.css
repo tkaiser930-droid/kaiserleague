@@ -404,10 +404,3 @@ body[data-page="home"] #topUndraftedAthletes {
 .official-import-preview table{min-width:640px}
 .official-import-preview td,.official-import-preview th{padding:7px 9px}
 @media(max-width:680px){.official-import-heading{display:block}.official-import-heading .official-source-link{display:inline-block;margin-top:10px}.official-import-controls{grid-template-columns:1fr}.official-import-panel{padding:12px}}
-
-/* Commissioner historical-season workspace */
-.commissioner-season-workspace{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,2fr);align-items:end;gap:8px 22px;border-color:#8e67f255;background:linear-gradient(135deg,#211a37,#171923)}
-.commissioner-season-workspace label{margin:0}
-.commissioner-season-workspace p{grid-column:1/-1;margin:0;color:var(--muted)}
-.commissioner-season-workspace select{max-width:320px}
-@media(max-width:650px){.commissioner-season-workspace{grid-template-columns:1fr}.commissioner-season-workspace p{grid-column:1}}

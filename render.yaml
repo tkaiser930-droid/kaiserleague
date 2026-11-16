@@ -13,8 +13,6 @@ services:
         value: 0.0.0.0
       - key: DATA_DIR
         value: /var/data
-      - key: COMMISSIONER_PASSWORD
-        sync: false
       - key: GITHUB_TOKEN
         sync: false
       - key: GITHUB_REPOSITORY

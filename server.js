@@ -7,11 +7,6 @@ const { URL } = require("url");
 const { createGithubBackup } = require("./github-backup");
 const { fetchOfficialResults } = require("./race-results-import");
 
-// Node.js 22 can load a local .env file without an extra package. Render uses its
-// dashboard environment variables and does not need a .env file.
-try { if (typeof process.loadEnvFile === "function") process.loadEnvFile(path.join(__dirname, ".env")); }
-catch (error) { if (error.code !== "ENOENT") throw error; }
-
 const ROOT = __dirname;
 const githubBackup = createGithubBackup(ROOT);
 // Render's persistent disk is the live working copy. GitHub stores a second copy
@@ -20,16 +15,11 @@ const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 const DB_FILE = path.join(DATA_DIR, "league-data.json");
 const PORT = Number(process.env.PORT || 10000);
 const HOST = process.env.HOST || "0.0.0.0";
-const HISTORICAL_KEY = "kaiserFantasyHistoricalSeasons";
-const PUBLIC_KEYS = [
+const KEYS = new Set([
   "kaiserFantasyAthletes", "kaiserFantasyTeams", "kaiserFantasyScores",
   "kaiserFantasyTrades", "kaiserFantasyDraftState", "kaiserFantasyDraftSettings",
-  "kaiserFantasySchedule", "kaiserFantasySeasonSettings"
-];
-const KEYS = new Set([...PUBLIC_KEYS, HISTORICAL_KEY]);
-const COMMISSIONER_PASSWORD = process.env.COMMISSIONER_PASSWORD || "TR3#$21a930T";
-const COMMISSIONER_SESSION_MS = 12 * 60 * 60 * 1000;
-const commissionerSessions = new Map();
+  "kaiserFantasySchedule"
+]);
 let db = { version: 1, state: {}, keyUpdatedAt: {}, savedAt: 0 };
 let writeChain = Promise.resolve();
 let githubOperationQueue = Promise.resolve();
@@ -60,34 +50,6 @@ function onlyKnownState(input) {
   const out = {};
   if (!input || typeof input !== "object" || Array.isArray(input)) return out;
   for (const key of KEYS) if (Object.prototype.hasOwnProperty.call(input, key)) out[key] = input[key];
-  return out;
-}
-function onlyPublicState(input) {
-  const out = {};
-  if (!input || typeof input !== "object" || Array.isArray(input)) return out;
-  for (const key of PUBLIC_KEYS) if (Object.prototype.hasOwnProperty.call(input, key)) out[key] = input[key];
-  return out;
-}
-function safeStringEqual(left, right) {
-  const a = Buffer.from(String(left ?? ""), "utf8"), b = Buffer.from(String(right ?? ""), "utf8");
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-function commissionerToken(req) {
-  const header = String(req.headers.authorization || "");
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  const token = match ? match[1].trim() : "";
-  const session = token ? commissionerSessions.get(token) : null;
-  if (!session || session.expiresAt <= Date.now()) {
-    if (token) commissionerSessions.delete(token);
-    return "";
-  }
-  session.expiresAt = Date.now() + COMMISSIONER_SESSION_MS;
-  return token;
-}
-function requireCommissioner(req) { return !!commissionerToken(req); }
-function publicKeyTimestamps(input) {
-  const out = {};
-  for (const key of PUBLIC_KEYS) if (Object.prototype.hasOwnProperty.call(input || {}, key)) out[key] = input[key];
   return out;
 }
 function formatVancouverDateTime(value) {
@@ -123,9 +85,7 @@ function fileHash(contents) {
   return crypto.createHash("sha256").update(contents).digest("hex");
 }
 function queueSave({ syncGithub = true, preserveSavedAt = false } = {}) {
-  // Keep the queue usable after a transient filesystem failure. The individual
-  // caller still receives the rejection, but later Data & Backup retries can run.
-  const job = writeChain.catch(() => {}).then(async () => {
+  writeChain = writeChain.then(async () => {
     await fs.promises.mkdir(DATA_DIR, { recursive: true });
     if (!preserveSavedAt) db.savedAt = Math.max(Date.now(), timestampMs(db.savedAt) + 1);
     const contents = JSON.stringify(db, null, 2);
@@ -135,8 +95,7 @@ function queueSave({ syncGithub = true, preserveSavedAt = false } = {}) {
     lastDbFileHash = fileHash(contents);
     if (syncGithub) scheduleAutomaticGithubSave();
   });
-  writeChain = job.catch(() => {});
-  return job;
+  return writeChain;
 }
 function scheduleAutomaticGithubSave() {
   if (!githubBackup.isAutoEnabled()) return;
@@ -225,109 +184,12 @@ async function readBody(req) {
   const chunks = []; let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 64 * 1024 * 1024) throw new Error("Request is too large (64 MB limit).");
+    if (size > 15 * 1024 * 1024) throw new Error("Request is too large (15 MB limit).");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 async function handleApi(req, res, url) {
-  if (url.pathname === "/api/commissioner/login" && req.method === "POST") {
-    const body = await readBody(req);
-    if (!safeStringEqual(body.password, COMMISSIONER_PASSWORD)) return send(res, 401, { error: "Incorrect commissioner password." });
-    const token = crypto.randomBytes(32).toString("hex");
-    commissionerSessions.set(token, { createdAt: Date.now(), expiresAt: Date.now() + COMMISSIONER_SESSION_MS });
-    return send(res, 200, { ok: true, token, expiresAt: Date.now() + COMMISSIONER_SESSION_MS });
-  }
-  if (url.pathname === "/api/historical/archive" && req.method === "POST") {
-    if (!requireCommissioner(req)) return send(res, 401, { error: "Commissioner session expired. Sign in again to archive a season." });
-    const body = await readBody(req);
-    const year = Number(body.year);
-    const nextYear = year + 1;
-    if (!Number.isInteger(year) || year < 2010 || year > 2098) return send(res, 400, { error: "The archive year must be between 2010 and 2098." });
-    const currentYear = Number(db.state.kaiserFantasySeasonSettings?.currentYear || 0);
-    if (currentYear !== year) return send(res, 409, { error: `The saved current season is ${currentYear || "not configured"}, not ${year}. Refresh the Commissioner page before archiving.` });
-    const history = body.history;
-    const record = history?.seasons?.[String(year)];
-    if (!history || typeof history !== "object" || Array.isArray(history) || !history.seasons || typeof history.seasons !== "object" || !record?.archived || record.status !== "archived" || !record.state || typeof record.state !== "object") {
-      return send(res, 400, { error: "The historical snapshot is incomplete or is not marked as archived." });
-    }
-    const nextState = onlyPublicState(body.nextState);
-    const missing = PUBLIC_KEYS.filter(key => !Object.prototype.hasOwnProperty.call(nextState, key));
-    if (missing.length) return send(res, 400, { error: `The next-season state is missing required data categories: ${missing.join(", ")}.` });
-    if (Number(nextState.kaiserFantasySeasonSettings?.currentYear) !== nextYear) return send(res, 400, { error: `The next-season state must set currentYear to ${nextYear}.` });
-    if (!Array.isArray(nextState.kaiserFantasyScores) || nextState.kaiserFantasyScores.length !== 0 || !Array.isArray(nextState.kaiserFantasyTrades) || nextState.kaiserFantasyTrades.length !== 0 || !Array.isArray(nextState.kaiserFantasySchedule) || nextState.kaiserFantasySchedule.length !== 0) {
-      return send(res, 400, { error: "The next season must begin with empty scoring, trades and schedule data." });
-    }
-    if (!Array.isArray(nextState.kaiserFantasyTeams) || nextState.kaiserFantasyTeams.some(team => Array.isArray(team.roster) && team.roster.length > 0)) {
-      return send(res, 400, { error: "The next season must begin with empty team rosters." });
-    }
-    if (!nextState.kaiserFantasyDraftState || !Array.isArray(nextState.kaiserFantasyDraftState.picks) || nextState.kaiserFantasyDraftState.picks.length !== 0 || !nextState.kaiserFantasyDraftSettings || Object.keys(nextState.kaiserFantasyDraftSettings).length !== 0) {
-      return send(res, 400, { error: "The next season must begin with empty draft picks and draft settings." });
-    }
-    const timestamp = Date.now();
-    db.state = { ...nextState, [HISTORICAL_KEY]: history };
-    for (const key of PUBLIC_KEYS) db.keyUpdatedAt[key] = timestamp;
-    db.keyUpdatedAt[HISTORICAL_KEY] = timestamp;
-    await queueSave();
-    return send(res, 200, { ok: true, archivedYear: year, currentYear: nextYear, savedAt: db.savedAt });
-  }
-  const historicalSeasonMatch = url.pathname.match(/^\/api\/historical\/season\/(\d{4})$/);
-  if (historicalSeasonMatch) {
-    if (!requireCommissioner(req)) return send(res, 401, { error: "Commissioner session expired. Sign in again to edit previous seasons." });
-    const year = Number(historicalSeasonMatch[1]);
-    if (!Number.isInteger(year) || year < 2010 || year > 2099) return send(res, 400, { error: "Historical seasons must be between 2010 and 2099." });
-    if (req.method === "PUT") {
-      const body = await readBody(req);
-      const record = body.record;
-      if (!record || typeof record !== "object" || Array.isArray(record) || !record.state || typeof record.state !== "object" || Array.isArray(record.state)) {
-        return send(res, 400, { error: `The ${year} season record must contain a state object.` });
-      }
-      if (Number(record.year || year) !== year) return send(res, 400, { error: `The season record year does not match ${year}.` });
-      const history = db.state[HISTORICAL_KEY] && typeof db.state[HISTORICAL_KEY] === "object" && !Array.isArray(db.state[HISTORICAL_KEY])
-        ? db.state[HISTORICAL_KEY] : { version: 1, seasons: {} };
-      history.seasons = history.seasons && typeof history.seasons === "object" && !Array.isArray(history.seasons) ? history.seasons : {};
-      history.seasons[String(year)] = { ...record, year };
-      history.version = 1;
-      db.state[HISTORICAL_KEY] = history;
-      db.keyUpdatedAt[HISTORICAL_KEY] = Date.now();
-      await queueSave();
-      return send(res, 200, { ok: true, year, savedAt: db.savedAt });
-    }
-    if (req.method === "DELETE") {
-      const history = db.state[HISTORICAL_KEY];
-      if (history?.seasons && Object.prototype.hasOwnProperty.call(history.seasons, String(year))) {
-        delete history.seasons[String(year)];
-        db.keyUpdatedAt[HISTORICAL_KEY] = Date.now();
-        await queueSave();
-      }
-      return send(res, 200, { ok: true, year, savedAt: db.savedAt });
-    }
-    return send(res, 405, { error: "Method not allowed for historical season records." });
-  }
-  if (url.pathname === "/api/historical") {
-    if (!requireCommissioner(req)) return send(res, 401, { error: "Commissioner session expired. Sign in again to access previous seasons." });
-    if (req.method === "GET") {
-      await writeChain;
-      return send(res, 200, { value: db.state[HISTORICAL_KEY] || { version: 1, seasons: {} }, updatedAt: db.keyUpdatedAt[HISTORICAL_KEY] || 0 });
-    }
-    if (req.method === "PUT") {
-      const body = await readBody(req);
-      const value = body.value;
-      if (!value || typeof value !== "object" || Array.isArray(value) || !value.seasons || typeof value.seasons !== "object" || Array.isArray(value.seasons)) {
-        return send(res, 400, { error: "Historical season data must contain a seasons object." });
-      }
-      db.state[HISTORICAL_KEY] = value;
-      db.keyUpdatedAt[HISTORICAL_KEY] = Date.now();
-      await queueSave();
-      return send(res, 200, { ok: true, savedAt: db.savedAt });
-    }
-    if (req.method === "DELETE") {
-      delete db.state[HISTORICAL_KEY];
-      db.keyUpdatedAt[HISTORICAL_KEY] = Date.now();
-      await queueSave();
-      return send(res, 200, { ok: true, savedAt: db.savedAt });
-    }
-  }
   if (url.pathname === "/api/results/preview" && req.method === "POST") {
     const body = await readBody(req);
     const result = await fetchOfficialResults({
@@ -368,38 +230,30 @@ async function handleApi(req, res, url) {
   if (url.pathname === "/api/state" && req.method === "GET") {
     await writeChain;
     return send(res, 200, {
-      version: db.version, state: onlyPublicState(db.state), keyUpdatedAt: publicKeyTimestamps(db.keyUpdatedAt), savedAt: db.savedAt,
+      version: db.version, state: db.state, keyUpdatedAt: db.keyUpdatedAt, savedAt: db.savedAt,
       storageMode: DATA_DIR === "/var/data" ? "render" : "local",
       storageLabel: DATA_DIR === "/var/data" ? "Render persistent disk (/var/data/league-data.json)" : (DATA_DIR === path.join(ROOT, "data") ? "project file data/league-data.json" : `server directory ${DATA_DIR}/league-data.json`)
     });
   }
   if (url.pathname === "/api/state" && req.method === "PUT") {
     const body = await readBody(req);
-    const incoming = onlyPublicState(body.state);
+    const incoming = onlyKnownState(body.state);
     const stamp = Number(body.updatedAt) || Date.now();
-    const privateHistory = db.state[HISTORICAL_KEY];
-    const privateHistoryStamp = db.keyUpdatedAt[HISTORICAL_KEY];
     db = { version: 1, state: incoming, keyUpdatedAt: {}, savedAt: stamp };
-    if (privateHistory !== undefined) db.state[HISTORICAL_KEY] = privateHistory;
-    for (const key of PUBLIC_KEYS) db.keyUpdatedAt[key] = stamp;
-    if (privateHistoryStamp !== undefined) db.keyUpdatedAt[HISTORICAL_KEY] = privateHistoryStamp;
+    for (const key of KEYS) db.keyUpdatedAt[key] = stamp;
     await queueSave();
     return send(res, 200, { ok: true, keysSaved: Object.keys(incoming).length, savedAt: db.savedAt });
   }
   if (url.pathname === "/api/state" && req.method === "DELETE") {
     const clearedAt = Date.now();
-    const privateHistory = db.state[HISTORICAL_KEY];
-    const historyStamp = db.keyUpdatedAt[HISTORICAL_KEY];
-    db = { version: 1, state: {}, keyUpdatedAt: Object.fromEntries(PUBLIC_KEYS.map(key => [key, clearedAt])), savedAt: clearedAt };
-    if (privateHistory !== undefined) db.state[HISTORICAL_KEY] = privateHistory;
-    if (historyStamp !== undefined) db.keyUpdatedAt[HISTORICAL_KEY] = historyStamp;
+    db = { version: 1, state: {}, keyUpdatedAt: Object.fromEntries([...KEYS].map(key => [key, clearedAt])), savedAt: clearedAt };
     await queueSave();
     return send(res, 200, { ok: true, savedAt: db.savedAt });
   }
   const match = url.pathname.match(/^\/api\/state\/([^/]+)$/);
   if (match && req.method === "PUT") {
     const key = decodeURIComponent(match[1]);
-    if (!PUBLIC_KEYS.includes(key)) return send(res, 400, { error: "Unknown or protected data category." });
+    if (!KEYS.has(key)) return send(res, 400, { error: "Unknown data category." });
     const body = await readBody(req);
     const stamp = Number(body.updatedAt) || Date.now();
     const current = Number(db.keyUpdatedAt[key] || 0);
@@ -419,18 +273,14 @@ async function serve(req, res) {
   }
   if (url.pathname.startsWith("/api/")) {
     try { return await handleApi(req, res, url); }
-    catch (err) {
-      console.error("API error:", err);
-      const status = err?.code && ["EACCES", "EPERM", "EROFS", "ENOSPC", "EISDIR", "ENOTDIR", "EMFILE", "ENFILE"].includes(err.code) ? 500 : 400;
-      return send(res, status, { error: err.message || "Request failed.", code: err.code || "" });
-    }
+    catch (err) { console.error("API error:", err); return send(res, 400, { error: err.message || "Request failed." }); }
   }
   let pathname;
   try { pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, "Bad URL", "text/plain; charset=utf-8"); }
   if (pathname === "/") pathname = "/index.html";
   // Keep persistent league data, Git metadata, dependencies, and server secrets private.
   const pathParts = pathname.split("/").filter(Boolean);
-  if (pathParts.some(part => part === "data" || part === ".git" || part === "node_modules" || part === "server.js" || part === "github-backup.js" || part === ".env" || (part.startsWith(".env.") && part !== ".env.example"))) {
+  if (pathParts.some(part => part === "data" || part === ".git" || part === "node_modules" || part === ".env" || (part.startsWith(".env.") && part !== ".env.example"))) {
     return send(res, 404, "Not found", "text/plain; charset=utf-8");
   }
   const file = path.resolve(ROOT, "." + pathname);

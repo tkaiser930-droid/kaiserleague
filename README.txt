@@ -56,14 +56,8 @@ LOCAL DEVELOPMENT
 - Open http://127.0.0.1:5500/.
 - The local database is stored under data/league-data.json.
 
-DATA SAFETY AND SEASON HISTORY
-- Existing league data is not reset by this package. The original Node.js save remains in `data/league-data.json` locally or `/var/data/league-data.json` on Render; the GitHub mirror continues to store the same complete JSON database.
-- The new `kaiserFantasySeasonSettings` key records the active season year. The private `kaiserFantasyHistoricalSeasons` key is stored inside the same database file and is excluded from the public `/api/state` response.
-- Historical seasons are available in Commissioner > Historical Results from 2010 onward. Each year has its own riders, teams, results, scoring, draft and schedule state. The public site reads the active season only. Historical data requires a server-authenticated Commissioner session.
-- Archiving is one server-side database transaction: the current year's full snapshot is retained privately, the next year becomes active, and that year's scores, trades, draft, rosters and schedule start empty. Rider directory data and team identity/passwords are carried forward. Points are never carried forward.
-- Average points per round is calculated separately for each rider, series and class. Multiple scoring segments at the same scheduled event count as one round.
-- Use the Commissioner season tools to copy rider records or a schedule into another year. Copied rider numbers, race teams and other metadata are season-specific; copied schedule dates move to the destination year and event IDs are regenerated to keep each season's results separate.
-- The new archive is saved in the existing `league-data.json`, not a second database. Render's attached persistent disk and the automatic GitHub JSON backup continue to cover it. Keep the GitHub backup repository private because the full backup includes commissioner-only historical records.
+DATA SAFETY
+- Existing league data is not reset by this package.
 - Startup migration maps old class names to their retained parent where appropriate, archives WMX-only and SMX Next-only riders instead of deleting athlete records, removes archived riders from active rosters, and retains historic scores.
 - Download a league backup from Data & Backup before deploying any update.
 
@@ -72,15 +66,10 @@ BACKGROUND AND BRANDING
 - Manufacturer logos and colors from the GASGAS-logo version remain. Later sponsor-only badge entries have been removed as part of this rollback.
 
 SECURITY
-- Historical records use a server-authenticated Commissioner session and a protected API. Public state reads and writes cannot read or overwrite the private historical key. Single-year workspace changes are saved through a dedicated per-season API route to avoid resending the full archive with every year switch; the archive remains inside the same `league-data.json` database.
-- Set `COMMISSIONER_PASSWORD` as a secret environment variable in Render. For local Node.js use, copy `.env.example` to `.env`, enter a unique password, and run `npm start`; Node 22 loads that file automatically. The legacy password remains as a compatibility fallback if the variable is not set; configure a unique password before exposing the service publicly.
-- Keep the configured GitHub backup repository private: the mirrored database includes the private archive even though the website's public API does not expose it.
+The existing login and data API were originally designed for a private family league prototype. Server-side role authorization should be added before allowing untrusted public users to modify league data.
 
 COMMISSIONER DASHBOARD NAVIGATION
-- The Commissioner page is organized into Athletes, Scoring, Draft, Schedule, Historical Results, and Data & Backup tabs.
-- The year selector changes the complete data workspace used by the Athletes, Scoring, Draft, and Schedule tabs. Historical workspaces are saved separately from the active season.
-- Historical Results shows rider totals, rounds and average points by series/class, plus event/session scoring records. All years from 2010 are selectable; empty years are created as isolated workspaces.
-- Copy Between Seasons can copy the rider directory or schedule from another season. Schedule dates shift to the destination year. Archive Current Season & Start Next Year creates a protected snapshot and resets the next season without deleting the old results.
+- The Commissioner page is organized into Athletes, Scoring, Draft, and Schedule tabs.
 - Athletes contains Add Athlete, Edit Rider, and All Athletes.
 - Scoring contains Score Race Results, Previously Scored Events, and Scoring History.
 - Draft contains Draft Management.
