@@ -398,20 +398,14 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     "a 250-active result table must never be imported as 450");
 
   // MXGP/MX2 official reslists.aspx classification headings are used to enforce both class and session.
-  const mx2Url = "https://results.mxgp.com/reslists.aspx?ct=1&c=7&e=4104&type=13";
   const mx2Html = mxgpPage("MX2 - Grand Prix Race 2 - Classification", [
     { pos: 1, number: 99, name: "Farres, Guillem", bestLap: "1:55.113", bike: "Triumph" },
     { pos: 2, number: 26, name: "Everts, Liam", bestLap: "1:56.075", bike: "Husqvarna" }
   ]);
-  const mx2Result = await withMockFetch({ [mx2Url]: mx2Html }, async calls => {
-    const result = await fetchOfficialResults({ url: mx2Url, series: "MXGP", division: "MX2", event: "Grand Prix", phase: "Moto 2" });
-    assert.deepEqual(calls, [mx2Url]);
-    return result;
-  });
+  const mx2Result = parseHtml(mx2Html, "MXGP results", { series: "MXGP", division: "MX2", phase: "Moto 2" });
   assert.equal(mx2Result.rows[0].name, "Guillem Farres", "MXGP comma-form names normalize to first-name last-name");
   assert.equal(mx2Result.rows[0].number, "99");
   assert.equal(mx2Result.rows[0].bestLap, "1:55.113");
-  assert.equal(mx2Result.division, "MX2");
   // The live Infront page can render the session caption in a DIV rather than
   // an H2/H3; session verification must still read that actual page caption.
   const mxgpDivHeadingHtml = mx2Html.replace("<h2>MX2 - Grand Prix Race 2 - Classification</h2>", "<div class=\"session-title\">MX2 - Grand Prix Race 2 - Classification</div>");
@@ -433,7 +427,10 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
   // order: championship -> class -> Grand Prix of round -> session. Explicit
   // selectedValues are carried between requests even if the source HTML omits
   // selected attributes on previously chosen dropdowns.
-  const mxgpPortalUrl = "https://results.mxgp.com/";
+  // Deliberately supply the stale URL from the reported failure. For MXGP,
+  // this query must never be fetched as-is: the importer must revisit the
+  // Standings page and select the current event/class/session from context.
+  const mxgpPortalUrl = "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4113&type=351&y=2026";
   const mxgpFilterForm = `<!doctype html><html><body><form action="/reslists.aspx" method="get">
     <select id="championship" name="ct"><option value="">Select Championship</option><option value="1">FIM Motocross World Championship</option><option value="2">FIM Motocross of Nations</option></select>
     <select id="class" name="c"><option value="">Select Class</option><option value="9">MXGP</option><option value="7">MX2</option></select>
@@ -463,6 +460,7 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     assert.deepEqual(result.filterSelections, ["FIM Motocross World Championship", "MX2", "Grand Prix of Argentina", "Grand Prix Race 2"]);
     assert.equal(result.rows[0].name, "Guillem Farres");
     assert.equal(result.fastestLap.name, "Liam Everts", "the minimum Bestlaptime in the selected MX2 race is identified for the fastest-lap bonus");
+    assert.equal(calls.includes(mxgpPortalUrl), false, "the stale filtered URL is never fetched directly");
     assert.deepEqual(calls, [
       "https://results.mxgp.com/mxgp/standings.aspx",
       "https://results.mxgp.com/reslists.aspx",
@@ -497,6 +495,34 @@ function json(body) { return { body: JSON.stringify(body), type: "application/js
     assert.equal(result.fastestLap.name, "Jeffrey Herlings");
     assert.ok(calls.every(url => !new URL(url).searchParams.has("s")), "the old unrecognized `s` session parameter is never sent");
     assert.equal(new URL(calls.at(-1)).searchParams.get("type"), "11");
+  });
+
+  // A stale Motocross of Nations classification URL must also be ignored
+  // when the requested session is Moto 1. The importer must select the GP
+  // event and the official Grand Prix Race 1 option from the filters.
+  const mxgpMoto1StaleUrl = "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4113&type=351&y=2026";
+  const mxgpMoto1Html = mxgpPage("MXGP - Grand Prix Race 1 - Classification", [
+    { pos: 1, number: 84, name: "Herlings, Jeffrey", bestLap: "1:43.111" },
+    { pos: 2, number: 1, name: "Febvre, Romain", bestLap: "1:43.187" }
+  ]);
+  await withMockFetch({
+    "https://results.mxgp.com/mxgp/standings.aspx": '<html><iframe src="/reslists.aspx"></iframe></html>',
+    "https://results.mxgp.com/reslists.aspx": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=&e=&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=&view=classification": mxgpFilterForm,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=12&view=classification": mxgpMoto1Html,
+    "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=12": mxgpMoto1Html
+  }, async calls => {
+    const result = await fetchOfficialResults({
+      url: mxgpMoto1StaleUrl, series: "MXGP", division: "MXGP", event: "Grand Prix of Argentina",
+      eventLocation: "Argentina", round: 3, phase: "Moto 1"
+    });
+    assert.equal(result.sessionTitle, "Grand Prix Race 1");
+    assert.equal(result.rows[0].name, "Jeffrey Herlings");
+    assert.equal(new URL(result.fetchedUrl).searchParams.get("type"), "12");
+    assert.equal(calls.includes(mxgpMoto1StaleUrl), false, "the stale Race 3 URL is never fetched for Moto 1");
+    assert.equal(calls.at(-1), "https://results.mxgp.com/reslists.aspx?ct=1&c=9&e=4104&type=12");
   });
 
   // Short-form portal session labels must resolve to the requested race,

@@ -356,7 +356,7 @@ function parseHtml(html, sourceTitle = "Official race results", options = {}) {
   }
   if (/\b(position|pos)\b.{0,80}\b(rider|driver|name)\b/i.test(source) && source.includes(",")) return parseCsv(source, sourceTitle, options);
   if (options.series === "MXGP") {
-    throw new Error(`The official MXGP response did not contain a readable classification table for the selected ${options.division || "class"} ${options.phase || "session"}. ${mxgpSourceDetails(options.url)} Try the same session's direct result link or upload the official CSV export.`);
+    throw new Error(`The official MXGP page returned no readable classification table after the importer selected ${options.division || "class"} ${options.phase || "session"}. ${mxgpSourceDetails(options.url)} The selected event, class, and session filters were requested automatically; the source did not return a readable result table.`);
   }
   throw new Error("The official page did not expose a readable results table. Try its direct session-results link or upload the official CSV export.");
 }
@@ -2464,9 +2464,13 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     resolved = await resolveTcsEventPage(url, context);
   } else if (series === "MXGP" || series === "MXON") {
     if (series === "MXGP") {
-      const isFilteredResult = url.hostname.toLowerCase() === "results.mxgp.com" &&
-        /\/reslists\.aspx$/i.test(url.pathname) && url.searchParams.has("ct") && url.searchParams.has("c") && url.searchParams.has("e") && url.searchParams.has("type");
-      if (!isFilteredResult) resolved = await resolveMxgpOfficialPage(url, context);
+      // Always drive the official filters from the Standings entry point.
+      // A previously filtered reslists.aspx URL can contain stale event and
+      // classification IDs (for example a Motocross of Nations Race 3) and
+      // must never bypass the current Commissioner selections. The resolver
+      // intentionally ignores those query parameters, reselects Championship
+      // -> Class -> Grand Prix round -> Session, and then fetches that result.
+      resolved = await resolveMxgpOfficialPage(url, context);
     } else if (url.hostname.toLowerCase() === "results.mxgp.com" && ["/", "/mxgp/", "/mxon/", "/mxgp", "/mxon"].includes(url.pathname.toLowerCase())) {
       url.pathname = "/reslists.aspx";
     }

@@ -122,3 +122,10 @@ MotoGP 403 diagnostics update:
 - Direct filtered MXGP URLs are only treated as complete when `ct`, `c`, `e`, and `type` are present, preventing a default session page from bypassing the chooser.
 - Classification caption extraction now supports the session heading in ordinary page containers as well as H1-H6 elements. MXGP import errors include the final source URL and selected official filter values for troubleshooting.
 - Replaced the old `s`-based tests with `type`-based coverage, including final direct-session fetches and div-rendered session headings.
+
+
+2026-11-16 MXGP stale filtered-link bypass fix:
+- MXGP imports now always restart from https://results.mxgp.com/mxgp/standings.aspx, even when the supplied source field contains a previously filtered reslists.aspx URL.
+- Previously saved ct/c/e/type values are ignored for MXGP so an old event/session (including Motocross of Nations Race 3) cannot bypass current Commissioner selections.
+- The importer always reselects Championship -> Class -> Grand Prix round -> Session, then fetches and validates that exact classification.
+- Regression tests now use the reported stale URL ct=1&c=9&e=4113&type=351&y=2026 and assert it is never fetched directly.
