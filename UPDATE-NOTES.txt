@@ -68,3 +68,20 @@ Official result athlete-matching correction (November 15, 2026)
 - Current public pages remain connected to the Current season only; archived rosters and schedules are only accessed through the Commissioner dashboard.
 - Athlete profiles now show the previous season's average points per round alongside current-season average. Average points use total archived score points divided by unique event rounds; multiple motos/segments in one round count as one round.
 - Selecting Current uses the 2026 archive as the previous-season source; selecting a historical year uses the preceding year (2016 has no prior archive in the configured range).
+
+2026-11-16 Commissioner Start Next Season workflow:
+- Added a commissioner-only Start Next Season button to the season selector panel. It is shown only while Current is selected.
+- The action archives the complete live season under its current year before incrementing the stored current season year (for example, Current 2026 becomes Current 2027).
+- The archived snapshot preserves athlete records, team identities and rosters, all scoring input/results, trade proposals and notification state, draft picks/settings, and the event schedule.
+- The new Current season carries forward the athlete catalogue, fantasy team identities/owners/passwords, configured draft order, and the existing built-in scoring rules. It starts with empty team rosters, score history, trades, draft picks, and schedule so the new season can be set up cleanly.
+- Every rollover advances from the persisted year metadata. Commissioner historical-year options advance to include the newly completed season, and the current-year athlete average uses the immediately previous year's archived scoring data.
+- Rollover saves the new live state and archive in one database replacement using the existing persistent Render/local storage and backup system.
+
+
+2026-11-16 Render + GitHub dual-save clarification:
+- The primary server database remains Render's attached persistent disk at /var/data/league-data.json when served from Render. The configured GitHub repository tkaiser930-droid/LeagueSave stores a timestamped mirror at league-data/league-data.json.
+- Added safe GitHub configuration metadata to the /api/state response (repository/path/auto-backup state only; no secrets are exposed).
+- The site-wide storage banner now clearly distinguishes Render-hosted, local Node.js, and browser-only modes. It warns that VS Code Live Server does not save to Render or GitHub.
+- Automatic GitHub backup remains queued after normal primary-database writes. Data & Backup now provides a dual-save action that waits for the active primary write and an explicit GitHub mirror confirmation before reporting success.
+- The explicit dual-save action reports partial success honestly: if the primary save succeeded but the GitHub write failed, it says so and displays the GitHub error rather than claiming both destinations were saved.
+- Local .env settings are loaded by the existing GitHub backup module. On Render, secrets remain environment variables and are not stored in project files.

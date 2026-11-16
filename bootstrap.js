@@ -11,6 +11,8 @@
   let lastError = null;
   let statusNode = null;
   let storageLabel = "project file data/league-data.json";
+  let serverMode = "";
+  let githubBackup = null;
   const parseLocal = key => {
     try { const value = localStorage.getItem(key); return value === null ? null : JSON.parse(value); }
     catch { return null; }
@@ -58,7 +60,12 @@
     setStatus("Saving changes to the project database…", "saving");
     pending = pending.then(() => apiPut(key, value, updatedAt)).then(() => {
       lastError = null;
-      setStatus("Saved to server storage: " + storageLabel, "good");
+      const primaryName = serverMode === "render" ? "Render persistent disk" : "local project database";
+      if (githubBackup?.automaticSaveEnabled) {
+        setStatus(`Saved to ${primaryName}; automatic GitHub backup queued for ${githubBackup.repository}.`, "good");
+      } else {
+        setStatus(`Saved to ${primaryName}, but automatic GitHub backup is NOT active. Check GITHUB_TOKEN and GITHUB_AUTO_BACKUP in the server environment.`, "warn");
+      }
     }).catch(err => {
       lastError = err;
       setStatus("Save to project file failed. The browser copy is retained; check the server and use Data & Backup to retry.", "error");
@@ -70,6 +77,22 @@
   async function flush() {
     await pending;
     if (lastError) throw lastError;
+  }
+  async function flushBoth() {
+    await flush();
+    if (mode !== "server") throw new Error("This page is in browser-only mode. It is not connected to Render or GitHub. Open the Render-hosted site or start the Node server with npm start.");
+    const response = await fetch("/api/storage/flush", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+      cache: "no-store"
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) throw new Error(result.error || `Dual save failed (HTTP ${response.status}).`);
+    lastError = null;
+    const target = serverMode === "render" ? "Render persistent disk" : "local project database";
+    setStatus(`Saved to ${target} and confirmed GitHub backup to ${result.githubRepository || githubBackup?.repository || "the configured repository"}.`, "good");
+    return result;
   }
   async function refreshFromServer() {
     if (mode !== "server") return false;
@@ -118,7 +141,12 @@
       else { localStorage.removeItem(key); localStorage.removeItem(TS_PREFIX + key); }
     }
     lastError = null;
-    setStatus(mode === "server" ? "Backup restored to server storage: " + storageLabel : "Backup restored to browser storage only. Start the project with npm start for file-based saving.", mode === "server" ? "good" : "warn");
+    if (mode === "server") {
+      const primaryName = serverMode === "render" ? "Render persistent disk" : "local project database";
+      setStatus(githubBackup?.automaticSaveEnabled ? `Backup restored to ${primaryName}; automatic GitHub backup queued for ${githubBackup.repository}.` : `Backup restored to ${primaryName}, but automatic GitHub backup is NOT active.`, githubBackup?.automaticSaveEnabled ? "good" : "warn");
+    } else {
+      setStatus("Backup restored to this browser only. It is NOT saved to Render or GitHub. Open the Render-hosted site or start the Node server with npm start.", "warn");
+    }
   }
   async function clearAll() {
     await pending.catch(() => {});
@@ -134,8 +162,11 @@
     get mode() { return mode; },
     get lastError() { return lastError; },
     get location() { return storageLabel; },
+    get serverMode() { return serverMode; },
+    get githubBackup() { return githubBackup ? { ...githubBackup } : null; },
     write: storageWrite,
     flush,
+    flushBoth,
     refreshFromServer,
     exportState,
     replaceState,
@@ -149,6 +180,8 @@
     try {
       const remote = await apiState();
       mode = "server";
+      serverMode = remote.storageMode || "local";
+      githubBackup = remote.githubBackup || null;
       storageLabel = remote.storageLabel || (remote.storageMode === "render" ? "Render persistent disk" : "project file data/league-data.json");
       const work = [];
       for (const key of KEYS) {
@@ -170,10 +203,17 @@
         }
       }
       await Promise.all(work);
-      setStatus("Connected — changes save to server storage: " + storageLabel, "good");
+      const primaryName = serverMode === "render" ? "Render persistent disk" : "local project database";
+      if (githubBackup?.automaticSaveEnabled) {
+        setStatus(`Connected to ${primaryName}. Automatic GitHub backup is configured for ${githubBackup.repository}; the Data & Backup page can confirm a completed mirror.`, "good");
+      } else {
+        setStatus(`Connected to ${primaryName}, but GitHub automatic backup is NOT active. Configure GITHUB_TOKEN and GITHUB_AUTO_BACKUP=true on the server.`, "warn");
+      }
     } catch (err) {
       mode = "browser";
-      setStatus("Browser-only storage is active. To save data inside the project folder, stop Live Server and start this project with npm start.", "warn");
+      serverMode = "";
+      githubBackup = null;
+      setStatus("Browser-only storage is active. Changes are NOT being saved to Render or GitHub. Stop VS Code Live Server and run npm start for local server storage, or open the Render-hosted website for shared Render + GitHub saving.", "warn");
     }
     const seasonHelper = document.createElement("script");
     seasonHelper.src = "season-archive-store.js";
