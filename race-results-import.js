@@ -7,6 +7,11 @@ const F1_RESULTS_ARCHIVE = "https://www.formula1.com/en/results";
 const TCS_RESULTS_ARCHIVE = "https://triplecrownseries.ca/results";
 const MXGP_RESULTS_ARCHIVE = "https://results.mxgp.com/";
 const MOTOGP_RESULTS_ARCHIVE = "https://www.motogp.com/en/gp-results/";
+// Use the long-standing MotoGP results API hostname documented by the public
+// results integrations. Keep the alternate Pulselive hostname as a fallback.
+// The reversed api.motogp.com hostname is NOT the same service and must not be used.
+const MOTOGP_API_BASE = "https://api.motogp.pulselive.com/motogp/v1";
+const MOTOGP_API_BASES = [MOTOGP_API_BASE, "https://api.pulselive.motogp.com/motogp/v1"];
 
 const OFFICIAL_HOSTS_BY_SERIES = {
   SMX: ["supermotocross.com", "results.supermotocross.com", "supercross.com", "results.supercrosslive.com", "results.supercross.com"],
@@ -14,7 +19,7 @@ const OFFICIAL_HOSTS_BY_SERIES = {
   MXGP: ["mxgp.com", "results.mxgp.com", "docs.mxgp.com", "fim-moto.com"],
   MXON: ["mxgp.com", "results.mxgp.com", "docs.mxgp.com", "fim-moto.com"],
   F1: ["formula1.com"],
-  MotoGP: ["motogp.com", "stats.motogp.com", "api.motogp.pulselive.com", "resources.motogp.com"]
+  MotoGP: ["motogp.com", "api.pulselive.motogp.com", "api.motogp.pulselive.com", "resources.motogp.com", "resources.motogp.pulselive.com"]
 };
 
 function hostIsAllowed(hostname, series) {
@@ -356,9 +361,17 @@ async function fetchApprovedUrl(initialUrl, series) {
       redirect: "manual",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: {
-        "User-Agent": "KaiserFamilyFantasySMXResultsImporter/1.1 (+official-results preview)",
-        "Accept": "text/html,text/csv,application/json,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.5",
-        ...(series === "MotoGP" ? { "Origin": "https://www.motogp.com", "Referer": "https://www.motogp.com/", "x-origin": "2" } : {})
+        "User-Agent": series === "MotoGP"
+          ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          : "KaiserFamilyFantasySMXResultsImporter/1.2 (+official-results preview)",
+        "Accept": series === "MotoGP"
+          ? "application/json, text/plain, application/pdf;q=0.9, */*;q=0.8"
+          : "text/html,text/csv,application/json,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.5",
+        ...(series === "MotoGP" ? {
+          "Origin": "https://www.motogp.com",
+          "Referer": "https://www.motogp.com/",
+          "x-origin": "2"
+        } : {})
       }
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
@@ -687,13 +700,46 @@ function validateMxgpClassification(parsed, context = {}) {
   return parsed;
 }
 
+async function officialHttpError(response, finalUrl, sourceLabel) {
+  let detail = "";
+  try {
+    const raw = await response.text();
+    if (raw) {
+      detail = stripHtml(raw).replace(/\s+/g, " ").slice(0, 220);
+    }
+  } catch { /* Keep the status + request target even if the body cannot be read. */ }
+  const server = response.headers?.get?.("server") || "";
+  const requestId = response.headers?.get?.("cf-ray") || response.headers?.get?.("x-request-id") || response.headers?.get?.("x-correlation-id") || "";
+  const diagnostics = [server && `server ${server}`, requestId && `request ${requestId}`, detail && `response: ${detail}`].filter(Boolean).join("; ");
+  return `${sourceLabel} returned HTTP ${response.status} (${response.statusText || "request refused"}) from ${finalUrl.hostname}${finalUrl.pathname}${diagnostics ? ` — ${diagnostics}` : ""}.`;
+}
+
 async function readOfficialJson(url, series) {
   const { response, finalUrl } = await fetchApprovedUrl(url, series);
-  if (!response.ok) throw new Error(`The official results service returned HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(await officialHttpError(response, finalUrl, "The official results service"));
   const body = await readLimitedResponse(response);
   let json;
-  try { json = JSON.parse(body); } catch { throw new Error("The official MotoGP results service returned invalid JSON."); }
+  try { json = JSON.parse(body); } catch { throw new Error(`The official MotoGP results service returned invalid JSON from ${finalUrl.hostname}${finalUrl.pathname}.`); }
   return { json, finalUrl };
+}
+
+async function readMotoGPApiJson(pathAndQuery) {
+  const errors = [];
+  for (const [index, base] of MOTOGP_API_BASES.entries()) {
+    const url = new URL(String(pathAndQuery || "").replace(/^\/+/, ""), `${base}/`);
+    try {
+      return await readOfficialJson(url, "MotoGP");
+    } catch (error) {
+      errors.push(error.message || String(error));
+      // The documented api.motogp.pulselive.com hostname is tried first;
+      // retry the alternate official hostname if its edge refuses the request.
+      if (index === 0 && /HTTP 403|HTTP 429|HTTP 5\d\d|fetch failed|timed out/i.test(error.message || "")) {
+        await new Promise(resolve => setTimeout(resolve, 350));
+      }
+    }
+  }
+  const blocked = errors.some(message => /HTTP 403/.test(message));
+  throw new Error(`${blocked ? "MotoGP's public results API refused the request on both official hostnames (HTTP 403)." : "MotoGP's official results API could not be reached through either published host."} The primary endpoint is ${MOTOGP_API_BASE}. ${errors.join(" | ")}`);
 }
 
 async function readLimitedBuffer(response) {
@@ -764,13 +810,37 @@ async function extractMotoGPPdfText(buffer) {
 
 async function readOfficialPdf(url, series) {
   const { response, finalUrl } = await fetchApprovedUrl(url, series);
-  if (!response.ok) throw new Error(`The official MotoGP Fast Lap Rider PDF returned HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(await officialHttpError(response, finalUrl, "The official MotoGP PDF"));
   const buffer = await readLimitedBuffer(response);
   if (buffer.length < 5 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
     throw new Error("The official Fast Lap Rider link did not return a valid PDF file.");
   }
   const text = await extractMotoGPPdfText(buffer);
   return { text, finalUrl };
+}
+
+async function readMotoGPResourcePdf(url) {
+  const initial = new URL(url.href || String(url));
+  const resourceHosts = [initial.hostname, "resources.motogp.com", "resources.motogp.pulselive.com"]
+    .filter((host, index, all) => all.indexOf(host) === index);
+  const errors = [];
+  for (const host of resourceHosts) {
+    if (!hostIsAllowed(host, "MotoGP")) continue;
+    const candidate = new URL(initial.href);
+    candidate.hostname = host;
+    try {
+      return await readOfficialPdf(candidate, "MotoGP");
+    } catch (error) {
+      const message = error.message || String(error);
+      errors.push(message);
+      // A missing PDF.js dependency or a PDF parsing failure is not a CDN
+      // hostname problem; surface it directly rather than issuing another GET.
+      if (/PDF parser is unavailable|pdfjs-dist/i.test(message)) throw error;
+      // MotoGP has used both official resources hostnames. Try the paired
+      // host if its CDN edge returns a 403/404 in the Render region.
+    }
+  }
+  throw new Error(`The official MotoGP PDF could not be fetched from either published resources host. ${errors.join(" | ")}`);
 }
 
 function arrayFromPayload(payload, keys = []) {
@@ -930,11 +1000,18 @@ function motogpPositionFromItem(item) {
 }
 
 function motogpStatsClassificationUrl(payload, sessionContext = {}) {
-  const urls = [];
+  // Backward-compatible name retained for older callers. The Stats Centre
+  // HTML now redirects to SSO, so this resolves the official session PDF.
+  return motogpClassificationPdfUrl(payload, sessionContext);
+}
+
+function motogpClassificationPdfUrl(payload, sessionContext = {}) {
+  const candidates = [];
   const visit = (value, depth = 0) => {
     if (depth > 10 || value == null) return;
     if (typeof value === "string") {
-      if (/\/files\/results\/\d{4}\/[^/]+\/MotoGP\/(?:RAC|SPR|Q2)\/(?:Classification|FastLapRider)\.pdf(?:$|[?#])/i.test(value)) urls.push(value);
+      const text = value.trim();
+      if (/\/(?:Classification|FastLapRider)\.pdf(?:$|[?#])/i.test(text)) candidates.push(text);
       return;
     }
     if (Array.isArray(value)) { value.forEach(child => visit(child, depth + 1)); return; }
@@ -942,28 +1019,104 @@ function motogpStatsClassificationUrl(payload, sessionContext = {}) {
   };
   visit(payload);
   visit(sessionContext);
-  const source = urls[0];
-  let match = null;
-  if (source) {
-    let fileUrl;
-    try { fileUrl = new URL(source, "https://resources.motogp.com"); } catch { fileUrl = null; }
-    if (fileUrl && fileUrl.hostname === "resources.motogp.com") {
-      match = fileUrl.pathname.match(/^\/files\/results\/(\d{4})\/([A-Z0-9]+)\/MotoGP\/(RAC|SPR|Q2)\/(?:Classification|FastLapRider)\.pdf$/i);
-      if (match) return new URL(`/en/gp-results/${match[1]}/${match[2].toUpperCase()}/MotoGP/${match[3].toUpperCase()}/Classification`, "https://stats.motogp.com");
+  const preferred = candidates.find(value => /\/Classification\.pdf(?:$|[?#])/i.test(value)) ||
+    candidates.find(value => /\/FastLapRider\.pdf(?:$|[?#])/i.test(value));
+  if (preferred) {
+    const url = new URL(preferred, "https://resources.motogp.com");
+    if (/\/FastLapRider\.pdf(?:$|[?#])/i.test(url.pathname)) {
+      url.pathname = url.pathname.replace(/FastLapRider\.pdf$/i, "Classification.pdf");
     }
+    if (!hostIsAllowed(url.hostname, "MotoGP")) throw new Error("The official MotoGP Classification PDF points to an unapproved host.");
+    return url;
   }
-
-  // Some versions of the results API put the session file links only on the
-  // session-list object, not in the classification response. If those links
-  // are absent too, the event's official short code gives the same Stats route.
   const year = String(sessionContext.year || sessionContext.seasonYear || "").match(/^(19\d{2}|20\d{2})$/)?.[1] || "";
   const event = sessionContext.event || {};
   const eventCode = String(event.short_name || event.shortName || event.event_code || event.eventCode || event.code || "").trim().toUpperCase();
   const sessionCode = String(sessionContext.sessionCode || "").trim().toUpperCase();
   if (year && /^[A-Z0-9]{2,5}$/.test(eventCode) && ["RAC", "SPR", "Q2"].includes(sessionCode)) {
-    return new URL(`/en/gp-results/${year}/${eventCode}/MotoGP/${sessionCode}/Classification`, "https://stats.motogp.com");
+    return new URL(`/files/results/${year}/${eventCode}/MotoGP/${sessionCode}/Classification.pdf`, "https://resources.motogp.com");
   }
   return null;
+}
+
+function normalizeMotoGPPdfRiderName(value) {
+  const cleaned = normalizeSeriesRiderName(value, "MotoGP");
+  return cleaned.split(/\s+/).map(token => {
+    if (!/^[A-Z][A-Z'’\-]+$/.test(token)) return token;
+    return token.toLowerCase().replace(/(^|[-'’])([a-z])/g, (_match, boundary, letter) => `${boundary}${letter.toUpperCase()}`);
+  }).join(" ");
+}
+
+function parseMotoGPClassificationPdfText(text, sourceTitle = "MotoGP official classification", sessionCode = "RAC") {
+  const nationCodes = new Set(["ARG", "AUS", "AUT", "BEL", "BRA", "CAN", "CHI", "CHN", "COL", "CRO", "CZE", "DEN", "ESP", "FIN", "FRA", "GBR", "GER", "HUN", "INA", "IND", "IRL", "ITA", "JPN", "KAZ", "KOR", "MAL", "MEX", "NED", "NOR", "NZL", "POL", "POR", "QAT", "ROU", "RSA", "RSM", "SLO", "SPA", "SUI", "SWE", "THA", "TUR", "UKR", "USA", "VEN"]);
+  const classified = [];
+  const unclassified = [];
+  let activeStatus = "";
+  const rows = String(text || "").split(/\r?\n/);
+  const timePattern = /^\d{1,2}[’']\d{2}\.\d{3}$/;
+  const colonTimePattern = /^\d{1,2}:\d{2}\.\d{3}$/;
+
+  for (const [sourceOrder, rawLine] of rows.entries()) {
+    const line = rawLine.trim().replace(/\s+/g, " ");
+    if (!line) continue;
+    const sectionStatus = motogpGroupStatus(line);
+    if (sectionStatus && !/^\d/.test(line)) { activeStatus = sectionStatus; continue; }
+    if (/^(pos\.?|pts\.?|#\s+rider|rider\s+nation|classification|race|sprint|grand prix|pole position|fastest lap|best race lap|all-time lap record|race condition|air:|ground:|humidity:|dry$|wet$)/i.test(line)) continue;
+
+    const tokens = line.split(/\s+/);
+    if (tokens.length < 5) continue;
+    let position = 0;
+    let numberIndex = 0;
+    let status = activeStatus;
+
+    if (activeStatus) {
+      // In MotoGP PDF sections such as "Not classified", the first numeric
+      // field is the bike number; the row remains after the classified order.
+      numberIndex = 0;
+    } else {
+      position = motogpPositionNumber(tokens[0]);
+      if (!position) continue;
+      // Race classification sheets include championship points between Pos
+      // and bike number; Q2 sheets generally go directly from Pos to No.
+      numberIndex = /^\d{1,3}[A-Za-z]?$/.test(tokens[1] || "") && /^\d{1,3}[A-Za-z]?$/.test(tokens[2] || "") ? 2 : 1;
+      if (!/^\d{1,3}[A-Za-z]?$/.test(tokens[numberIndex] || "")) continue;
+    }
+
+    const number = cleanNumber(tokens[numberIndex]);
+    if (!number) continue;
+    let nationIndex = -1;
+    for (let i = numberIndex + 2; i < tokens.length; i++) {
+      if (nationCodes.has(tokens[i].toUpperCase())) { nationIndex = i; break; }
+    }
+    if (nationIndex <= numberIndex + 1) continue;
+    const name = normalizeMotoGPPdfRiderName(tokens.slice(numberIndex + 1, nationIndex).join(" "));
+    if (!name || name.split(/\s+/).length < 2) continue;
+    const timeToken = tokens.slice(nationIndex + 1).find(token => timePattern.test(token) || colonTimePattern.test(token)) || "";
+    const row = {
+      position: position || 0,
+      displayPosition: status || (position ? String(position) : "—"),
+      status,
+      sourceOrder,
+      number,
+      name,
+      team: "",
+      // Only Q2's table time represents a qualifying lap. RAC/SPR total race
+      // times must never be mistaken for the fastest-lap bonus.
+      bestLap: normalizeHeader(sessionCode) === "q2" ? timeToken.replace(/[’]/g, "'") : ""
+    };
+    if (status) unclassified.push(row); else classified.push(row);
+  }
+
+  classified.sort((a, b) => a.position - b.position || a.sourceOrder - b.sourceOrder);
+  unclassified.sort((a, b) => a.sourceOrder - b.sourceOrder);
+  let nextPosition = classified.reduce((max, row) => Math.max(max, row.position), 0) + 1;
+  for (const row of unclassified) {
+    row.position = nextPosition++;
+    row.displayPosition = row.status || "NC";
+  }
+  const ordered = [...classified, ...unclassified];
+  if (!ordered.length) throw new Error("The official MotoGP Classification PDF did not contain readable rider rows.");
+  return { title: sourceTitle, rows: ordered };
 }
 
 function motogpRiderCellParts(cellHtml) {
@@ -1105,23 +1258,22 @@ async function readMotoGPClassification(payload, sourceTitle, sessionCode, sessi
   catch (error) { jsonError = error.message || "The JSON classification could not be parsed."; }
   if (motogpHasRankedClassificationRows(result)) return result;
 
-  // The API can put a lap-time string in the position field, or omit a numeric
-  // rank for rows whose time/status is published elsewhere. Never turn those
-  // values into NC: resolve the exact session's official Stats classification.
-  // The file link may be attached to the session-list record, not the JSON
-  // classification payload, so both objects are searched.
-  const statsUrl = motogpStatsClassificationUrl(payload, { ...sessionContext, sessionCode });
-  if (statsUrl) {
-    const statsPage = await readOfficialPage(statsUrl, "MotoGP");
-    const statsResult = parseMotoGPStatsClassificationHtml(statsPage.body, sourceTitle, sessionCode);
-    if (!motogpHasRankedClassificationRows(statsResult)) {
-      throw new Error(`The official MotoGP ${sessionCode} Stats page did not contain a complete numeric classification. No lap times were imported as race positions.`);
+  // The HTML Stats Centre now redirects to an SSO sign-in for some requests.
+  // Use the official session Classification.pdf linked from MotoGP's own
+  // session metadata instead; it exposes explicit Pos / Rider / Nation rows
+  // and the ordered unclassified sections without relying on the protected UI.
+  const pdfUrl = motogpClassificationPdfUrl(payload, { ...sessionContext, sessionCode });
+  if (pdfUrl) {
+    const pdf = await readMotoGPResourcePdf(pdfUrl);
+    const pdfResult = parseMotoGPClassificationPdfText(pdf.text, sourceTitle, sessionCode);
+    if (!motogpHasRankedClassificationRows(pdfResult)) {
+      throw new Error(`The official MotoGP ${sessionCode} Classification PDF did not contain a complete ranked list. No lap times were imported as race positions.`);
     }
-    statsResult.sourceUrl = statsPage.finalUrl.href;
-    return statsResult;
+    pdfResult.sourceUrl = pdf.finalUrl.href;
+    return pdfResult;
   }
   if (result) {
-    throw new Error(`The official MotoGP ${sessionCode} response did not provide a complete numeric classification${jsonError ? ` (${jsonError})` : ""}, and its session metadata did not expose a verifiable Stats classification link. No lap times were imported as race positions.`);
+    throw new Error(`The official MotoGP ${sessionCode} response did not provide a complete numeric classification${jsonError ? ` (${jsonError})` : ""}, and its session metadata did not expose a Classification PDF. No lap times were imported as race positions.`);
   }
   throw new Error(jsonError || `The official MotoGP ${sessionCode} classification could not be parsed.`);
 }
@@ -1258,36 +1410,27 @@ function chooseMotoGPEvent(events, context = {}, year = "") {
 
 async function resolveMotoGPResults(context = {}) {
   const yearMatch = String(context.eventDate || "").match(/\b(19\d{2}|20\d{2})\b/);
-  const seasonsUrl = new URL("https://api.motogp.pulselive.com/motogp/v1/results/seasons");
-  const seasonsResponse = await readOfficialJson(seasonsUrl, "MotoGP");
+  const seasonsResponse = await readMotoGPApiJson("results/seasons");
   const seasons = arrayFromPayload(seasonsResponse.json, ["seasons", "results"]);
   const requestedYear = yearMatch?.[1] || "";
   const season = (requestedYear ? seasons.find(item => String(item.year) === requestedYear) : null) || seasons.find(item => item.current) || seasons[0];
   if (!season?.id) throw new Error(`The official MotoGP archive does not list season ${requestedYear || "current"}.`);
   const year = String(season.year || requestedYear || "");
 
-  const eventsUrl = new URL("https://api.motogp.pulselive.com/motogp/v1/results/events");
-  eventsUrl.searchParams.set("seasonUuid", season.id);
-  eventsUrl.searchParams.set("isFinished", "true");
-  const eventsResponse = await readOfficialJson(eventsUrl, "MotoGP");
+  const eventsResponse = await readMotoGPApiJson(`results/events?seasonUuid=${encodeURIComponent(season.id)}&isFinished=true`);
   const events = arrayFromPayload(eventsResponse.json, ["events", "results"]);
   if (!events.length) throw new Error(`The official MotoGP archive has no published event results for ${year}.`);
   const event = chooseMotoGPEvent(events, context, year);
   const eventId = event.id || event.uuid;
   if (!eventId) throw new Error("The selected MotoGP event did not include an official event identifier.");
 
-  const categoriesUrl = new URL("https://api.motogp.pulselive.com/motogp/v1/results/categories");
-  categoriesUrl.searchParams.set("eventUuid", eventId);
-  const categoriesResponse = await readOfficialJson(categoriesUrl, "MotoGP");
+  const categoriesResponse = await readMotoGPApiJson(`results/categories?eventUuid=${encodeURIComponent(eventId)}`);
   const categories = arrayFromPayload(categoriesResponse.json, ["categories", "results"]);
   const category = categories.find(item => normalizeHeader(item.name || item.description || item.category) === "motogp" || /motogp/i.test(String(item.name || item.description || ""))) || categories.find(item => String(item.legacy_id || item.legacyId || "") === "3");
   if (!category?.id && !category?.uuid) throw new Error("The selected MotoGP weekend did not expose its MotoGP category in the official results service.");
   const categoryId = category.id || category.uuid;
 
-  const sessionsUrl = new URL("https://api.motogp.pulselive.com/motogp/v1/results/sessions");
-  sessionsUrl.searchParams.set("eventUuid", eventId);
-  sessionsUrl.searchParams.set("categoryUuid", categoryId);
-  const sessionsResponse = await readOfficialJson(sessionsUrl, "MotoGP");
+  const sessionsResponse = await readMotoGPApiJson(`results/sessions?eventUuid=${encodeURIComponent(eventId)}&categoryUuid=${encodeURIComponent(categoryId)}`);
   const sessions = arrayFromPayload(sessionsResponse.json, ["sessions", "results"]);
   const sprint = normalizeHeader(context.phase || "Grand Prix").includes("sprint");
   const raceCode = sprint ? "spr" : "rac";
@@ -1295,10 +1438,9 @@ async function resolveMotoGPResults(context = {}) {
   if (!raceSession) throw new Error(`The official ${motogpEventText(event)} session list does not contain a ${sprint ? "Sprint" : "Grand Prix Race"} classification. Check the selected scoring tab and whether results have been published.`);
   const raceSessionId = raceSession.id || raceSession.uuid;
   if (!raceSessionId) throw new Error("The official MotoGP race session did not include a session identifier.");
-  const classificationUrl = new URL(`https://api.motogp.pulselive.com/motogp/v1/results/session/${encodeURIComponent(raceSessionId)}/classification`);
-  classificationUrl.searchParams.set("seasonYear", year);
-  classificationUrl.searchParams.set("test", "false");
-  const classificationResponse = await readOfficialJson(classificationUrl, "MotoGP");
+  const classificationPath = `results/session/${encodeURIComponent(raceSessionId)}/classification?seasonYear=${encodeURIComponent(year)}&test=false`;
+  const classificationResponse = await readMotoGPApiJson(classificationPath);
+  const classificationUrl = classificationResponse.finalUrl;
   const eventTitle = motogpEventText(event) || `${year} MotoGP Grand Prix`;
   const sessionTitle = sprint ? "Sprint" : "Grand Prix";
   const result = await readMotoGPClassification(classificationResponse.json, `${eventTitle} — ${sessionTitle}`, raceCode.toUpperCase(), { session: raceSession, event, year });
@@ -1311,7 +1453,7 @@ async function resolveMotoGPResults(context = {}) {
     // session metadata. If only the paired Classification.pdf is present,
     // the official FastLapRider.pdf lives in the same session folder.
     const fastLapPdfUrl = motogpFastLapRiderPdfUrl({ session: raceSession, classification: classificationResponse.json });
-    const fastLapPdf = await readOfficialPdf(fastLapPdfUrl, "MotoGP");
+    const fastLapPdf = await readMotoGPResourcePdf(fastLapPdfUrl);
     const fastLapResults = parseMotoGPFastLapRiderText(fastLapPdf.text, `${eventTitle} — ${sessionTitle} Fast Lap Rider`);
     fastestLapSourceUrl = fastLapPdf.finalUrl.href;
     fastestLap = fastLapResults.rows[0] || null;
@@ -1329,10 +1471,9 @@ async function resolveMotoGPResults(context = {}) {
   const q2Session = sessions.find(item => motogpSessionMatches(item, "Q2"));
   if (q2Session?.id || q2Session?.uuid) {
     try {
-      const q2Url = new URL(`https://api.motogp.pulselive.com/motogp/v1/results/session/${encodeURIComponent(q2Session.id || q2Session.uuid)}/classification`);
-      q2Url.searchParams.set("seasonYear", year);
-      q2Url.searchParams.set("test", "false");
-      const q2Response = await readOfficialJson(q2Url, "MotoGP");
+      const q2Path = `results/session/${encodeURIComponent(q2Session.id || q2Session.uuid)}/classification?seasonYear=${encodeURIComponent(year)}&test=false`;
+      const q2Response = await readMotoGPApiJson(q2Path);
+      const q2Url = q2Response.finalUrl;
       const q2Results = await readMotoGPClassification(q2Response.json, `${eventTitle} — Q2`, "Q2", { session: q2Session, event, year });
       fastestQualifier = motogpFastestQualifierFromRows(q2Results.rows);
       if (fastestQualifier) fastestQualifier.sourceUrl = q2Results.sourceUrl || q2Url.href;
@@ -1835,7 +1976,8 @@ module.exports = {
   TCS_RESULTS_ARCHIVE,
   MXGP_RESULTS_ARCHIVE,
   MOTOGP_RESULTS_ARCHIVE,
-  MOTOGP_API_BASE: "https://api.motogp.pulselive.com/motogp/v1",
+  MOTOGP_API_BASE,
+  MOTOGP_API_BASES,
   hostIsAllowed,
   divisionKey,
   parseCsv,
@@ -1856,6 +1998,10 @@ module.exports = {
   motogpSessionMatches,
   motogpPositionNumber,
   motogpStatsClassificationUrl,
+  motogpClassificationPdfUrl,
+  parseMotoGPClassificationPdfText,
+  readMotoGPResourcePdf,
+  readMotoGPApiJson,
   parseMotoGPStatsClassificationHtml,
   motogpFastestQualifierFromRows,
   motogpFastLapRiderPdfUrl,

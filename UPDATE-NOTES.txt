@@ -85,3 +85,17 @@ MotoGP classification retention update:
 - Q2 is fetched as its own event session. If its API result has time values instead of numeric positions, the Q2 Stats classification is parsed and the smallest valid Q2 lap time determines the +3 Fastest Qualifier rider.
 - Race `Time/Gap` values are not treated as rider lap times or positions. The separate `Fast Lap Rider` PDF remains the source for the +1 fastest-lap bonus on RAC / SPR.
 - Added regression tests reproducing lap-time-in-position API responses, session-metadata URL fallback, Q2 fastest-lap comparison, and grouped NC / first-lap DNF rows. Full `npm run check` passes.
+
+MotoGP HTTP 403 source fix (Nov 2026)
+- Use MotoGP's long-standing documented public results API hostname `api.motogp.pulselive.com` first, with `api.pulselive.motogp.com` as an alternate-host fallback. These are two distinct hosts; do not use `api.motogp.com`.
+- Use standard browser request headers for the public MotoGP API and include the exact hostname/path in upstream HTTP error messages.
+- Do not fetch the Stats Centre HTML fallback: that route can redirect to the MotoGP SSO sign-in and return access errors.
+- When the JSON classification does not contain numeric finishing positions, read the selected session's official `Classification.pdf` from the session file link (or the matching event/session path) and parse its Pos/Rider rows plus ordered NC/DNF sections.
+- For PDF delivery, try both official MotoGP resources hostnames (`resources.motogp.com` and `resources.motogp.pulselive.com`) if one edge returns an HTTP error.
+- Q2's Classification.pdf supplies its actual lap-time column for fastest-qualifier selection. RAC/SPR race-time columns are never treated as fastest laps; their Fast Lap Rider PDFs remain the source for +1 fastest-lap bonuses.
+
+MotoGP 403 diagnostics update:
+- The canonical API hostname is now the primary request target, matching the public MotoGP results API documentation and a directly verified seasons endpoint.
+- An HTTP 403 from the primary API host triggers a short pause and a retry against the alternate published API hostname.
+- HTTP errors include the exact hostname/path, response server/request ID where available, and a short upstream response-body excerpt to distinguish an API-edge 403 from a resource-PDF 403.
+- MotoGP PDF fetch errors likewise include the exact resource host and path, so a remaining access block can be isolated without guessing.
