@@ -3,9 +3,16 @@
   const KEYS = [
     "kaiserFantasyAthletes", "kaiserFantasyTeams", "kaiserFantasyScores",
     "kaiserFantasyTrades", "kaiserFantasyDraftState", "kaiserFantasyDraftSettings",
-    "kaiserFantasySchedule"
+    "kaiserFantasySchedule", "kaiserFantasySeasonSettings"
   ];
+  const HISTORICAL_KEY = "kaiserFantasyHistoricalSeasons";
+  let commissionerToken = sessionStorage.getItem("commApiToken") || "";
   const TS_PREFIX = "__kf_saved_at__";
+  // A public visitor on a shared browser must not inherit the commissioner's cached private history.
+  if (!commissionerToken) {
+    localStorage.removeItem(HISTORICAL_KEY);
+    localStorage.removeItem(TS_PREFIX + HISTORICAL_KEY);
+  }
   let mode = "browser";
   let pending = Promise.resolve();
   let lastError = null;
@@ -45,6 +52,24 @@
     if (!res.ok) throw new Error("Database write failed for " + key + ".");
     return res.json();
   }
+  async function apiHistoricalPut(value) {
+    if (!commissionerToken) throw new Error("Sign in as commissioner again to save historical seasons.");
+    const res = await fetch("/api/historical", {
+      method: "PUT", headers: { "Content-Type": "application/json", Authorization: "Bearer " + commissionerToken },
+      body: JSON.stringify({ value }), keepalive: true, cache: "no-store"
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "Historical season data could not be saved.");
+    return body;
+  }
+  async function apiHistoricalGet() {
+    if (!commissionerToken) throw new Error("Commissioner sign-in is required to access previous seasons.");
+    const res = await fetch("/api/historical", { headers: { Authorization: "Bearer " + commissionerToken }, cache: "no-store" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "Historical season data could not be loaded.");
+    loadLocal(HISTORICAL_KEY, body.value || { version: 1, seasons: {} }, body.updatedAt || Date.now());
+    return body.value || { version: 1, seasons: {} };
+  }
   function loadLocal(key, value, updatedAt) {
     localStorage.setItem(key, JSON.stringify(value));
     localStorage.setItem(TS_PREFIX + key, String(updatedAt || 0));
@@ -56,7 +81,8 @@
     localStorage.setItem(TS_PREFIX + key, String(updatedAt));
     if (mode !== "server") return;
     setStatus("Saving changes to the project database…", "saving");
-    pending = pending.then(() => apiPut(key, value, updatedAt)).then(() => {
+    const saveRequest = key === HISTORICAL_KEY ? () => apiHistoricalPut(value) : () => apiPut(key, value, updatedAt);
+    pending = pending.then(saveRequest).then(() => {
       lastError = null;
       setStatus("Saved to server storage: " + storageLabel, "good");
     }).catch(err => {
@@ -96,10 +122,13 @@
   async function exportState() {
     if (mode === "server") {
       await flush();
-      return (await apiState()).state;
+      const state = (await apiState()).state;
+      if (commissionerToken) state[HISTORICAL_KEY] = await apiHistoricalGet();
+      return state;
     }
     const state = {};
     for (const key of KEYS) { const value = parseLocal(key); if (value !== null) state[key] = value; }
+    if (commissionerToken) { const history = parseLocal(HISTORICAL_KEY); if (history !== null) state[HISTORICAL_KEY] = history; }
     return state;
   }
   async function replaceState(state) {
@@ -107,16 +136,19 @@
     await pending.catch(() => {});
     const filtered = {};
     for (const key of KEYS) if (Object.prototype.hasOwnProperty.call(state, key)) filtered[key] = state[key];
+    const includesHistory = Object.prototype.hasOwnProperty.call(state, HISTORICAL_KEY);
     const timestamp = Date.now();
     if (mode === "server") {
       const res = await fetch("/api/state", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state: filtered, updatedAt: timestamp }), cache: "no-store" });
       if (!res.ok) throw new Error("The project database could not replace its saved data.");
       await res.json();
+      if (includesHistory) await apiHistoricalPut(state[HISTORICAL_KEY]);
     }
     for (const key of KEYS) {
       if (Object.prototype.hasOwnProperty.call(filtered, key)) loadLocal(key, filtered[key], timestamp);
       else { localStorage.removeItem(key); localStorage.removeItem(TS_PREFIX + key); }
     }
+    if (includesHistory) loadLocal(HISTORICAL_KEY, state[HISTORICAL_KEY], timestamp);
     lastError = null;
     setStatus(mode === "server" ? "Backup restored to server storage: " + storageLabel : "Backup restored to browser storage only. Start the project with npm start for file-based saving.", mode === "server" ? "good" : "warn");
   }
@@ -126,9 +158,53 @@
       const res = await fetch("/api/state", { method: "DELETE", cache: "no-store" });
       if (!res.ok) throw new Error("Could not clear the project database.");
       await res.json();
+      if (commissionerToken) {
+        const historyRes = await fetch("/api/historical", { method: "DELETE", headers: { Authorization: "Bearer " + commissionerToken }, cache: "no-store" });
+        if (!historyRes.ok) throw new Error("Could not clear archived seasons. Sign in again and retry.");
+      }
     }
-    for (const key of KEYS) { localStorage.removeItem(key); localStorage.removeItem(TS_PREFIX + key); }
+    for (const key of [...KEYS, HISTORICAL_KEY]) { localStorage.removeItem(key); localStorage.removeItem(TS_PREFIX + key); }
     lastError = null;
+  }
+  async function commissionerLogin(password) {
+    const res = await fetch("/api/commissioner/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }), cache: "no-store" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.token) throw new Error(body.error || "Commissioner sign-in failed.");
+    commissionerToken = body.token;
+    sessionStorage.setItem("commApiToken", commissionerToken);
+    sessionStorage.setItem("commAuthV2", "yes");
+    await apiHistoricalGet();
+    return body;
+  }
+  async function commissionerRefresh() { return apiHistoricalGet(); }
+  async function archiveSeason(year, history, nextState) {
+    if (!commissionerToken) throw new Error("Sign in as commissioner again before archiving a season.");
+    if (mode !== "server") throw new Error("Season archiving requires the Node.js server so the archive and new season can be saved together. Start the project with npm start.");
+    await flush();
+    const res = await fetch("/api/historical/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + commissionerToken },
+      body: JSON.stringify({ year: Number(year), history, nextState }),
+      cache: "no-store"
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Season archive failed (HTTP ${res.status}).`);
+    const timestamp = Number(body.savedAt) || Date.now();
+    loadLocal(HISTORICAL_KEY, history, timestamp);
+    for (const key of KEYS) {
+      if (Object.prototype.hasOwnProperty.call(nextState, key)) loadLocal(key, nextState[key], timestamp);
+    }
+    lastError = null;
+    setStatus(`Archived season ${year} and started ${Number(year) + 1} in ${storageLabel}.`, "good");
+    return body;
+  }
+  function commissionerLogout() {
+    commissionerToken = "";
+    sessionStorage.removeItem("commApiToken");
+    sessionStorage.removeItem("commAuthV2");
+    // Historical records stay on the server but are removed from this browser cache at sign-out.
+    localStorage.removeItem(HISTORICAL_KEY);
+    localStorage.removeItem(TS_PREFIX + HISTORICAL_KEY);
   }
   window.KFStorage = {
     get mode() { return mode; },
@@ -140,7 +216,11 @@
     exportState,
     replaceState,
     clearAll,
-    keys: KEYS.slice()
+    commissionerLogin,
+    commissionerRefresh,
+    archiveSeason,
+    commissionerLogout,
+    keys: [...KEYS, HISTORICAL_KEY]
   };
 
   async function start() {

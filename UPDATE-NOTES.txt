@@ -136,3 +136,12 @@ MotoGP 403 diagnostics update:
 - The final URL now preserves those hidden classification-view parameters while replacing only the selected championship, class, event, session, and year filters.
 - Added regression assertions that fail when `view=classification` is missing from the final request, including the WebForms postback path.
 - MXGP classification mismatch errors now report the exact dropdown text and option value selected at each level, alongside the final URL.
+
+HISTORICAL RESULTS AND YEAR WORKSPACES (November 16, 2026)
+- Added Commissioner > Historical Results with independent year workspaces from 2010 onward. The season selector switches the Athletes, Scoring, Draft, and Schedule tabs into the selected year's own state.
+- Current-season athlete profiles and results remain visible on the public site, including average points per round. Averages are broken down by rider, series, and class; scoring segments at the same scheduled event count as one round.
+- Archived seasons are private to commissioner-authenticated API requests. The public state endpoint never returns the historical-season key.
+- Added an atomic archive-and-advance endpoint. It writes the current year's full rider/team/scoring/draft/schedule snapshot, then starts the next year with empty scoring, trades, rosters, draft and schedule while retaining rider directory details and team identities/passwords. The transaction is committed once to the existing league-data.json file.
+- Added Copy Riders and Copy Schedule tools. Copies are independent by year; schedule event IDs are regenerated and dates shift to the destination year, with leap days clamped to the last valid day when needed.
+- Existing Render persistent-disk and GitHub JSON mirror storage remain in place. The same league-data.json database contains both the public current-season state and commissioner-only archive, while `/api/state` exposes only public keys.
+- Added season unit tests and a server API integration test covering private access, archive atomicity, no point carryover, public API isolation, team identity preservation, and persistence after server restart.
