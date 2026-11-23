@@ -300,8 +300,11 @@ function cloneJson(value) { return value === undefined ? undefined : JSON.parse(
 function normalizedName(value) { return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
 function scoreMatchesRider(record, riderId, riderName, riderClass) {
   if (riderId && String(record.riderId || "") === String(riderId)) return true;
-  return normalizedName(record.riderName || record.athleteName) === normalizedName(riderName)
-    && (!riderClass || normalizedName(record.riderClass || record.athleteClass) === normalizedName(riderClass));
+  // Rider IDs normally survive season copies. The name fallback also includes
+  // older season records where IDs were regenerated or the rider changed class.
+  // Current class is intentionally not a hard filter: career results follow the
+  // athlete across series/class changes while each result keeps its scored class.
+  return normalizedName(record.riderName || record.athleteName) === normalizedName(riderName);
 }
 function scoreRoundKey(record) {
   const series = normalizedName(record.series || record.riderClass || record.division || "unknown");
@@ -315,15 +318,20 @@ function summarizeHistoricalRider(database, riderId, riderName, riderClass, year
   const athlete = athletes.find(item => (riderId && String(item.id || item.riderId) === String(riderId))
     || (normalizedName(item.name || item.riderName) === normalizedName(riderName) && (!riderClass || normalizedName(item.primarySeries || item.class || item.riderClass) === normalizedName(riderClass)))) || null;
   const scores = Array.isArray(state.kaiserFantasyScores) ? state.kaiserFantasyScores : [];
-  const records = scores.filter(record => scoreMatchesRider(record, riderId, riderName, riderClass)).map(record => ({
-    id: record.id || "", riderId: record.riderId || riderId || "", riderName: record.riderName || record.athleteName || athlete?.name || riderName || "",
-    riderClass: record.riderClass || record.athleteClass || athlete?.primarySeries || athlete?.class || riderClass || "",
-    riderNumber: record.riderNumber || athlete?.number || "", riderRaceTeam: record.riderRaceTeam || record.raceTeam || athlete?.raceTeam || "",
-    manufacturer: record.manufacturer || athlete?.manufacturer || "", series: record.series || "", division: record.division || record.riderClass || "",
-    event: record.event || "", round: record.round ?? "", eventType: record.eventType || "", scoringPhase: record.scoringPhase || "",
-    place: record.place || 0, points: Number(record.points || 0), bonuses: Array.isArray(record.bonuses) ? record.bonuses : [],
-    teamName: record.teamName || "Unrostered / Free Agent", recordedAt: record.recordedAt || "", seasonYear: Number(year)
-  }));
+  const scheduledEvents = Array.isArray(state.kaiserFantasySchedule) ? state.kaiserFantasySchedule : [];
+  const eventById = new Map(scheduledEvents.map(event => [String(event.id || ""), event]));
+  const records = scores.filter(record => scoreMatchesRider(record, riderId, riderName, riderClass)).map(record => {
+    const scheduled = eventById.get(String(record.scheduledEventId || ""));
+    return {
+      id: record.id || "", riderId: record.riderId || riderId || "", riderName: record.riderName || record.athleteName || athlete?.name || riderName || "",
+      riderClass: record.riderClass || record.athleteClass || athlete?.primarySeries || athlete?.class || riderClass || "",
+      riderNumber: record.riderNumber || athlete?.number || "", riderRaceTeam: record.riderRaceTeam || record.raceTeam || athlete?.raceTeam || "",
+      manufacturer: record.manufacturer || athlete?.manufacturer || "", series: record.series || "", division: record.division || record.riderClass || "",
+      event: record.event || scheduled?.name || "", eventDate: record.eventDate || scheduled?.date || "", round: record.round ?? scheduled?.round ?? "", eventType: record.eventType || scheduled?.type || "", scoringPhase: record.scoringPhase || "",
+      place: record.place || 0, points: Number(record.points || 0), bonuses: Array.isArray(record.bonuses) ? record.bonuses : [],
+      teamName: record.teamName || "Unrostered / Free Agent", recordedAt: record.recordedAt || "", seasonYear: Number(year)
+    };
+  });
   const groups = new Map();
   for (const record of records) {
     const series = String(record.series || record.riderClass || "Unknown");
@@ -460,19 +468,55 @@ async function handleApi(req, res, url) {
     const riderName = url.searchParams.get("name") || "";
     const riderClass = url.searchParams.get("class") || "";
     if (!riderId && !riderName) return send(res, 400, { error: "A rider ID or name is required." });
-    const years = Object.entries(seasonIndex.seasons || {}).map(([year, meta]) => Number(year)).filter(year => validYear(year) && year < activeYear && seasonIndex.seasons[String(year)]?.archived).sort((a, b) => b - a);
+
+    // Publish the active season plus archived seasons only. Non-current,
+    // unarchived commissioner workspaces must remain private.
+    const archivedYears = Object.entries(seasonIndex.seasons || {})
+      .map(([year, meta]) => Number(year))
+      .filter(year => validYear(year) && year < activeYear && seasonIndex.seasons[String(year)]?.archived);
+    const years = [...new Set([activeYear, ...archivedYears])].sort((a, b) => b - a);
     const seasons = [];
     for (const year of years) {
       try {
         const database = await loadSeasonDatabase(year);
-        if (!database.archived) continue;
+        const isActive = year === activeYear;
+        if (!isActive && !database.archived && !seasonIndex.seasons[String(year)]?.archived) continue;
         const result = summarizeHistoricalRider(database, riderId, riderName, riderClass, year);
-        if (result.records.length || result.athlete) seasons.push(result);
+        if (result.records.length) seasons.push(result);
       } catch (error) {
-        console.warn(`Could not read archived season ${year} for public athlete history: ${error.message}`);
+        console.warn(`Could not read public athlete history for ${year}: ${error.message}`);
       }
     }
-    return send(res, 200, { seasons });
+
+    const records = seasons.flatMap(season => season.records || []).sort((a, b) => {
+      const dateValue = record => Date.parse(record.eventDate || "") || Date.parse(record.recordedAt || "") || 0;
+      return dateValue(b) - dateValue(a) || Number(b.seasonYear || 0) - Number(a.seasonYear || 0)
+        || Number(a.place || 999) - Number(b.place || 999);
+    });
+    const groups = new Map(), allRounds = new Set();
+    for (const record of records) {
+      const series = String(record.series || record.riderClass || "Unknown");
+      const division = String(record.division || record.riderClass || "Unknown");
+      const key = `${normalizedName(series)}|${normalizedName(division)}`;
+      if (!groups.has(key)) groups.set(key, { series, division, total: 0, rounds: new Set() });
+      const group = groups.get(key);
+      group.total += Number(record.points || 0);
+      const roundKey = scoreRoundKey(record);
+      group.rounds.add(roundKey);
+      allRounds.add(roundKey);
+    }
+    const averages = [...groups.values()].map(group => ({
+      series: group.series, division: group.division, total: group.total, rounds: group.rounds.size,
+      average: group.rounds.size ? group.total / group.rounds.size : 0
+    })).sort((a, b) => a.series.localeCompare(b.series) || a.division.localeCompare(b.division));
+    const totalPoints = records.reduce((sum, record) => sum + Number(record.points || 0), 0);
+    const currentSeasonPoints = records.filter(record => Number(record.seasonYear) === activeYear)
+      .reduce((sum, record) => sum + Number(record.points || 0), 0);
+    const rounds = allRounds.size;
+    return send(res, 200, {
+      activeYear, seasons, records,
+      career: { totalPoints, rounds, average: rounds ? totalPoints / rounds : 0, segmentCount: records.length, currentSeasonPoints, averages }
+    });
   }
 
   if (url.pathname === "/api/results/preview" && req.method === "POST") {

@@ -1,13 +1,19 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
+const APP_SOURCE = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
 const REPO_PREFIX = "/repos/test-owner/test-league";
+assert.match(APP_SOURCE, /Most Recent Scored Results/, "athlete profiles show recent results across published seasons");
+assert.match(APP_SOURCE, /Career average \/ round/, "athlete profiles display a career average per round");
+assert.match(APP_SOURCE, /Career rounds scored/, "athlete profiles display rounds accumulated across seasons");
+assert.doesNotMatch(APP_SOURCE, /Previously Scored Results|Archived Season Results|No archived results have been published/, "old split result placeholders are removed from athlete profiles");
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -123,7 +129,29 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     },
     keyUpdatedAt: {}, savedAt: 1_800_000_000_000
   };
-  const fakeGithub = await createFakeGithub({ "league-data/league-data.json": initialLegacy });
+  const historical2025 = {
+    version: 1, seasonYear: 2025, archived: true, archivedAt: "2025-12-01T00:00:00.000Z", savedAt: 1_765_000_000_000,
+    state: {
+      kaiserFantasyAthletes: [{ id: "rider-1", name: "Historic Racer", number: "12", class: "250", primarySeries: "250", raceTeam: "2025 Factory Team", manufacturer: "KTM" }],
+      kaiserFantasyTeams: [],
+      kaiserFantasyScores: [
+        { id: "score-2025-1", riderId: "rider-1", riderName: "Historic Racer", riderClass: "250", series: "SMX", division: "250", event: "Anaheim 1", round: 1, scheduledEventId: "event-2025-1", seasonYear: 2025, scoringPhase: "Moto 1", place: 1, points: 12, teamName: "Team One", riderNumber: "12", riderRaceTeam: "2025 Factory Team", recordedAt: "2025-01-11T20:00:00.000Z" },
+        { id: "score-2025-2", riderId: "rider-1", riderName: "Historic Racer", riderClass: "250", series: "SMX", division: "250", event: "Anaheim 1", round: 1, scheduledEventId: "event-2025-1", seasonYear: 2025, scoringPhase: "Moto 2", place: 2, points: 13, teamName: "Team One", riderNumber: "12", riderRaceTeam: "2025 Factory Team", recordedAt: "2025-01-11T21:00:00.000Z" }
+      ],
+      kaiserFantasyTrades: [], kaiserFantasyDraftState: { picks: [] }, kaiserFantasyDraftSettings: {},
+      kaiserFantasySchedule: [{ id: "event-2025-1", name: "Anaheim 1", date: "2025-01-11", series: "SMX", round: 1 }]
+    },
+    keyUpdatedAt: {}
+  };
+  const initialSeasonIndex = { version: 1, activeYear: 2027, seasons: {
+    "2025": { year: 2025, status: "archived", archived: true, archivedAt: "2025-12-01T00:00:00.000Z" },
+    "2027": { year: 2027, status: "current", archived: false }
+  } };
+  const fakeGithub = await createFakeGithub({
+    "league-data/league-data.json": initialLegacy,
+    "league-data/season-index.json": initialSeasonIndex,
+    "league-data/seasons/2025.json": historical2025
+  });
   const appPort = await freePort();
   const baseUrl = `http://127.0.0.1:${appPort}`;
   const child = spawn(process.execPath, [path.join(ROOT, "server.js")], {
@@ -192,6 +220,25 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(result.body.state.kaiserFantasyAthletes[0].number, "21", "editing a previous year does not change the current season rider number");
     assert.equal(result.body.state.kaiserFantasyAthletes[0].raceTeam, "2027 Factory Team");
 
+    result = await api(baseUrl, "/api/public/athlete-history?riderId=rider-1&name=Historic%20Racer&class=450");
+    assert.equal(result.response.status, 200);
+    assert.deepEqual(result.body.seasons.map(season => season.year), [2027, 2025], "public profile history includes the active season and archived seasons, but skips a non-archived commissioner workspace");
+    assert.equal(result.body.career.totalPoints, 60, "career history combines rider points across season files without changing team season totals");
+    assert.equal(result.body.career.rounds, 2, "career rounds accumulate across seasons while multiple motos within each event count once");
+    assert.equal(result.body.career.average, 30, "career average is total points across all published seasons divided by unique event rounds across those seasons");
+    assert.equal(result.body.career.currentSeasonPoints, 35, "current-season points remain separately identifiable and do not include archived points");
+    assert.equal(result.body.career.averages.length, 2, "career averages retain separate series/class buckets when a rider changes class between seasons");
+    const average250 = result.body.career.averages.find(item => item.division === "250");
+    const average450 = result.body.career.averages.find(item => item.division === "450");
+    assert.deepEqual([average250.total, average250.rounds, average250.average], [25, 1, 25]);
+    assert.deepEqual([average450.total, average450.rounds, average450.average], [35, 1, 35]);
+    assert.equal(result.body.records[0].seasonYear, 2027, "combined results are ordered newest event first");
+    assert.equal(result.body.records[0].eventDate, "2027-01-08", "older scoring records can derive race dates from that season's schedule");
+    assert.equal(result.body.records.find(record => record.seasonYear === 2025).eventDate, "2025-01-11");
+    assert.equal(result.body.records.find(record => record.seasonYear === 2025).division, "250", "career history follows the same rider across a class change");
+    assert.equal(result.body.records.find(record => record.seasonYear === 2025).riderNumber, "12", "historical number is retained on old score records");
+    assert.equal(result.body.records.find(record => record.seasonYear === 2025).riderRaceTeam, "2025 Factory Team", "historical race team is retained on old score records");
+
     result = await api(baseUrl, "/api/seasons/archive", { method: "POST", body: JSON.stringify({ year: 2027 }) }, cookie);
     assert.equal(result.response.status, 200, result.body.error || "archiving the current season should succeed");
     assert.equal(result.body.currentYear, 2028);
@@ -214,7 +261,7 @@ async function api(baseUrl, route, options = {}, cookie = "") {
 
     result = await api(baseUrl, "/api/public/athlete-history?riderId=rider-1&name=Historic%20Racer&class=450");
     assert.equal(result.response.status, 200);
-    assert.equal(result.body.seasons.length, 1, "only archived seasons are published to public athlete profiles");
+    assert.deepEqual(result.body.seasons.map(season => season.year), [2027, 2025], "public profile history keeps archived seasons after a new season starts");
     const historic = result.body.seasons[0];
     assert.equal(historic.year, 2027);
     assert.equal(historic.averages[0].total, 35);
@@ -222,6 +269,10 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(historic.averages[0].average, 35);
     assert.equal(historic.records[0].riderNumber, "21");
     assert.equal(historic.records[0].riderRaceTeam, "2027 Factory Team");
+    assert.equal(result.body.career.totalPoints, 60, "career average and rounds persist across the season archive transition");
+    assert.equal(result.body.career.rounds, 2);
+    assert.equal(result.body.career.average, 30);
+    assert.equal(result.body.career.currentSeasonPoints, 0, "archived points do not carry into the new active season total");
     assert.equal(Object.prototype.hasOwnProperty.call(historic.records[0], "teamKey"), false, "public history omits internal team keys");
     assert.equal(Object.prototype.hasOwnProperty.call(historic.athlete, "passwordHash"), false);
 
@@ -234,7 +285,7 @@ async function api(baseUrl, route, options = {}, cookie = "") {
 
     // Separate save files are the only league-data JSON persistence destinations.
     const seasonFiles = [...fakeGithub.files.keys()].filter(file => /^league-data\/seasons\/\d{4}\.json$/.test(file)).sort();
-    assert.deepEqual(seasonFiles, ["league-data/seasons/2026.json", "league-data/seasons/2027.json", "league-data/seasons/2028.json"]);
+    assert.deepEqual(seasonFiles, ["league-data/seasons/2025.json", "league-data/seasons/2026.json", "league-data/seasons/2027.json", "league-data/seasons/2028.json"]);
     console.log("Historical season integration tests passed: per-year GitHub files, 2010+ commissioner access control, isolated rider edits, cross-season rider/schedule copy, event-round averages, public archived rider history, and archive/new-season reset behavior.");
   } finally {
     child.kill("SIGTERM");

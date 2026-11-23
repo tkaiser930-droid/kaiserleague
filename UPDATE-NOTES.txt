@@ -1,3 +1,12 @@
+2026-11-23 athlete profile career results update:
+- Replaced the separate "Previously Scored Results" and empty "Archived Season Results" profile panels with one "Most Recent Scored Results" feed.
+- Public athlete profiles now combine the active season and archived seasons, while unarchived non-current commissioner workspaces remain private.
+- The ten newest scored segments display by race date (using the season schedule date when an older score snapshot did not store one); older scored segments remain expandable.
+- Career average per round and rounds scored now accumulate across seasons, with separate lifetime average rows by series and class when a rider changes class.
+- Current-season points remain a separate figure, and fantasy-team seasonal totals are not carried into a new season.
+- New scoring records retain the scheduled event date, and older records infer it from their season schedule when possible.
+- Regression coverage verifies multi-season totals, event-round deduplication across motos, class changes, race-date ordering, and privacy of unarchived workspaces.
+
 Kaiser Family Fantasy SMX - Update Notes
 
 Teams & Manufacturers
