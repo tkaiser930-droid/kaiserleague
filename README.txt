@@ -45,10 +45,10 @@ SCHEDULE
 - Team Management and Trade Center lock during scheduled event dates.
 
 GITHUB-ONLY STORAGE / RENDER DEPLOYMENT
-- GitHub is the only shared persistent store for league data. Default repository: tkaiser930-droid/LeagueSave; JSON path: league-data/league-data.json.
-- The Node server loads the league JSON from GitHub into memory at startup and commits each accepted change directly back to GitHub.
+- GitHub is the only shared persistent store for league data. Default repository: tkaiser930-droid/LeagueSave. Each season is stored in league-data/seasons/YYYY.json, with league-data/season-index.json tracking active and archived years.
+- The Node server loads the active season from GitHub into memory at startup and commits each accepted change directly back to that season file. The former league-data/league-data.json path is used only for one-time migration if the active season file does not yet exist.
 - No Render persistent disk or local server-side league-data JSON file is used. The Render service hosts the website and API only.
-- In Render > Service > Environment, set GITHUB_TOKEN, GITHUB_REPOSITORY=tkaiser930-droid/LeagueSave, GITHUB_BACKUP_PASSWORD, GITHUB_BRANCH (blank for default), and GITHUB_DATA_PATH=league-data/league-data.json. The token needs Contents: Read and write and Metadata: Read.
+- In Render > Service > Environment, set GITHUB_TOKEN, GITHUB_REPOSITORY=tkaiser930-droid/LeagueSave, GITHUB_BACKUP_PASSWORD, COMMISSIONER_PASSWORD, COMMISSIONER_SESSION_SECRET, GITHUB_BRANCH (blank for default), GITHUB_DATA_PATH=league-data/league-data.json (legacy migration only), GITHUB_SEASON_DIRECTORY=league-data/seasons, GITHUB_SEASON_INDEX_PATH=league-data/season-index.json, and KF_ACTIVE_SEASON=2027. The token needs Contents: Read and write and Metadata: Read.
 - Do not set DATA_DIR. The included render.yaml no longer declares a persistent disk.
 - Before deploying this update from the former disk-based version, first use the current live site’s Commissioner > Data & Backup > Save Current League JSON to GitHub. Confirm the GitHub commit and download a JSON backup. Only then deploy and remove the old Render persistent disk.
 - Manual portable JSON download and restore remain available in Data & Backup. When GitHub is offline, the browser copy can still be downloaded; server-side shared saving reports an error rather than falling back to a Render disk.
@@ -71,10 +71,16 @@ BACKGROUND AND BRANDING
 - Manufacturer logos and colors from the GASGAS-logo version remain. Later sponsor-only badge entries have been removed as part of this rollback.
 
 SECURITY
-The existing login and data API were originally designed for a private family league prototype. Server-side role authorization should be added before allowing untrusted public users to modify league data.
+- Historical season state and season editing APIs require a commissioner session. Public athlete-history responses contain only selected athlete details and scored results; team passwords, ownership credentials, trades and draft data are not exposed.
+- Keep the LeagueSave repository private. GitHub repository permissions are separate from the website commissioner login.
+- Set a strong COMMISSIONER_PASSWORD and COMMISSIONER_SESSION_SECRET in Render environment variables; do not commit either value.
 
 COMMISSIONER DASHBOARD NAVIGATION
-- The Commissioner page is organized into Athletes, Scoring, Draft, and Schedule tabs.
+- The Commissioner page is organized into Athletes, Scoring, Draft, Schedule, Historical Results, and Data & Backup tabs. A commissioner-only season dropdown selects the independent workspace to edit or score; it offers seasons from 2010 onward.
+- Historical Results shows rider totals, unique event-round counts, and average points per round grouped by rider, series, and class. Previous-season workspaces are commissioner-only; public rider profiles expose only sanitized results from archived seasons.
+- Archive Current Season marks the active year as archived and starts the next year with the rider directory and team identities but no rosters, scores, trades, draft, or schedule.
+- Riders and schedules can be copied between season files; copied rider numbers and race teams are season-specific, and copied schedule dates move to the destination year.
+- Each year has its own GitHub JSON file at league-data/seasons/YYYY.json; league-data/season-index.json tracks the active year and archive status.
 - Athletes contains Add Athlete, Edit Rider, and All Athletes.
 - Scoring contains Score Race Results, Previously Scored Events, and Scoring History.
 - Draft contains Draft Management.
@@ -115,3 +121,12 @@ URL fetching is handled by the Node server, so run the site with `npm start` rat
 MXGP importer request correction (November 16, 2026)
 - The final `reslists.aspx` request now retains hidden non-framework view parameters from the dropdown form when present, including `view=classification`. The previous final-URL builder cleared the whole query string and dropped this state after the dropdown selections; the corrected builder no longer strips it.
 - Mismatch errors now include the exact selected dropdown labels and option values (Championship, Class, Round, Session) alongside the final source URL. This is intended to identify the actual portal option-value mapping if the live source still returns a different classification.
+
+
+Historical season files
+-----------------------
+The commissioner dashboard provides season workspaces from 2010 through the active year. Each year has its own GitHub file under league-data/seasons/YYYY.json; league-data/season-index.json records the active year and archived status. The active year defaults to 2027 and can be changed with KF_ACTIVE_SEASON before the index is initialized.
+
+Only the active season is served to public team, draft, schedule and current standings endpoints. Accessing any previous-year workspace requires a commissioner session cookie. The public athlete profile API returns a sanitized subset of archived rider results and per-series/class average points; it does not return historical team passwords, owner details, trades or draft information. Keep the LeagueSave repository private because it contains the underlying season save files.
+
+Archive Current Season saves the year snapshot, carries forward independent copies of the rider directory and team identities, and creates the next year without rosters, scores, trades, draft state or schedule. Copy Between Seasons can copy rider records or schedule events to the selected year. Local JSON backup download and restore apply to the currently selected year.

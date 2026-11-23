@@ -1,11 +1,12 @@
 KAISER FAMILY FANTASY SMX — GITHUB-ONLY LEAGUE STORAGE
 
 PURPOSE
-- GitHub is the only shared persistent store for the league database.
+- GitHub is the only shared persistent store for league data.
 - Default repository: tkaiser930-droid/LeagueSave.
-- Default JSON path: league-data/league-data.json.
-- The Node server loads the latest JSON from GitHub into memory when it starts.
-- Each accepted league change is committed directly to GitHub before the API reports the save as successful.
+- Each year has its own file: league-data/seasons/YYYY.json.
+- The season index is stored at league-data/season-index.json.
+- The Node server loads the active season from GitHub into memory when it starts.
+- Each accepted change is committed directly to that season file before the API reports the save as successful.
 - The server does not read or write league data to a Render persistent disk or local server JSON file.
 - The browser keeps its normal local working copy. Data & Backup can download a portable JSON backup and restore a downloaded backup to GitHub.
 
@@ -16,7 +17,12 @@ GITHUB SETUP
    - GITHUB_TOKEN = the fine-grained token
    - GITHUB_REPOSITORY = tkaiser930-droid/LeagueSave
    - GITHUB_BRANCH = leave blank to auto-detect the repository default branch
-   - GITHUB_DATA_PATH = league-data/league-data.json
+   - GITHUB_DATA_PATH = league-data/league-data.json (legacy migration only)
+   - GITHUB_SEASON_DIRECTORY = league-data/seasons
+   - GITHUB_SEASON_INDEX_PATH = league-data/season-index.json
+   - KF_ACTIVE_SEASON = 2027
+   - COMMISSIONER_PASSWORD = commissioner website sign-in password
+   - COMMISSIONER_SESSION_SECRET = long random secret for commissioner sessions
    - GITHUB_BACKUP_PASSWORD = a separate long password for the commissioner-only manual Save / Load Latest buttons
 4) Do not set DATA_DIR. It is no longer used.
 5) Deploy the updated project. The service no longer requires a Render persistent disk.
@@ -32,8 +38,8 @@ Before deploying this version, open the current live site and sign in as commiss
 7) After deployment and verification, remove/detach the old Render persistent disk in the Render dashboard if it is still attached. Do not delete it before confirming the GitHub save and local download.
 
 AUTOMATIC SAVING
-- Browser changes are sent to the Node service.
-- The Node service serializes saves and commits the updated league-data JSON directly to GitHub.
+- Browser changes are sent to the Node service with the selected season year.
+- The Node service serializes saves and commits the updated season JSON file directly to GitHub.
 - If the GitHub commit fails, the API reports an error and the browser retains the local copy for retry/download. The server does not silently fall back to a Render disk or local JSON file.
 - If GitHub is unavailable at startup, the service remains available for static pages/health checks, but shared data loading is disabled until GitHub can be reached. The browser operates in browser-only mode and keeps its local copy.
 - The first save can initialize an empty GitHub repository by creating the first Git tree, commit, and branch.
@@ -62,3 +68,12 @@ SECURITY
 - GITHUB_TOKEN is read only by the Node server from environment variables or an untracked .env file.
 - Never put the token in app.js, HTML, browser storage, or a committed file.
 - GITHUB_BACKUP_PASSWORD is separate from the GitHub token and protects manual commissioner-only GitHub actions.
+
+
+Season file storage
+-------------------
+The server writes each year's data to its own JSON file: league-data/seasons/YYYY.json. The active-year and archive index is league-data/season-index.json. Configure GITHUB_SEASON_DIRECTORY=league-data/seasons, GITHUB_SEASON_INDEX_PATH=league-data/season-index.json and KF_ACTIVE_SEASON=2027. GITHUB_DATA_PATH points to the previous single-file save only; if that file exists and no 2027 season file exists, the server migrates its state to the 2027 season file and registers the index.
+
+Set COMMISSIONER_PASSWORD to the password used to sign in to the Commissioner page. Set COMMISSIONER_SESSION_SECRET to a long random secret used to sign the HttpOnly commissioner session cookie. GITHUB_BACKUP_PASSWORD remains the password for the Data & Backup manual save/reload actions.
+
+Historical season APIs require the commissioner session. Public users see only the current season's main league state. Public athlete profiles can request sanitized rider scoring history from archived seasons. Keep the LeagueSave repository private: GitHub repository access controls are separate from website commissioner sign-in.

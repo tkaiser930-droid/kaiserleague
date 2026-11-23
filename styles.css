@@ -404,3 +404,14 @@ body[data-page="home"] #topUndraftedAthletes {
 .official-import-preview table{min-width:640px}
 .official-import-preview td,.official-import-preview th{padding:7px 9px}
 @media(max-width:680px){.official-import-heading{display:block}.official-import-heading .official-source-link{display:inline-block;margin-top:10px}.official-import-controls{grid-template-columns:1fr}.official-import-panel{padding:12px}}
+
+/* Year-specific commissioner season workspace and archive results */
+.commissioner-season-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,320px);align-items:center;gap:18px;margin-bottom:16px;border-color:#806b32;background:linear-gradient(130deg,#191b29,#171822)}
+.commissioner-season-workspace label{margin:0;font-weight:800}
+.commissioner-season-workspace select{width:100%;margin-top:7px}
+#historicalSeasonSummary .summary{margin:14px 0 18px}
+.historical-profile-season{margin:12px 0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#141722}
+.historical-profile-season summary{cursor:pointer;font-weight:800;color:var(--gold);padding:3px 0}
+.historical-profile-season h4{margin:14px 0 8px}
+#commTabPanel-history>.panel{margin-bottom:16px}
+@media(max-width:700px){.commissioner-season-workspace{grid-template-columns:1fr}.commissioner-season-workspace label{max-width:none}}

@@ -21,3 +21,13 @@ services:
         value: ""
       - key: GITHUB_DATA_PATH
         value: league-data/league-data.json
+      - key: GITHUB_SEASON_DIRECTORY
+        value: league-data/seasons
+      - key: GITHUB_SEASON_INDEX_PATH
+        value: league-data/season-index.json
+      - key: KF_ACTIVE_SEASON
+        value: "2027"
+      - key: COMMISSIONER_PASSWORD
+        sync: false
+      - key: COMMISSIONER_SESSION_SECRET
+        sync: false

@@ -136,3 +136,14 @@ MotoGP 403 diagnostics update:
 - The final URL now preserves those hidden classification-view parameters while replacing only the selected championship, class, event, session, and year filters.
 - Added regression assertions that fail when `view=classification` is missing from the final request, including the WebForms postback path.
 - MXGP classification mismatch errors now report the exact dropdown text and option value selected at each level, alongside the final URL.
+
+
+2026-11-22 Historical season management / individual GitHub season files:
+- Added Commissioner > Historical Results and a commissioner-only season selector for independent seasons from 2010 onward. Historical year selection loads that year's own riders, scoring, draft, teams, and schedule workspace; public users continue to receive only the active season state.
+- Each season is stored in its own GitHub file at league-data/seasons/YYYY.json. The active/archive index is league-data/season-index.json. The legacy league-data/league-data.json is read only as a one-time migration source for the configured active year when its season file does not yet exist.
+- Added per-rider total points, unique event-round count, and average points per round grouped by series and class. Multiple session/moto records from the same event count as one round for the rider's series/class average.
+- Archived-season rider results are visible on public athlete profiles through a sanitized history endpoint; previous-year workspace data remains commissioner-only. Public responses do not include team credentials, trades, draft records, or the full historical database.
+- Added archive-and-start-next-season workflow. The archived season remains unchanged; the new active season carries rider directory details and team identities but does not carry points, rosters, trades, draft state/settings, or schedule events.
+- Added season-to-season rider and schedule copying. Rider number, race-team, and manufacturer changes remain isolated to the selected season; copied schedule dates are adjusted to the destination year.
+- Kept GitHub as the only shared persistent database, browser working-copy recovery, the concise Connected status banner, and local JSON download/restore. No Render persistent disk or local server-side league data file is used.
+- Added automated integration tests for separate season files, 2010+ commissioner access control, isolated rider details, copy operations, round averages, public historical rider results, and archive reset behavior.

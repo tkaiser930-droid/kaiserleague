@@ -9,6 +9,14 @@ const { createGithubBackup } = require("../github-backup");
 const root = path.resolve(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
+function testConnectedStatusIsConcise() {
+  const bootstrap = read("bootstrap.js");
+  assert.match(bootstrap, /setStatus\("Connected", "good"\)/, "successful GitHub initialization should display only Connected");
+  assert.doesNotMatch(bootstrap, /Connected — all shared league changes save directly to GitHub:/, "the detailed repository path should not appear in the connection banner");
+}
+
+testConnectedStatusIsConcise();
+
 async function testGithubBackupRoundTrip() {
   const originalFetch = global.fetch;
   const originalEnv = {
@@ -153,7 +161,7 @@ async function testGithubIsCanonicalOverStaleBrowserCache() {
     storageLabel: "GitHub repository test-owner/test-league"
   };
   const fetch = async (url, options = {}) => {
-    if (url === "/api/state" && !options.method) {
+    if (String(url) === "/api/state" && !options.method) {
       return { ok: true, status: 200, json: async () => remote };
     }
     if (String(url).startsWith("/api/state/") && options.method === "PUT") {
@@ -171,15 +179,62 @@ async function testGithubIsCanonicalOverStaleBrowserCache() {
     addEventListener() {}
   };
   const window = {};
-  vm.runInNewContext(bootstrap, { window, document, localStorage, fetch, console, Date, Promise, Set, JSON, Object, Number, String });
+  vm.runInNewContext(bootstrap, { window, document, localStorage, fetch, console, Date, Promise, Set, JSON, Object, Number, String, URL, location: { origin: "https://league.example" } });
   await new Promise(resolve => setTimeout(resolve, 20));
 
   assert.deepEqual(JSON.parse(values.get("kaiserFantasyScores")), [{ id: "github-canonical-score" }], "a stale browser cache with a newer local clock must not overwrite GitHub");
   assert.equal(values.get("__kf_saved_at__kaiserFantasyScores"), "900000000000");
   assert.equal(putCalls.length, 1, "only the explicitly marked unsynced local edit should be uploaded");
-  assert.equal(putCalls[0].url, "/api/state/kaiserFantasyAthletes");
+  assert.equal(putCalls[0].url, "/api/state/kaiserFantasyAthletes?year=2027");
   assert.deepEqual(putCalls[0].body.value, [{ id: "pending-unsynced-athlete" }]);
   assert.equal(values.has("__kf_unsynced__kaiserFantasyAthletes"), false, "successful GitHub sync clears the pending marker");
+}
+
+
+async function testSameYearRefreshAppliesRemoteCopy() {
+  const bootstrap = read("bootstrap.js");
+  const values = new Map();
+  const localStorage = {
+    getItem: key => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key)
+  };
+  let remoteAthletes = [{ id: "before-copy", name: "Before Copy" }];
+  const fetch = async (url, options = {}) => {
+    const textUrl = String(url);
+    if (textUrl === "/api/state" || textUrl.startsWith("/api/state?year=2027")) {
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          state: { kaiserFantasyAthletes: remoteAthletes },
+          keyUpdatedAt: { kaiserFantasyAthletes: remoteAthletes[0]?.id === "after-copy" ? 200 : 100 },
+          savedAt: 200, activeYear: 2027, seasonYear: 2027, storageLabel: "GitHub season files"
+        })
+      };
+    }
+    throw new Error(`Unexpected same-year refresh request: ${options.method || "GET"} ${textUrl}`);
+  };
+  const body = { prepend() {}, appendChild(node) { this.lastScript = node; } };
+  const document = {
+    readyState: "complete", body,
+    createElement: () => ({}),
+    querySelector: () => null,
+    addEventListener() {}
+  };
+  const window = {};
+  vm.runInNewContext(bootstrap, {
+    window, document, localStorage, fetch, console, Date, Promise, Set, JSON,
+    Object, Number, String, URL, location: { origin: "https://league.example" }
+  });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(window.KFStorage.mode, "server");
+  assert.deepEqual(JSON.parse(values.get("kaiserFantasyAthletes")), [{ id: "before-copy", name: "Before Copy" }]);
+
+  // Simulate a server-side copy that has updated the selected year's GitHub file.
+  remoteAthletes = [{ id: "after-copy", name: "Copied Rider" }];
+  await window.KFStorage.setSeasonYear(2027);
+  assert.deepEqual(JSON.parse(values.get("kaiserFantasyAthletes")), [{ id: "after-copy", name: "Copied Rider" }],
+    "refreshing the already-selected year must apply the updated GitHub file to the browser copy");
 }
 
 function testNoServerSideDiskPersistence() {
@@ -192,14 +247,16 @@ function testNoServerSideDiskPersistence() {
 
   assert.doesNotMatch(server, /\bDATA_DIR\b|\bDB_FILE\b|fs\.watchFile|fs\.promises\.writeFile|\/var\/data/);
   assert.match(server, /githubBackup\.saveLeagueData/);
-  assert.match(server, /storage: "github-only"/);
+  assert.match(server, /storage: "github-only-season-files"/);
+  assert.match(server, /function seasonPath\(year\).*SEASON_DIRECTORY/);
+  assert.match(server, /GITHUB_SEASON_INDEX_PATH|SEASON_INDEX_PATH/);
   assert.doesNotMatch(render, /^\s*disk:/m);
   assert.doesNotMatch(render, /DATA_DIR/);
   assert.doesNotMatch(docker, /DATA_DIR|\/var\/data/);
 
   // Keep the local browser JSON export and the Restore-a-backup flow intact.
   assert.match(bootstrap, /async function exportState\(\)/);
-  assert.match(bootstrap, /hasUnsyncedLocalEdit/);
+  assert.match(bootstrap, /UNSYNCED_PREFIX/);
   assert.doesNotMatch(bootstrap, /localTs > remoteTs/, "local wall-clock timestamps must not override the GitHub canonical copy");
   assert.match(commissioner, /id="exportData"/);
   assert.match(commissioner, /id="importData"/);
@@ -211,7 +268,8 @@ function testNoServerSideDiskPersistence() {
   testNoServerSideDiskPersistence();
   await testGithubBackupRoundTrip();
   await testGithubIsCanonicalOverStaleBrowserCache();
-  console.log("GitHub-only storage tests passed: no Render/local server database writes, automatic GitHub commits, initial repository setup, update/load round trip, stale browser-cache protection, pending offline edit recovery, token/password checks, and local JSON download/restore retention.");
+  await testSameYearRefreshAppliesRemoteCopy();
+  console.log("GitHub-only storage tests passed: no Render/local server database writes, automatic GitHub commits, initial repository setup, update/load round trip, stale browser-cache protection, pending offline edit recovery, same-year post-copy refresh, token/password checks, and local JSON download/restore retention.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

@@ -3,7 +3,7 @@
 const path = require("path");
 const crypto = require("crypto");
 
-const API_ROOT = "https://api.github.com";
+const API_ROOT = (process.env.GITHUB_API_BASE_URL || "https://api.github.com").replace(/\/$/, "");
 const DEFAULT_REPOSITORY = "tkaiser930-droid/LeagueSave";
 
 function loadDotEnv(root) {
@@ -58,7 +58,12 @@ function createGithubBackup(root) {
     const [owner, repo] = repositoryParts();
     return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${suffix}`;
   };
-  const encodedDataPath = () => config().dataPath.split("/").map(encodeURIComponent).join("/");
+  const resolvedDataPath = value => {
+    const pathValue = safeRelativePath(value || config().dataPath);
+    if (!pathValue) throw new Error("The requested GitHub JSON path is invalid.");
+    return pathValue;
+  };
+  const encodedDataPath = value => resolvedDataPath(value).split("/").map(encodeURIComponent).join("/");
   const encodeRefPath = branch => encodeURIComponent(branch).replace(/%2F/gi, "/");
 
   async function api(endpoint, options = {}) {
@@ -124,28 +129,28 @@ function createGithubBackup(root) {
     }
   }
 
-  async function getLatestLeagueData() {
+  async function getJsonFile(dataPathOverride) {
     if (!configured()) return { configured: false, found: false, data: null, savedAt: 0, sha: null, commit: null, branchExists: false };
-    const cfg = config();
+    const dataPath = resolvedDataPath(dataPathOverride);
     const branchInfo = await resolveBranch();
     if (!branchInfo.branchExists) {
-      return { configured: true, found: false, data: null, savedAt: 0, sha: null, commit: null, path: cfg.dataPath, branch: branchInfo.branch, branchExists: false };
+      return { configured: true, found: false, data: null, savedAt: 0, sha: null, commit: null, path: dataPath, branch: branchInfo.branch, branchExists: false };
     }
     let file;
     try {
-      file = await api(repoApi(`/contents/${encodedDataPath()}?ref=${encodeURIComponent(branchInfo.branch)}`));
+      file = await api(repoApi(`/contents/${encodedDataPath(dataPath)}?ref=${encodeURIComponent(branchInfo.branch)}`));
     } catch (err) {
-      if (err.status === 404) return { configured: true, found: false, data: null, savedAt: 0, sha: null, commit: null, path: cfg.dataPath, branch: branchInfo.branch, branchExists: true };
+      if (err.status === 404) return { configured: true, found: false, data: null, savedAt: 0, sha: null, commit: null, path: dataPath, branch: branchInfo.branch, branchExists: true };
       throw err;
     }
     if (file.type !== "file" || file.encoding !== "base64" || typeof file.content !== "string") {
-      throw new Error(`GitHub returned an unsupported format for ${cfg.dataPath}. The saved league file must be a base64 JSON file.`);
+      throw new Error(`GitHub returned an unsupported format for ${dataPath}. The saved file must be a base64 JSON file.`);
     }
     let data;
     try { data = JSON.parse(Buffer.from(file.content.replace(/\n/g, ""), "base64").toString("utf8")); }
-    catch { throw new Error(`The GitHub league save at ${cfg.dataPath} is not valid JSON.`); }
-    if (!data || typeof data !== "object" || !data.state || typeof data.state !== "object" || Array.isArray(data.state)) {
-      throw new Error(`The GitHub league save at ${cfg.dataPath} does not contain a valid state object.`);
+    catch { throw new Error(`The GitHub JSON file at ${dataPath} is not valid JSON.`); }
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error(`The GitHub JSON file at ${dataPath} does not contain a valid JSON object.`);
     }
     return {
       configured: true,
@@ -158,21 +163,29 @@ function createGithubBackup(root) {
         url: file.commit.html_url || "",
         date: file.commit.committer?.date || file.commit.author?.date || ""
       } : null,
-      path: cfg.dataPath,
+      path: dataPath,
       branch: branchInfo.branch,
       branchExists: true
     };
   }
 
-  async function createFirstCommit(content, message, branch) {
-    const cfg = config();
+  async function getLatestLeagueData(dataPathOverride) {
+    const result = await getJsonFile(dataPathOverride);
+    if (result.found && (!result.data.state || typeof result.data.state !== "object" || Array.isArray(result.data.state))) {
+      throw new Error(`The GitHub league save at ${result.path} does not contain a valid state object.`);
+    }
+    return result;
+  }
+
+  async function createFirstCommit(content, message, branch, dataPathOverride) {
+    const dataPath = resolvedDataPath(dataPathOverride);
     // The Contents API cannot create a file in a repository with no commits.
     // Use Git Database APIs to create the first tree, commit, and branch ref.
     const tree = await api(repoApi("/git/trees"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tree: [{ path: cfg.dataPath, mode: "100644", type: "blob", content }]
+        tree: [{ path: dataPath, mode: "100644", type: "blob", content }]
       })
     });
     if (!tree.sha) throw new Error("GitHub did not return a tree SHA while creating the initial league backup.");
@@ -190,46 +203,40 @@ function createGithubBackup(root) {
     return commit;
   }
 
-  async function saveLeagueData(database, message = "Kaiser Family Fantasy SMX: automatic league-data save") {
-    if (!configured()) throw new Error("GitHub league-data backup is not configured. Set GITHUB_TOKEN and GITHUB_REPOSITORY on the server.");
-    if (!database || typeof database !== "object" || !database.state || typeof database.state !== "object" || Array.isArray(database.state)) {
-      throw new Error("The current league database is not valid and cannot be saved to GitHub.");
-    }
+  async function saveJsonFile(value, message = "Kaiser Family Fantasy SMX: JSON save", dataPathOverride) {
+    if (!configured()) throw new Error("GitHub JSON storage is not configured. Set GITHUB_TOKEN and GITHUB_REPOSITORY on the server.");
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("The submitted JSON document is invalid.");
     const cfg = config();
-    const current = await getLatestLeagueData();
-    const content = JSON.stringify(database, null, 2);
-    const commitMessage = String(message || "Kaiser Family Fantasy SMX: league-data save").replace(/[\r\n]+/g, " ").trim().slice(0, 180);
+    const dataPath = resolvedDataPath(dataPathOverride);
+    const current = await getJsonFile(dataPath);
+    const content = JSON.stringify(value, null, 2);
+    const commitMessage = String(message || "Kaiser Family Fantasy SMX: JSON save").replace(/[\r\n]+/g, " ").trim().slice(0, 180);
     if (current.found && JSON.stringify(current.data, null, 2) === content) {
-      return {
-        ok: true, changed: false, savedAt: savedAtMs(database), path: cfg.dataPath, branch: current.branch,
-        commit: current.commit || { sha: "", url: "", date: "" }
-      };
+      return { ok: true, changed: false, savedAt: savedAtMs(value), path: dataPath, branch: current.branch, commit: current.commit || { sha: "", url: "", date: "" } };
     }
-
     if (!current.branchExists) {
-      const commit = await createFirstCommit(content, commitMessage, current.branch || cfg.branchOverride || "main");
+      const commit = await createFirstCommit(content, commitMessage, current.branch || cfg.branchOverride || "main", dataPath);
       return {
-        ok: true, changed: true, initialCommit: true, savedAt: savedAtMs(database), path: cfg.dataPath, branch: current.branch || cfg.branchOverride || "main",
+        ok: true, changed: true, initialCommit: true, savedAt: savedAtMs(value), path: dataPath, branch: current.branch || cfg.branchOverride || "main",
         commit: { sha: commit.sha, shortSha: String(commit.sha).slice(0, 7), url: commit.html_url || "", date: commit.committer?.date || commit.author?.date || new Date().toISOString() }
       };
     }
-
     const payload = { message: commitMessage, content: Buffer.from(content, "utf8").toString("base64"), branch: current.branch };
     if (current.sha) payload.sha = current.sha;
-    const result = await api(repoApi(`/contents/${encodedDataPath()}`), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    const result = await api(repoApi(`/contents/${encodedDataPath(dataPath)}`), {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
     });
     return {
-      ok: true, changed: true, savedAt: savedAtMs(database), path: cfg.dataPath, branch: current.branch,
-      commit: {
-        sha: result.commit?.sha || "",
-        shortSha: String(result.commit?.sha || "").slice(0, 7),
-        url: result.commit?.html_url || "",
-        date: result.commit?.committer?.date || result.commit?.author?.date || new Date().toISOString()
-      }
+      ok: true, changed: true, savedAt: savedAtMs(value), path: dataPath, branch: current.branch,
+      commit: { sha: result.commit?.sha || "", shortSha: String(result.commit?.sha || "").slice(0, 7), url: result.commit?.html_url || "", date: result.commit?.committer?.date || result.commit?.author?.date || new Date().toISOString() }
     };
+  }
+
+  async function saveLeagueData(database, message = "Kaiser Family Fantasy SMX: automatic league-data save", dataPathOverride) {
+    if (!database || typeof database !== "object" || !database.state || typeof database.state !== "object" || Array.isArray(database.state)) {
+      throw new Error("The current league database is not valid and cannot be saved to GitHub.");
+    }
+    return saveJsonFile(database, message, dataPathOverride);
   }
 
   async function getStatus(localInfo = {}) {
@@ -257,7 +264,7 @@ function createGithubBackup(root) {
       return result;
     }
     try {
-      const remote = await getLatestLeagueData();
+      const remote = await getLatestLeagueData(localInfo.dataPath);
       result.branch = remote.branch || cfg.branchOverride || "main";
       result.branchExists = !!remote.branchExists;
       if (remote.found) {
@@ -289,10 +296,12 @@ function createGithubBackup(root) {
     configured,
     isAutoEnabled: () => { try { return configured(); } catch { return false; } },
     authorize,
+    getJsonFile,
+    saveJsonFile,
     getLatestLeagueData,
     saveLeagueData,
     getStatus,
-    getConfigSummary: () => ({ repository: config().repository, branch: config().branchOverride || "repository default (auto-detect)", dataPath: config().dataPath })
+    getConfigSummary: (dataPathOverride) => ({ repository: config().repository, branch: config().branchOverride || "repository default (auto-detect)", dataPath: resolvedDataPath(dataPathOverride) })
   };
 }
 
