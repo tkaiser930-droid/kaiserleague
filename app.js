@@ -1383,7 +1383,7 @@ function dataInit(){
    const response=await fetch(`/api/github/status?year=${encodeURIComponent(statusYear)}`,{cache:"no-store",credentials:"same-origin"});
    const info=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(info.error||`The Node.js API returned HTTP ${response.status} while checking GitHub connectivity. Open /healthz to verify the deployed server build.`);
-   if(info.build!=="kf-github-status-consistency-20261123d")throw new Error("The deployed server is running an older storage-status build. Deploy the latest GitHub status consistency project ZIP and reopen the site.");
+   if(info.build!=="kf-github-status-consistency-20261123e")throw new Error("The deployed server is running an older storage-status build. Deploy the latest GitHub status consistency project ZIP and reopen the site.");
    if(!info.configured){
     const message=`Unavailable: GitHub-only saving is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;
     if(!publishStatus(message,"warn"))return;

@@ -57,16 +57,16 @@ async function runBootstrap(fetchImpl) {
   for (const file of htmlFiles) {
     const html = fs.readFileSync(path.join(root, file), "utf8");
     if (/bootstrap\.js/.test(html)) {
-      assert.match(html, /bootstrap\.js\?v=kf-github-status-consistency-20261123d/,
+      assert.match(html, /bootstrap\.js\?v=kf-github-status-consistency-20261123e/,
         `${file} must request the cache-busted storage bootstrap`);
     }
   }
-  assert.match(bootstrap, /app\.js\?v=kf-github-status-consistency-20261123d/,
+  assert.match(bootstrap, /app\.js\?v=kf-github-status-consistency-20261123e/,
     "the dynamically loaded app must also be cache-busted");
   assert.match(bootstrap, /One authoritative status is reflected everywhere/, "header and Data & Backup storage status should not contradict each other");
   assert.match(bootstrap, /statusRevision/, "newer status operations must prevent stale async probes from overwriting the latest result");
   assert.match(bootstrap, /fetchJson\(yearUrl\("\/api\/state\/"/, "GitHub writes should use the bounded retry wrapper");
-  assert.match(bootstrap, /status.build !== "kf-github-status-consistency-20261123d"/, "an older cached server deployment must not be accepted as connected");
+  assert.match(bootstrap, /status.build !== "kf-github-status-consistency-20261123e"/, "an older cached server deployment must not be accepted as connected");
   const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
   assert.match(app, /reportStatus\(text,state,statusTicket\)/, "a failed live status probe must update the header through the authoritative status helper");
   assert.match(app, /!info\.writeReady\|\|!storageVerified/, "manual actions must be disabled when the active GitHub file cannot be verified");
@@ -78,7 +78,7 @@ async function runBootstrap(fetchImpl) {
   // direct GitHub probe reports an outage.
   const unavailable = await runBootstrap(async url => {
     if (String(url).startsWith("/api/github/status")) {
-      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: false, build: "kf-github-status-consistency-20261123d", error: "Could not reach api.github.com" }) };
+      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: false, build: "kf-github-status-consistency-20261123e", error: "Could not reach api.github.com" }) };
     }
     throw new Error(`Unexpected request after failed live GitHub probe: ${url}`);
   });
@@ -91,7 +91,7 @@ async function runBootstrap(fetchImpl) {
   // the selected season state through the same Node service.
   const stateApiUnavailable = await runBootstrap(async url => {
     if (String(url).startsWith("/api/github/status")) {
-      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123d", activeYear: 2027, statusYear: 2027 }) };
+      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123e", activeYear: 2027, statusYear: 2027 }) };
     }
     if (String(url).startsWith("/api/state")) throw new TypeError("Failed to fetch season state");
     throw new Error(`Unexpected request after state API failure: ${url}`);
@@ -101,7 +101,42 @@ async function runBootstrap(fetchImpl) {
   assert.notEqual(stateFailureBanner.textContent, "Connected", "the overall site must not show Connected until both GitHub verification and season state loading succeed");
   assert.equal(stateApiUnavailable.window.KFStorage?.mode, "browser", "failed season-state loading must retain the browser copy and disable shared mode");
 
-  console.log("Storage diagnostics tests passed: live GitHub and season-state verification, cached-state false-positive prevention, retries, and cache-busting.");
+  // Large scoring histories must not use fetch keepalive: browsers impose a
+  // small aggregate body limit on keepalive requests (typically 64 KiB), which
+  // makes larger score payloads fail in the browser before reaching Node.
+  let capturedScoreSave = null;
+  const largeSave = await runBootstrap(async (url, options = {}) => {
+    const parsed = new URL(String(url), "https://league.example");
+    const method = String(options.method || "GET").toUpperCase();
+    const jsonResponse = value => ({
+      ok: true, status: 200,
+      headers: { get: () => "application/json" },
+      json: async () => value
+    });
+    if (parsed.pathname === "/api/github/status" && method === "GET") {
+      return jsonResponse({ configured: true, verified: true, build: "kf-github-status-consistency-20261123e", activeYear: 2027, statusYear: 2027 });
+    }
+    if (parsed.pathname === "/api/state" && method === "GET") {
+      return jsonResponse({ state: {}, keyUpdatedAt: {}, savedAt: 0, activeYear: 2027, seasonYear: 2027 });
+    }
+    if (parsed.pathname === "/api/state/kaiserFantasyScores" && method === "PUT") {
+      capturedScoreSave = options;
+      return jsonResponse({ ok: true, applied: true, savedAt: Date.now(), storage: "GitHub", seasonYear: 2027 });
+    }
+    throw new Error(`Unexpected large-save test request: ${method} ${parsed.pathname}`);
+  });
+  assert.equal(largeSave.window.KFStorage?.mode, "server", "the large-save fixture should connect to the Node API first");
+  const largeScores = Array.from({ length: 2500 }, (_, index) => ({
+    id: `score-${index}`, athleteId: `athlete-${index % 80}`,
+    event: `Grand Prix Round ${index % 24 + 1}`, details: "race-classification-and-scoring-record-".repeat(5)
+  }));
+  largeSave.window.KFStorage.write("kaiserFantasyScores", largeScores);
+  await largeSave.window.KFStorage.flush();
+  assert.ok(capturedScoreSave, "a large scoring array must be sent to the season-state PUT endpoint");
+  assert.ok(Buffer.byteLength(capturedScoreSave.body, "utf8") > 64 * 1024, "the regression payload must exceed the browser keepalive body limit");
+  assert.notEqual(capturedScoreSave.keepalive, true, "large league saves must not use fetch keepalive, which browsers reject above their small body quota");
+
+  console.log("Storage diagnostics tests passed: live GitHub and season-state verification, cached-state false-positive prevention, retries, cache-busting, and large score-save payloads.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

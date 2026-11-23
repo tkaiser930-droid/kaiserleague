@@ -204,7 +204,7 @@ GitHub live status verification update (kf-github-live-status-20261123c)
 - A readable GitHub repository is no longer reported as fully Connected when the last league-data commit failed. The browser copy remains available and retry actions remain enabled when live GitHub reads are available.
 
 
-GitHub status consistency update (kf-github-status-consistency-20261123d)
+GitHub status consistency update (kf-github-status-consistency-20261123e)
 - All visible storage status labels now use one sequenced status update path; stale asynchronous probes cannot overwrite newer save failures.
 - GitHub write requests use the same bounded retry wrapper as reads.
 - The site reports Connected only after the current live GitHub verification succeeds and there are no pending failed writes.
@@ -212,7 +212,14 @@ GitHub status consistency update (kf-github-status-consistency-20261123d)
 - Refresh Save Status retries retained unsynced browser edits even when the API is still reachable.
 - Manual Save can be retried after a server-side status error when no local dirty keys remain.
 
-Additional status consistency safeguard (kf-github-status-consistency-20261123d)
+Additional status consistency safeguard (kf-github-status-consistency-20261123e)
 - A GitHub status endpoint read cannot mark the site Connected unless the browser's /api/state connection is also active.
 - A status probe is not allowed to overwrite a newer save error or pending write; status updates share a monotonic request ticket.
 - The header banner, Data & Backup status labels, and draft status now reflect the same storage state.
+
+
+Large scoring save request fix (kf-github-status-consistency-20261123e)
+- Removed fetch keepalive from normal per-category saves.
+- Browser keepalive requests have a small aggregate body quota (typically 64 KiB); large kaiserFantasyScores arrays could be rejected locally as Failed to fetch before the Node API was contacted.
+- Normal saves remain awaited, serialized, retried, and retained in the browser copy if the request fails.
+- Added a regression test that sends a score payload larger than 64 KiB and asserts keepalive is not enabled.
