@@ -45,9 +45,34 @@
     if (!response.ok) throw new Error(body.error || `${fallbackMessage} (HTTP ${response.status}).`);
     return body;
   }
+  const retryWait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  function retryableStatus(status) { return [408, 429, 500, 502, 503, 504].includes(Number(status)); }
+  async function fetchJson(url, options = {}, fallbackMessage = "GitHub season storage is unavailable", attempts = 4) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        const response = await fetch(url, { ...options, cache: "no-store", credentials: options.credentials || "same-origin" });
+        const body = await response.json().catch(() => ({}));
+        if (response.ok) return body;
+        const error = new Error(body.error || `${fallbackMessage} (HTTP ${response.status}).`);
+        error.status = response.status;
+        if (!retryableStatus(response.status) || attempt === attempts) throw error;
+        lastError = error;
+      } catch (error) {
+        if (error.status && !retryableStatus(error.status)) throw error;
+        if (!error.status && (error.name === "TypeError" || /Failed to fetch|NetworkError/i.test(error.message || ""))) {
+          lastError = new Error(`Could not reach this site's Node.js API at ${url}. Confirm the Render web service is running and this page is being served by that Node.js service.`);
+        } else lastError = error;
+        if (attempt === attempts) break;
+      }
+      await retryWait(Math.min(3000, 300 * (2 ** (attempt - 1))));
+    }
+    const detail = lastError?.message || "Network request failed";
+    throw new Error(`${fallbackMessage} after ${attempts} attempts: ${detail}`);
+  }
   async function apiState(year) {
     const url = year == null ? "/api/state" : yearUrl("/api/state", year);
-    const body = await readJson(await fetch(url, { cache: "no-store", credentials: "same-origin" }), "GitHub season storage is unavailable");
+    const body = await fetchJson(url, { credentials: "same-origin" }, "GitHub season storage is unavailable");
     if (!body || typeof body.state !== "object" || !body.keyUpdatedAt) throw new Error("Invalid GitHub season response.");
     return body;
   }
@@ -248,43 +273,73 @@
     get seasonYear() { return seasonYear; },
     write: storageWrite,
     flush, refreshFromServer, loadServerState, exportState, replaceState, clearAll,
-    commissionerLogin, commissionerSession, commissionerLogout, getSeasonMeta, setSeasonYear, archiveSeason, copySeason,
+    commissionerLogin, commissionerSession, commissionerLogout, getSeasonMeta, setSeasonYear, archiveSeason, copySeason, reconnect,
     keys: KEYS.slice()
   };
 
-  async function start() {
-    ensureBanner(); setStatus("Connecting to the GitHub league database…", "info");
+  let reconnecting = false;
+  let reconnectTimer = null;
+  async function connectToServer() {
+    const remote = await apiState();
+    mode = "server";
+    activeYear = Number(remote.activeYear || remote.seasonYear || 2027);
+    seasonYear = activeYear;
+    storageLabel = remote.storageLabel || "GitHub season files";
+    const work = [];
+    for (const key of KEYS) {
+      const localValue = parseLocal(key), localTs = localTime(key);
+      const hasRemote = Object.prototype.hasOwnProperty.call(remote.state, key);
+      const remoteTs = Number(remote.keyUpdatedAt[key] || 0);
+      const unsynced = localStorage.getItem(UNSYNCED_PREFIX + key) === "1";
+      if (localValue !== null && unsynced && (!hasRemote || localTs >= remoteTs)) {
+        const updatedAt = localTs || Date.now();
+        loadLocal(key, localValue, updatedAt, true);
+        work.push(apiPut(key, localValue, updatedAt, seasonYear));
+      } else if (hasRemote) loadLocal(key, remote.state[key], remoteTs);
+      else clearLocal(key);
+    }
+    await Promise.all(work);
+    lastError = null;
+    dirtyKeys.clear();
+    setStatus("Connected", "good");
+    const dataModeDetail = typeof document.getElementById === "function" ? document.getElementById("dataModeDetail") : null;
+    if (dataModeDetail) { dataModeDetail.textContent = "Connected"; dataModeDetail.className = "storage-detail good"; }
+    return true;
+  }
+  async function reconnect() {
+    if (reconnecting) return false;
+    reconnecting = true;
     try {
-      const remote = await apiState();
-      mode = "server";
-      activeYear = Number(remote.activeYear || remote.seasonYear || 2027);
-      seasonYear = activeYear;
-      storageLabel = remote.storageLabel || "GitHub season files";
-      const work = [];
-      for (const key of KEYS) {
-        const localValue = parseLocal(key), localTs = localTime(key);
-        const hasRemote = Object.prototype.hasOwnProperty.call(remote.state, key);
-        const hasRemoteStamp = Object.prototype.hasOwnProperty.call(remote.keyUpdatedAt, key);
-        const remoteTs = Number(remote.keyUpdatedAt[key] || 0);
-        const unsynced = localStorage.getItem(UNSYNCED_PREFIX + key) === "1";
-        if (localValue !== null && unsynced && (!hasRemote || localTs >= remoteTs)) {
-          const updatedAt = localTs || Date.now();
-          loadLocal(key, localValue, updatedAt, true);
-          work.push(apiPut(key, localValue, updatedAt, seasonYear));
-        } else if (hasRemote) loadLocal(key, remote.state[key], remoteTs);
-        else clearLocal(key);
-      }
-      await Promise.all(work);
-      setStatus("Connected", "good");
+      await connectToServer();
+      return true;
     } catch (err) {
       mode = "browser";
-      setStatus("GitHub storage is unavailable: " + err.message + ". This browser copy remains available for download.", "warn");
+      setStatus("GitHub storage is unavailable: " + err.message + ". The browser copy remains available for download; reconnecting automatically.", "warn");
+      const dataModeDetail = typeof document.getElementById === "function" ? document.getElementById("dataModeDetail") : null;
+      if (dataModeDetail) { dataModeDetail.textContent = "GitHub unavailable — browser copy retained; retrying"; dataModeDetail.className = "storage-detail warn"; }
+      return false;
+    } finally {
+      reconnecting = false;
+    }
+  }
+  function ensureReconnectLoop() {
+    if (reconnectTimer || typeof setInterval !== "function") return;
+    reconnectTimer = setInterval(() => { if (mode !== "server") reconnect(); }, 30000);
+  }
+  async function start() {
+    ensureBanner(); setStatus("Connecting to the GitHub league database…", "info");
+    await reconnect();
+    ensureReconnectLoop();
+    if (typeof window.addEventListener === "function") {
+      window.addEventListener("online", () => { if (mode !== "server") reconnect(); });
+      window.addEventListener("focus", () => { if (mode !== "server") reconnect(); });
     }
     const script = document.createElement("script");
     script.src = "app.js";
     script.onerror = () => setStatus("Could not load app.js. Make sure this page is opened from the project folder.", "error");
     document.body.appendChild(script);
   }
+
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
   else start();
 })();

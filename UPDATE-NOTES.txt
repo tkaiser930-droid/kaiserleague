@@ -172,3 +172,13 @@ MotoGP 403 diagnostics update:
 - Public athlete-history now includes scored results from every indexed prior season, including years previously marked as unarchived workspaces. Full archived season data remains private.
 - Selecting a past year that has not yet been saved opens an empty archived season; its first save creates that year's independent GitHub season file with the archived flag.
 - Regression tests cover migration of old workspace metadata, scoring an older workspace as an archived season, public sanitized rider history from that season, and preservation of separate current-season standings.
+
+GITHUB CONNECTION RECOVERY (NOVEMBER 23, 2026)
+- GitHub API requests now retry temporary network failures, timeouts, rate limits, and transient server errors before reporting an outage.
+- GitHub API failures now include the API host and underlying network error code (when available), so DNS/egress/connection problems can be distinguished from token/repository permission errors.
+- The browser bootstrap retries transient server responses and network failures before falling back to the retained browser copy.
+- If the site starts in browser-only mode during a temporary outage, it retries the GitHub-backed connection every 30 seconds and when the browser comes online or regains focus.
+- Data & Backup > Refresh Save Status now attempts to reconnect before refreshing the GitHub status panel.
+- Unsynced browser edits remain marked locally and are synchronized after a successful reconnect only when their explicit unsynced marker and timestamp qualify; stale browser cache is not allowed to replace newer GitHub data.
+- Local JSON download and restore remain available. No Render persistent disk or server-side local database was introduced.
+- Added regression tests for transient GitHub API disconnects, permanent DNS failures with actionable diagnostics, and browser recovery after a temporary 503 response.

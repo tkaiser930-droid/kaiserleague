@@ -25,7 +25,9 @@ async function testGithubBackupRoundTrip() {
     GITHUB_BRANCH: process.env.GITHUB_BRANCH,
     GITHUB_DATA_PATH: process.env.GITHUB_DATA_PATH,
     GITHUB_BACKUP_PASSWORD: process.env.GITHUB_BACKUP_PASSWORD,
-    GITHUB_AUTO_BACKUP: process.env.GITHUB_AUTO_BACKUP
+    GITHUB_AUTO_BACKUP: process.env.GITHUB_AUTO_BACKUP,
+    GITHUB_API_MAX_ATTEMPTS: process.env.GITHUB_API_MAX_ATTEMPTS,
+    GITHUB_API_TIMEOUT_MS: process.env.GITHUB_API_TIMEOUT_MS
   };
 
   process.env.GITHUB_TOKEN = "test-token";
@@ -34,7 +36,10 @@ async function testGithubBackupRoundTrip() {
   process.env.GITHUB_DATA_PATH = "league-data/league-data.json";
   process.env.GITHUB_BACKUP_PASSWORD = "test-manual-password";
   process.env.GITHUB_AUTO_BACKUP = "false"; // Must not disable GitHub-only persistence.
+  process.env.GITHUB_API_MAX_ATTEMPTS = "4";
 
+  let transientFailures = 1;
+  let transientRetryObserved = false;
   let branchExists = false;
   let pendingTreeContent = "";
   let storedContent = "";
@@ -48,6 +53,12 @@ async function testGithubBackupRoundTrip() {
   });
 
   global.fetch = async (input, options = {}) => {
+    if (transientFailures > 0) {
+      transientFailures--;
+      transientRetryObserved = true;
+      const cause = Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+      throw new TypeError("fetch failed", { cause });
+    }
     const url = new URL(String(input));
     const method = String(options.method || "GET").toUpperCase();
     const body = options.body ? JSON.parse(options.body) : {};
@@ -101,6 +112,7 @@ async function testGithubBackupRoundTrip() {
     const firstSave = await github.saveLeagueData(initial, "test initial GitHub save");
     assert.equal(firstSave.changed, true);
     assert.equal(firstSave.initialCommit, true);
+    assert.equal(transientRetryObserved, true, "a temporary GitHub network failure should be retried automatically");
 
     const loaded = await github.getLatestLeagueData();
     assert.equal(loaded.found, true);
@@ -237,6 +249,77 @@ async function testSameYearRefreshAppliesRemoteCopy() {
     "refreshing the already-selected year must apply the updated GitHub file to the browser copy");
 }
 
+async function testPermanentGithubNetworkFailureIsActionable() {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+    GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
+    GITHUB_API_MAX_ATTEMPTS: process.env.GITHUB_API_MAX_ATTEMPTS,
+    GITHUB_API_TIMEOUT_MS: process.env.GITHUB_API_TIMEOUT_MS
+  };
+  process.env.GITHUB_TOKEN = "test-token";
+  process.env.GITHUB_REPOSITORY = "test-owner/test-league";
+  process.env.GITHUB_API_MAX_ATTEMPTS = "2";
+  let calls = 0;
+  global.fetch = async () => {
+    calls++;
+    const cause = Object.assign(new Error("getaddrinfo EAI_AGAIN api.github.com"), { code: "EAI_AGAIN" });
+    throw new TypeError("fetch failed", { cause });
+  };
+  try {
+    const github = createGithubBackup(root);
+    await assert.rejects(
+      github.getJsonFile("league-data/seasons/2027.json"),
+      /Could not reach the GitHub API at api\.github\.com after 2 attempts.*EAI_AGAIN.*outbound HTTPS\/DNS access/
+    );
+    assert.equal(calls, 2, "the GitHub client should stop after the configured retry count");
+  } finally {
+    global.fetch = originalFetch;
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+async function testBootstrapRetriesTemporaryServerFailure() {
+  const bootstrap = read("bootstrap.js");
+  const values = new Map();
+  const localStorage = {
+    getItem: key => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key)
+  };
+  let requests = 0;
+  const remote = {
+    state: { kaiserFantasyAthletes: [{ id: "github-rider", name: "GitHub Rider" }] },
+    keyUpdatedAt: { kaiserFantasyAthletes: 100 },
+    savedAt: 100, activeYear: 2027, seasonYear: 2027, storageLabel: "GitHub season files"
+  };
+  const fetch = async (url) => {
+    requests++;
+    if (requests === 1) return { ok: false, status: 503, json: async () => ({ error: "GitHub temporarily unavailable" }) };
+    return { ok: true, status: 200, json: async () => remote };
+  };
+  const body = { prepend() {}, appendChild(node) { this.lastScript = node; } };
+  const document = {
+    readyState: "complete", body,
+    createElement: () => ({}), querySelector: () => null,
+    getElementById: () => null, addEventListener() {}
+  };
+  const window = { addEventListener() {} };
+  vm.runInNewContext(bootstrap, {
+    window, document, localStorage, fetch, console, Date, Promise, Set, JSON,
+    Object, Number, String, URL, location: { origin: "https://league.example" },
+    setTimeout, setInterval: () => 1, clearInterval: () => {}
+  });
+  await new Promise(resolve => setTimeout(resolve, 450));
+  assert.equal(window.KFStorage.mode, "server", "a temporary 503 must not leave the site stuck in browser-only mode");
+  assert.ok(requests >= 2, "the browser should retry the API request");
+  assert.deepEqual(JSON.parse(values.get("kaiserFantasyAthletes")), remote.state.kaiserFantasyAthletes);
+  assert.equal(body.lastScript.src, "app.js");
+}
+
 function testNoServerSideDiskPersistence() {
   const server = read("server.js");
   const render = read("render.yaml");
@@ -257,6 +340,9 @@ function testNoServerSideDiskPersistence() {
   // Keep the local browser JSON export and the Restore-a-backup flow intact.
   assert.match(bootstrap, /async function exportState\(\)/);
   assert.match(bootstrap, /UNSYNCED_PREFIX/);
+  assert.match(bootstrap, /async function reconnect\(\)/, "the browser copy must be able to reconnect without a page reload");
+  assert.match(bootstrap, /setInterval\(\(\) => \{ if \(mode !== "server"\) reconnect\(\); \}, 30000\)/, "temporary startup outages should trigger automatic reconnects");
+  assert.match(app, /window\.KFStorage\.reconnect\(\)/, "Data & Backup refresh should offer a manual reconnect");
   assert.doesNotMatch(bootstrap, /localTs > remoteTs/, "local wall-clock timestamps must not override the GitHub canonical copy");
   assert.match(commissioner, /id="exportData"/);
   assert.match(commissioner, /id="importData"/);
@@ -269,7 +355,9 @@ function testNoServerSideDiskPersistence() {
   await testGithubBackupRoundTrip();
   await testGithubIsCanonicalOverStaleBrowserCache();
   await testSameYearRefreshAppliesRemoteCopy();
-  console.log("GitHub-only storage tests passed: no Render/local server database writes, automatic GitHub commits, initial repository setup, update/load round trip, stale browser-cache protection, pending offline edit recovery, same-year post-copy refresh, token/password checks, and local JSON download/restore retention.");
+  await testPermanentGithubNetworkFailureIsActionable();
+  await testBootstrapRetriesTemporaryServerFailure();
+  console.log("GitHub-only storage tests passed: no Render/local server database writes, automatic GitHub commits, transient GitHub API retry, actionable permanent network errors, browser retry after temporary server failure, initial repository setup, update/load round trip, stale browser-cache protection, pending offline edit recovery, same-year post-copy refresh, token/password checks, and local JSON download/restore retention.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

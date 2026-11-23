@@ -66,32 +66,84 @@ function createGithubBackup(root) {
   const encodedDataPath = value => resolvedDataPath(value).split("/").map(encodeURIComponent).join("/");
   const encodeRefPath = branch => encodeURIComponent(branch).replace(/%2F/gi, "/");
 
+  const API_MAX_ATTEMPTS = Math.max(1, Math.min(5, Number(process.env.GITHUB_API_MAX_ATTEMPTS || 4)));
+  const API_TIMEOUT_MS = Math.max(5000, Math.min(60000, Number(process.env.GITHUB_API_TIMEOUT_MS || 20000)));
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  function transientHttp(response) {
+    const status = Number(response?.status || 0);
+    return [408, 429, 500, 502, 503, 504].includes(status)
+      || (status === 403 && (response.headers?.get?.("retry-after") || response.headers?.get?.("x-ratelimit-remaining") === "0"));
+  }
+  function retryDelay(response, attempt) {
+    const retryAfter = Number(response?.headers?.get?.("retry-after") || 0);
+    if (retryAfter > 0) return Math.min(10000, retryAfter * 1000);
+    const resetAt = Number(response?.headers?.get?.("x-ratelimit-reset") || 0);
+    if (resetAt > 0) return Math.min(10000, Math.max(250, resetAt * 1000 - Date.now()));
+    return Math.min(4000, 250 * (2 ** Math.max(0, attempt - 1)));
+  }
+  function networkFailureMessage(error) {
+    const code = error?.cause?.code || error?.code || error?.cause?.name || "";
+    const detail = code ? `${error?.message || "Network request failed"} (${code})` : (error?.message || "Network request failed");
+    const host = (() => { try { return new URL(API_ROOT).host; } catch { return API_ROOT; } })();
+    return `Could not reach the GitHub API at ${host} after ${API_MAX_ATTEMPTS} attempts. Last error: ${detail}. Check outbound HTTPS/DNS access from the hosting service and try again.`;
+  }
   async function api(endpoint, options = {}) {
     const cfg = config();
     if (!cfg.token) throw new Error("GitHub token is not configured. Set GITHUB_TOKEN in the hosting service environment.");
-    const response = await fetch(`${API_ROOT}${endpoint}`, {
-      ...options,
-      headers: {
-        "Accept": "application/vnd.github+json",
-        "Authorization": `Bearer ${cfg.token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "Kaiser-Family-Fantasy-SMX-League-Backup",
-        ...(options.headers || {})
+    let lastNetworkError = null;
+    for (let attempt = 1; attempt <= API_MAX_ATTEMPTS; attempt++) {
+      let response;
+      try {
+        const timeoutSignal = typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+          ? AbortSignal.timeout(API_TIMEOUT_MS) : undefined;
+        response = await fetch(`${API_ROOT}${endpoint}`, {
+          ...options,
+          signal: options.signal || timeoutSignal,
+          headers: {
+            "Accept": "application/vnd.github+json",
+            "Authorization": `Bearer ${cfg.token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "Kaiser-Family-Fantasy-SMX-League-Backup",
+            ...(options.headers || {})
+          }
+        });
+      } catch (error) {
+        lastNetworkError = error;
+        if (attempt < API_MAX_ATTEMPTS) {
+          await wait(Math.min(4000, 250 * (2 ** (attempt - 1))));
+          continue;
+        }
+        throw new Error(networkFailureMessage(lastNetworkError));
       }
-    });
-    const text = await response.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text.slice(0, 500) }; }
-    if (!response.ok) {
-      const err = new Error(data.message || `GitHub returned HTTP ${response.status}.`);
-      err.status = response.status;
-      if (response.status === 401) err.message = `GitHub rejected GITHUB_TOKEN (401). Create a valid token and check that it has not expired. ${err.message}`;
-      if (response.status === 403) err.message = `GitHub denied access (403). The token needs Contents: Read and write plus Metadata: Read access to ${config().repository}. ${err.message}`;
-      if (response.status === 404) err.message = `GitHub could not find ${config().repository} or the requested branch/file. Verify GITHUB_REPOSITORY is exactly \"${config().repository}\" and that GITHUB_TOKEN has access to this repository. ${err.message}`;
-      if (response.status === 409 && /empty/i.test(err.message)) err.message = `The GitHub repository ${config().repository} has no first commit yet. The backup service will create its initial commit automatically.`;
-      throw err;
+
+      let text;
+      try { text = await response.text(); }
+      catch (error) {
+        lastNetworkError = error;
+        if (attempt < API_MAX_ATTEMPTS) {
+          await wait(Math.min(4000, 250 * (2 ** (attempt - 1))));
+          continue;
+        }
+        throw new Error(networkFailureMessage(lastNetworkError));
+      }
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text.slice(0, 500) }; }
+      if (!response.ok) {
+        const err = new Error(data.message || `GitHub returned HTTP ${response.status}.`);
+        err.status = response.status;
+        if (response.status === 401) err.message = `GitHub rejected GITHUB_TOKEN (401). Create a valid token and check that it has not expired. ${err.message}`;
+        if (response.status === 403) err.message = `GitHub denied access (403). The token needs Contents: Read and write plus Metadata: Read access to ${cfg.repository}. ${err.message}`;
+        if (response.status === 404) err.message = `GitHub could not find ${cfg.repository} or the requested branch/file. Verify GITHUB_REPOSITORY is exactly \"${cfg.repository}\" and that GITHUB_TOKEN has access to this repository. ${err.message}`;
+        if (response.status === 409 && /empty/i.test(err.message)) err.message = `The GitHub repository ${cfg.repository} has no first commit yet. The backup service will create its initial commit automatically.`;
+        if (transientHttp(response) && attempt < API_MAX_ATTEMPTS) {
+          await wait(retryDelay(response, attempt));
+          continue;
+        }
+        throw err;
+      }
+      return data;
     }
-    return data;
+    throw new Error(networkFailureMessage(lastNetworkError));
   }
 
   function isMissingRef(err) {
