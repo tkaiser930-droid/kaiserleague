@@ -67,7 +67,11 @@ function emptyState() {
   };
 }
 function emptyDatabase(year) {
-  return { version: 1, seasonYear: Number(year), archived: false, state: emptyState(), keyUpdatedAt: {}, savedAt: 0 };
+  const target = Number(year);
+  // Every non-current year is an archived season. There is no separate
+  // historical-workspace lifecycle: a past year is the same editable archive
+  // that the active season becomes when it is archived.
+  return { version: 1, seasonYear: target, archived: target < activeYear, state: emptyState(), keyUpdatedAt: {}, savedAt: 0 };
 }
 function send(res, status, data, type = "application/json; charset=utf-8", extraHeaders = {}) {
   res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...extraHeaders });
@@ -99,7 +103,7 @@ function normalizeDatabase(input, year, fallbackTimestamp = 0) {
   return {
     version: 1,
     seasonYear: Number(year),
-    archived: !!input?.archived,
+    archived: Number(year) < Number(activeYear) || !!input?.archived,
     archivedAt: input?.archivedAt || "",
     state,
     keyUpdatedAt: { ...keyUpdatedAt },
@@ -213,7 +217,7 @@ async function loadSeasonDatabase(year) {
     }
     const database = remote.found ? normalizeDatabase(remote.data, target, remote.savedAt) : emptyDatabase(target);
     if (remote.found && !seasonIndex.seasons[String(target)]) {
-      seasonIndex.seasons[String(target)] = { year: target, status: database.archived ? "archived" : target === activeYear ? "current" : "workspace", archived: !!database.archived, createdAt: new Date().toISOString() };
+      seasonIndex.seasons[String(target)] = { year: target, status: target < activeYear || database.archived ? "archived" : target === activeYear ? "current" : "workspace", archived: target < activeYear || !!database.archived, createdAt: new Date().toISOString() };
       await persistSeasonIndex(`Kaiser Family Fantasy SMX: register existing ${target} season file`);
     }
     seasonCache.set(target, database);
@@ -230,11 +234,12 @@ async function saveSeasonDatabase(year, database, message = "Kaiser Family Fanta
   const result = await queueGithubOperation(() => githubBackup.saveLeagueData(normalized, message, seasonPath(target)));
   seasonCache.set(target, normalized);
   const entry = seasonIndex.seasons[String(target)] || { year: target, createdAt: new Date().toISOString() };
+  const historical = target < activeYear || normalized.archived;
   seasonIndex.seasons[String(target)] = {
     ...entry,
     year: target,
-    status: normalized.archived ? "archived" : target === activeYear ? "current" : (entry.status || "workspace"),
-    archived: normalized.archived,
+    status: historical ? "archived" : target === activeYear ? "current" : (entry.status || "workspace"),
+    archived: historical,
     archivedAt: normalized.archivedAt || entry.archivedAt || "",
     savedAt: normalized.savedAt,
     updatedAt: new Date().toISOString()
@@ -376,10 +381,28 @@ async function handleApi(req, res, url) {
   if (url.pathname === "/api/seasons/meta" && req.method === "GET") {
     await ensureGithubReady();
     const years = {};
-    for (const [year, metadata] of Object.entries(seasonIndex.seasons || {})) {
-      if (validYear(year)) years[year] = { status: metadata.status || (Number(year) === activeYear ? "current" : "workspace"), archived: !!metadata.archived };
+    let indexNeedsNormalization = false;
+    for (const [yearText, metadata] of Object.entries(seasonIndex.seasons || {})) {
+      if (!validYear(yearText)) continue;
+      const year = Number(yearText);
+      const historical = year < activeYear;
+      const status = historical ? "archived" : year === activeYear ? "current" : (metadata.status || "workspace");
+      const archived = historical;
+      years[yearText] = { status, archived, archivedAt: metadata.archivedAt || "" };
+      // Normalize older entries written by versions that called these years
+      // "workspaces". Persist the same archive status used by the API/UI.
+      if (metadata.status !== status || !!metadata.archived !== archived) {
+        seasonIndex.seasons[yearText] = { ...metadata, year, status, archived };
+        indexNeedsNormalization = true;
+      }
     }
-    years[String(activeYear)] = { ...(years[String(activeYear)] || {}), status: "current", archived: false };
+    // Every prior year is selectable and behaves as an archived season even
+    // before its first save file is created.
+    for (let year = MIN_SEASON_YEAR; year <= activeYear; year++) {
+      if (!years[String(year)]) years[String(year)] = { status: year === activeYear ? "current" : "archived", archived: year < activeYear, archivedAt: "" };
+    }
+    years[String(activeYear)] = { ...(years[String(activeYear)] || {}), status: "current", archived: false, archivedAt: "" };
+    if (indexNeedsNormalization) await persistSeasonIndex("Kaiser Family Fantasy SMX: normalize historical seasons as archived");
     return send(res, 200, { activeYear, minYear: MIN_SEASON_YEAR, maxYear: MAX_SEASON_YEAR, seasons: years });
   }
 
@@ -469,18 +492,16 @@ async function handleApi(req, res, url) {
     const riderClass = url.searchParams.get("class") || "";
     if (!riderId && !riderName) return send(res, 400, { error: "A rider ID or name is required." });
 
-    // Publish the active season plus archived seasons only. Non-current,
-    // unarchived commissioner workspaces must remain private.
-    const archivedYears = Object.entries(seasonIndex.seasons || {})
-      .map(([year, meta]) => Number(year))
-      .filter(year => validYear(year) && year < activeYear && seasonIndex.seasons[String(year)]?.archived);
-    const years = [...new Set([activeYear, ...archivedYears])].sort((a, b) => b - a);
+    // Every non-current season is an archive, including years that older
+    // versions called historical workspaces. Public profiles receive only the
+    // sanitized scored-rider history, never the archived season workspace.
+    const historicalYears = Object.keys(seasonIndex.seasons || {})
+      .map(Number).filter(year => validYear(year) && year < activeYear);
+    const years = [...new Set([activeYear, ...historicalYears])].sort((a, b) => b - a);
     const seasons = [];
     for (const year of years) {
       try {
         const database = await loadSeasonDatabase(year);
-        const isActive = year === activeYear;
-        if (!isActive && !database.archived && !seasonIndex.seasons[String(year)]?.archived) continue;
         const result = summarizeHistoricalRider(database, riderId, riderName, riderClass, year);
         if (result.records.length) seasons.push(result);
       } catch (error) {
@@ -569,11 +590,10 @@ async function handleApi(req, res, url) {
     const year = selectedYear(url);
     requireYearAccess(req, year);
     const database = await loadSeasonDatabase(year);
-    const meta = seasonIndex.seasons[String(year)] || {};
     return send(res, 200, {
       version: database.version, state: database.state, keyUpdatedAt: database.keyUpdatedAt, savedAt: database.savedAt,
       storageMode: "github", storageLabel: `GitHub season file ${seasonPath(year)}`,
-      seasonYear: year, activeYear, archived: !!database.archived || !!meta.archived, status: meta.status || (year === activeYear ? "current" : "workspace")
+      seasonYear: year, activeYear, archived: year < activeYear, status: year < activeYear ? "archived" : "current"
     });
   }
 

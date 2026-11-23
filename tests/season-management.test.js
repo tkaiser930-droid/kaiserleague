@@ -9,11 +9,16 @@ const { spawn } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const APP_SOURCE = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
+const COMMISSIONER_HTML = fs.readFileSync(path.join(ROOT, "commissioner.html"), "utf8");
 const REPO_PREFIX = "/repos/test-owner/test-league";
 assert.match(APP_SOURCE, /Most Recent Scored Results/, "athlete profiles show recent results across published seasons");
 assert.match(APP_SOURCE, /Career average \/ round/, "athlete profiles display a career average per round");
 assert.match(APP_SOURCE, /Career rounds scored/, "athlete profiles display rounds accumulated across seasons");
 assert.doesNotMatch(APP_SOURCE, /Previously Scored Results|Archived Season Results|No archived results have been published/, "old split result placeholders are removed from athlete profiles");
+assert.doesNotMatch(APP_SOURCE, /Historical Workspace|Historical workspace/, "commissioner season selector and summary do not present a separate workspace lifecycle");
+assert.match(APP_SOURCE, /· Archived/, "every non-current year is labeled as an archived season in the commissioner selector");
+assert.match(COMMISSIONER_HTML, /Every year before the current season is an archived season/, "commissioner page explains that every prior year is an archived season");
+assert.doesNotMatch(COMMISSIONER_HTML, /previous-year workspaces|full previous-season workspaces/i, "commissioner page does not describe a separate historical workspace state");
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -145,6 +150,9 @@ async function api(baseUrl, route, options = {}, cookie = "") {
   };
   const initialSeasonIndex = { version: 1, activeYear: 2027, seasons: {
     "2025": { year: 2025, status: "archived", archived: true, archivedAt: "2025-12-01T00:00:00.000Z" },
+    // Simulate a pre-existing historical workspace from the older application.
+    // The new app must normalize it into the same archived-season state.
+    "2026": { year: 2026, status: "workspace", archived: false },
     "2027": { year: 2027, status: "current", archived: false }
   } };
   const fakeGithub = await createFakeGithub({
@@ -178,6 +186,11 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(result.response.status, 200);
     assert.equal(result.body.minYear, 2010, "the commissioner season range begins at 2010");
     assert.equal(result.body.activeYear, 2027);
+    assert.equal(result.body.seasons["2026"].status, "archived", "legacy historical workspaces are normalized to archived seasons in the season selector");
+    assert.equal(result.body.seasons["2026"].archived, true);
+    const normalizedIndex = JSON.parse(fakeGithub.files.get("league-data/season-index.json"));
+    assert.equal(normalizedIndex.seasons["2026"].status, "archived", "legacy workspace metadata is normalized in GitHub");
+    assert.equal(normalizedIndex.seasons["2026"].archived, true);
 
     result = await api(baseUrl, "/api/state");
     assert.equal(result.response.status, 200);
@@ -196,7 +209,9 @@ async function api(baseUrl, route, options = {}, cookie = "") {
 
     result = await api(baseUrl, "/api/state?year=2026", {}, cookie);
     assert.equal(result.response.status, 200);
-    assert.deepEqual(result.body.state.kaiserFantasyScores, [], "a new historical workspace does not inherit current-year points");
+    assert.equal(result.body.archived, true, "a previously-created workspace behaves exactly like an archived season");
+    assert.equal(result.body.status, "archived");
+    assert.deepEqual(result.body.state.kaiserFantasyScores, [], "a new historical season does not inherit current-year points");
 
     result = await api(baseUrl, "/api/seasons/copy", {
       method: "POST", body: JSON.stringify({ sourceYear: 2027, destinationYear: 2026, parts: ["riders", "schedule"] })
@@ -211,7 +226,13 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(result.response.status, 200);
     const season2026 = JSON.parse(fakeGithub.files.get("league-data/seasons/2026.json"));
     assert.equal(season2026.state.kaiserFantasyAthletes[0].number, "99");
+    assert.equal(season2026.archived, true, "a saved historical season file carries the archived flag");
     assert.equal(season2026.state.kaiserFantasySchedule[0].date, "2026-01-08", "schedule dates are shifted to the destination season");
+
+    result = await api(baseUrl, "/api/state/kaiserFantasyScores?year=2026", {
+      method: "PUT", body: JSON.stringify({ value: [{ id: "score-2026-1", riderId: "rider-1", riderName: "Historic Racer", riderClass: "450", series: "SMX", division: "450", event: "Anaheim 1", round: 1, eventDate: "2026-01-08", seasonYear: 2026, place: 1, points: 18, teamName: "Team One", riderNumber: "99", riderRaceTeam: "2026 Independent Team", recordedAt: "2026-01-08T20:00:00.000Z" }], updatedAt: Date.now() })
+    }, cookie);
+    assert.equal(result.response.status, 200, "commissioner can enter and save scoring in any archived season");
 
     result = await api(baseUrl, "/api/state?year=2026");
     assert.equal(result.response.status, 401, "previous-year workspace reads remain commissioner-only after a separate year is created");
@@ -222,16 +243,16 @@ async function api(baseUrl, route, options = {}, cookie = "") {
 
     result = await api(baseUrl, "/api/public/athlete-history?riderId=rider-1&name=Historic%20Racer&class=450");
     assert.equal(result.response.status, 200);
-    assert.deepEqual(result.body.seasons.map(season => season.year), [2027, 2025], "public profile history includes the active season and archived seasons, but skips a non-archived commissioner workspace");
-    assert.equal(result.body.career.totalPoints, 60, "career history combines rider points across season files without changing team season totals");
-    assert.equal(result.body.career.rounds, 2, "career rounds accumulate across seasons while multiple motos within each event count once");
-    assert.equal(result.body.career.average, 30, "career average is total points across all published seasons divided by unique event rounds across those seasons");
+    assert.deepEqual(result.body.seasons.map(season => season.year), [2027, 2026, 2025], "public profile history includes active and all archived seasons, including years previously labeled historical workspaces");
+    assert.equal(result.body.career.totalPoints, 78, "career history combines rider points across active and archived season files without changing team season totals");
+    assert.equal(result.body.career.rounds, 3, "career rounds accumulate across every season while multiple motos within each event count once");
+    assert.equal(result.body.career.average, 26, "career average is total points across active and archived seasons divided by unique event rounds across those seasons");
     assert.equal(result.body.career.currentSeasonPoints, 35, "current-season points remain separately identifiable and do not include archived points");
     assert.equal(result.body.career.averages.length, 2, "career averages retain separate series/class buckets when a rider changes class between seasons");
     const average250 = result.body.career.averages.find(item => item.division === "250");
     const average450 = result.body.career.averages.find(item => item.division === "450");
     assert.deepEqual([average250.total, average250.rounds, average250.average], [25, 1, 25]);
-    assert.deepEqual([average450.total, average450.rounds, average450.average], [35, 1, 35]);
+    assert.deepEqual([average450.total, average450.rounds, average450.average], [53, 2, 26.5]);
     assert.equal(result.body.records[0].seasonYear, 2027, "combined results are ordered newest event first");
     assert.equal(result.body.records[0].eventDate, "2027-01-08", "older scoring records can derive race dates from that season's schedule");
     assert.equal(result.body.records.find(record => record.seasonYear === 2025).eventDate, "2025-01-11");
@@ -261,7 +282,7 @@ async function api(baseUrl, route, options = {}, cookie = "") {
 
     result = await api(baseUrl, "/api/public/athlete-history?riderId=rider-1&name=Historic%20Racer&class=450");
     assert.equal(result.response.status, 200);
-    assert.deepEqual(result.body.seasons.map(season => season.year), [2027, 2025], "public profile history keeps archived seasons after a new season starts");
+    assert.deepEqual(result.body.seasons.map(season => season.year), [2027, 2026, 2025], "all seasons remain in the same archived history lifecycle after the active season rolls forward");
     const historic = result.body.seasons[0];
     assert.equal(historic.year, 2027);
     assert.equal(historic.averages[0].total, 35);
@@ -269,9 +290,9 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(historic.averages[0].average, 35);
     assert.equal(historic.records[0].riderNumber, "21");
     assert.equal(historic.records[0].riderRaceTeam, "2027 Factory Team");
-    assert.equal(result.body.career.totalPoints, 60, "career average and rounds persist across the season archive transition");
-    assert.equal(result.body.career.rounds, 2);
-    assert.equal(result.body.career.average, 30);
+    assert.equal(result.body.career.totalPoints, 78, "career average and rounds persist across the season archive transition");
+    assert.equal(result.body.career.rounds, 3);
+    assert.equal(result.body.career.average, 26);
     assert.equal(result.body.career.currentSeasonPoints, 0, "archived points do not carry into the new active season total");
     assert.equal(Object.prototype.hasOwnProperty.call(historic.records[0], "teamKey"), false, "public history omits internal team keys");
     assert.equal(Object.prototype.hasOwnProperty.call(historic.athlete, "passwordHash"), false);
@@ -286,7 +307,7 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     // Separate save files are the only league-data JSON persistence destinations.
     const seasonFiles = [...fakeGithub.files.keys()].filter(file => /^league-data\/seasons\/\d{4}\.json$/.test(file)).sort();
     assert.deepEqual(seasonFiles, ["league-data/seasons/2025.json", "league-data/seasons/2026.json", "league-data/seasons/2027.json", "league-data/seasons/2028.json"]);
-    console.log("Historical season integration tests passed: per-year GitHub files, 2010+ commissioner access control, isolated rider edits, cross-season rider/schedule copy, event-round averages, public archived rider history, and archive/new-season reset behavior.");
+    console.log("Historical season integration tests passed: per-year GitHub files, workspace-to-archive normalization, commissioner-only archived season editing/scoring, isolated rider edits, cross-season rider/schedule copy, event-round averages, public history for every archived season, and archive/new-season reset behavior.");
   } finally {
     child.kill("SIGTERM");
     await new Promise(resolve => {

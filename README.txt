@@ -76,8 +76,8 @@ SECURITY
 - Set a strong COMMISSIONER_PASSWORD and COMMISSIONER_SESSION_SECRET in Render environment variables; do not commit either value.
 
 COMMISSIONER DASHBOARD NAVIGATION
-- The Commissioner page is organized into Athletes, Scoring, Draft, Schedule, Historical Results, and Data & Backup tabs. A commissioner-only season dropdown selects the independent workspace to edit or score; it offers seasons from 2010 onward.
-- Historical Results shows rider totals, unique event-round counts, and average points per round grouped by rider, series, and class. Previous-season workspaces are commissioner-only; public rider profiles expose only sanitized results from archived seasons.
+- The Commissioner page is organized into Athletes, Scoring, Draft, Schedule, Historical Results, and Data & Backup tabs. A commissioner-only season dropdown selects the current or an archived season to edit or score; it offers seasons from 2010 onward.
+- Historical Results shows rider totals, unique event-round counts, and average points per round grouped by rider, series, and class. Every non-current season is an archived season and uses the same commissioner editing/scoring workflow; full archived workspaces are commissioner-only, while public rider profiles expose sanitized scored results from all archived seasons.
 - Archive Current Season marks the active year as archived and starts the next year with the rider directory and team identities but no rosters, scores, trades, draft, or schedule.
 - Riders and schedules can be copied between season files; copied rider numbers and race teams are season-specific, and copied schedule dates move to the destination year.
 - Each year has its own GitHub JSON file at league-data/seasons/YYYY.json; league-data/season-index.json tracks the active year and archive status.
@@ -125,9 +125,9 @@ MXGP importer request correction (November 16, 2026)
 
 Historical season files
 -----------------------
-The commissioner dashboard provides season workspaces from 2010 through the active year. Each year has its own GitHub file under league-data/seasons/YYYY.json; league-data/season-index.json records the active year and archived status. The active year defaults to 2027 and can be changed with KF_ACTIVE_SEASON before the index is initialized.
+The commissioner dashboard provides seasons from 2010 through the active year. Every year before the active year is automatically an archived season and uses the same editable/scorable historical-season workflow; there is no separate non-archived historical workspace state. Each year has its own GitHub file under league-data/seasons/YYYY.json; league-data/season-index.json records the active year and archived status. The active year defaults to 2027 and can be changed with KF_ACTIVE_SEASON before the index is initialized.
 
-Only the active season is served to public team, draft, schedule and current standings endpoints. Accessing any previous-year workspace requires a commissioner session cookie. The public athlete profile API returns a sanitized subset of archived rider results and per-series/class average points; it does not return historical team passwords, owner details, trades or draft information. Keep the LeagueSave repository private because it contains the underlying season save files.
+Only the active season is served to public team, draft, schedule and current standings endpoints. Accessing any archived season's full workspace requires a commissioner session cookie. The public athlete profile API returns a sanitized subset of rider results from the active season and every archived season, plus per-series/class average points; it does not return historical team passwords, owner details, trades or draft information. Keep the LeagueSave repository private because it contains the underlying season save files.
 
 Archive Current Season saves the year snapshot, carries forward independent copies of the rider directory and team identities, and creates the next year without rosters, scores, trades, draft state or schedule. Copy Between Seasons can copy rider records or schedule events to the selected year. Local JSON backup download and restore apply to the currently selected year.
 

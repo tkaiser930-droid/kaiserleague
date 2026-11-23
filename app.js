@@ -1114,12 +1114,12 @@ async function renderCommissionerSeasonControls(){
  try{commissionerSeasonMeta=await window.KFStorage.getSeasonMeta()}catch(error){commissionerSeasonMeta={activeYear:Number(activeSeasonYear()),seasons:{}}}
  const active=Number(commissionerSeasonMeta.activeYear||activeSeasonYear()),years=[];
  for(let year=active;year>=2010;year--)years.push(String(year));
- const label=year=>{const info=commissionerSeasonMeta.seasons?.[year];return Number(year)===active?`${year} · Current Season`:info?.archived?`${year} · Archived`:info?.status==="workspace"?`${year} · Historical Workspace`:`${year} · Historical Workspace`};
+ const label=year=>Number(year)===active?`${year} · Current Season`:`${year} · Archived`;
  const fill=(node,placeholder)=>{if(!node)return;const prior=node.value;node.replaceChildren(new Option(placeholder,""));years.forEach(year=>node.add(new Option(label(year),year)));if(years.includes(prior))node.value=prior};
  fill(select,"Choose season…");select.value=years.includes(String(selectedSeasonYear))?String(selectedSeasonYear):String(active);
  fill(source,"Copy from season…");if(source&&!source.value)source.value=String(active);
- const status=$("commissionerSeasonStatus"),selectedInfo=commissionerSeasonMeta.seasons?.[selectedSeasonYear];
- if(status)status.textContent=String(selectedSeasonYear)===String(active)?`You are editing the current ${active} season. Public standings use this season only.`:selectedInfo?.archived?`You are editing archived season ${selectedSeasonYear}. Changes are saved only to its separate GitHub season file.`:`You are editing the ${selectedSeasonYear} historical workspace. It is separate from the current season and can be scored independently.`;
+ const status=$("commissionerSeasonStatus");
+ if(status)status.textContent=String(selectedSeasonYear)===String(active)?`You are editing the current ${active} season. Public standings use this season only.`:`You are editing archived season ${selectedSeasonYear}. It has the same editing and scoring tools as every archived year, and changes are saved only to its separate GitHub season file.`;
  const archiveButton=$("archiveCurrentSeason");if(archiveButton)archiveButton.disabled=String(selectedSeasonYear)!==String(active);
 }
 function historicalScoringBreakdown(records){
@@ -1139,10 +1139,10 @@ function historicalScoringBreakdown(records){
 }
 function renderHistoricalSeasonPanel(){
  const summary=$("historicalSeasonSummary"),breakdownEl=$("historicalAverageTable"),eventsEl=$("historicalEventTable");if(!summary||!breakdownEl||!eventsEl)return;
- const year=String(selectedSeasonYear),active=activeSeasonYear(),records=scores(),groups=scoredGroups(),info=commissionerSeasonMeta.seasons?.[year];
+ const year=String(selectedSeasonYear),active=activeSeasonYear(),records=scores(),groups=scoredGroups();
  const riders=new Set(records.map(item=>String(item.riderId||norm(item.riderName||item.athleteName))).filter(Boolean));
  const rounds=new Set(records.map(scoreRoundKey));
- const status=year===active?"Current season":info?.archived?"Archived season":"Historical workspace";
+ const status=year===active?"Current season":"Archived season";
  summary.innerHTML=`<div class="summary"><div><strong>${esc(year)}</strong><span>Season</span></div><div><strong>${esc(status)}</strong><span>Status</span></div><div><strong>${records.length.toLocaleString()}</strong><span>Scored rider segments</span></div><div><strong>${riders.size.toLocaleString()}</strong><span>Riders scored</span></div><div><strong>${rounds.size.toLocaleString()}</strong><span>Unique rounds</span></div></div><p class="muted">Each year is stored in its own GitHub file. Season totals never carry forward. Averages are calculated per rider, series and class using unique event rounds; multiple motos and qualifying sessions at the same event count as one round.</p>`;
  const averageRows=historicalScoringBreakdown(records).map(item=>`<tr><td>${athleteDetailButtonHTML(item.athlete)}</td><td>${esc(item.series)}</td><td>${esc(item.division)}</td><td class="points">${item.total.toLocaleString()}</td><td>${item.roundCount}</td><td class="points">${item.average.toFixed(2)}</td></tr>`);
  breakdownEl.innerHTML=averageRows.length?table(["Rider","Series","Class","Total Points","Rounds","Average / Round"],averageRows):'<p class="muted">No scored results are saved for this season yet.</p>';

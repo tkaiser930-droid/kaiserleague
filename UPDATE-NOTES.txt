@@ -1,11 +1,11 @@
 2026-11-23 athlete profile career results update:
 - Replaced the separate "Previously Scored Results" and empty "Archived Season Results" profile panels with one "Most Recent Scored Results" feed.
-- Public athlete profiles now combine the active season and archived seasons, while unarchived non-current commissioner workspaces remain private.
+- Every non-current season is now treated as an archived season; there is no separate historical-workspace state. Public athlete profiles combine the active season and every archived season, while full archived commissioner workspaces remain private.
 - The ten newest scored segments display by race date (using the season schedule date when an older score snapshot did not store one); older scored segments remain expandable.
 - Career average per round and rounds scored now accumulate across seasons, with separate lifetime average rows by series and class when a rider changes class.
 - Current-season points remain a separate figure, and fantasy-team seasonal totals are not carried into a new season.
 - New scoring records retain the scheduled event date, and older records infer it from their season schedule when possible.
-- Regression coverage verifies multi-season totals, event-round deduplication across motos, class changes, race-date ordering, and privacy of unarchived workspaces.
+- Regression coverage verifies multi-season totals, event-round deduplication across motos, class changes, race-date ordering, and privacy of full archived workspaces.
 
 Kaiser Family Fantasy SMX - Update Notes
 
@@ -164,3 +164,11 @@ MotoGP 403 diagnostics update:
 - The Select a scheduled event to edit dropdown now follows the active schedule filters, so edit selection and the visible table stay consistent.
 - Added result counts and Clear Filters controls. Filters only change the visible lists and do not modify league records or GitHub save data.
 - Added automated UI-wiring regression checks for all commissioner athlete and scheduled-event filters.
+
+
+2026-11-23 archived-season lifecycle unification:
+- Removed the separate non-current "historical workspace" status. Every season before the active year is now normalized as an archived season in the server response, GitHub season index, and Commissioner season selector.
+- All archived seasons use the same commissioner-only read/edit/scoring tools regardless of whether they were created as older workspaces or by the Archive Current Season action.
+- Public athlete-history now includes scored results from every indexed prior season, including years previously marked as unarchived workspaces. Full archived season data remains private.
+- Selecting a past year that has not yet been saved opens an empty archived season; its first save creates that year's independent GitHub season file with the archived flag.
+- Regression tests cover migration of old workspace metadata, scoring an older workspace as an archived season, public sanitized rider history from that season, and preservation of separate current-season standings.
