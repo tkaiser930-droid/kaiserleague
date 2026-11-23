@@ -32,7 +32,7 @@ HEADER BRANDING UPDATE
 2026-11-14 trade alerts and Triple Crown Supercross scoring:
 - Added alerts under the selected team name in team management for pending outgoing trade requests, incoming trade proposals that need an answer, and sent trade requests that have been accepted or rejected.
 - Each alert links to the Trade Center with that team's context. When the same team is already authenticated in team management, its Trade Center session is reused; otherwise the linked team is preselected for login.
-- Team management listens for same-browser trade updates and checks Render/server storage every 15 seconds while open so a response alert appears without requiring a manual reload.
+- Team management listens for same-browser trade updates and checks the GitHub-backed server storage every 15 seconds while open so a response alert appears without requiring a manual reload.
 - Added a Supercross Scoring Format selector for SMX Supercross events: Standard Supercross or Triple Crown.
 - Triple Crown Supercross bonuses: Fastest Qualifier +2; Race 1 Winner +3; Race 2 Winner +3; Race 3 Winner +3; Race 1 Fastest Lap +1; Race 2 Fastest Lap +1; Race 3 Fastest Lap +1.
 - Standard Supercross scoring is unchanged. The selected format is saved with race results, shown in scored-event history, and restored when editing an event.

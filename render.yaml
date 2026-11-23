@@ -11,8 +11,6 @@ services:
         value: "22"
       - key: HOST
         value: 0.0.0.0
-      - key: DATA_DIR
-        value: /var/data
       - key: GITHUB_TOKEN
         sync: false
       - key: GITHUB_REPOSITORY
@@ -23,9 +21,3 @@ services:
         value: ""
       - key: GITHUB_DATA_PATH
         value: league-data/league-data.json
-      - key: GITHUB_AUTO_BACKUP
-        value: "true"
-    disk:
-      name: kaiser-family-fantasy-smx-data
-      mountPath: /var/data
-      sizeGB: 1

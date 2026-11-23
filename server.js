@@ -1,18 +1,14 @@
 "use strict";
+
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 const { URL } = require("url");
 const { createGithubBackup } = require("./github-backup");
 const { fetchOfficialResults } = require("./race-results-import");
 
 const ROOT = __dirname;
 const githubBackup = createGithubBackup(ROOT);
-// Render's persistent disk is the live working copy. GitHub stores a second copy
-// of this same JSON file so the server can select the newest save on startup.
-const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
-const DB_FILE = path.join(DATA_DIR, "league-data.json");
 const PORT = Number(process.env.PORT || 10000);
 const HOST = process.env.HOST || "0.0.0.0";
 const KEYS = new Set([
@@ -20,54 +16,54 @@ const KEYS = new Set([
   "kaiserFantasyTrades", "kaiserFantasyDraftState", "kaiserFantasyDraftSettings",
   "kaiserFantasySchedule"
 ]);
+
+// The server keeps only an in-memory working copy. GitHub is the sole shared,
+// persistent league-data store; no league JSON is read from or written to disk.
 let db = { version: 1, state: {}, keyUpdatedAt: {}, savedAt: 0 };
-let writeChain = Promise.resolve();
+let githubReady = false;
+let githubLoadPromise = null;
 let githubOperationQueue = Promise.resolve();
-let githubAutoTimer = null;
+let lastGithubStateSignature = "";
 let githubAutoLastError = "";
 let githubAutoLastAt = "";
 let githubLastSync = { source: "not checked", at: "", message: "" };
-let lastDbFileHash = "";
-let databaseWatchStarted = false;
 
 const MIME = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg", ".txt": "text/plain; charset=utf-8", ".ico": "image/x-icon"
+  ".jpeg": "image/jpeg", ".webp": "image/webp", ".txt": "text/plain; charset=utf-8", ".ico": "image/x-icon"
 };
 
 function send(res, status, data, type = "application/json; charset=utf-8") {
   res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
   res.end(type.startsWith("application/json") ? JSON.stringify(data) : data);
 }
+
 function queueGithubOperation(operation) {
   const job = githubOperationQueue.then(operation);
+  // A failed save must not poison the queue; a later explicit retry can recover.
   githubOperationQueue = job.catch(() => {});
   return job;
 }
+
 function onlyKnownState(input) {
   const out = {};
   if (!input || typeof input !== "object" || Array.isArray(input)) return out;
   for (const key of KEYS) if (Object.prototype.hasOwnProperty.call(input, key)) out[key] = input[key];
   return out;
 }
-function formatVancouverDateTime(value) {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value ?? "");
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Vancouver", month: "long", day: "numeric", year: "numeric",
-    hour: "numeric", minute: "2-digit", hour12: true
-  }).format(date);
-}
+
 function timestampMs(value) {
   if (typeof value === "string") return Date.parse(value) || 0;
   const number = Number(value || 0);
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
+
 function maxKeyTimestamp(keyUpdatedAt) {
   return Math.max(0, ...Object.values(keyUpdatedAt || {}).map(value => Number(value) || 0));
 }
+
 function normalizeDatabase(input, fallbackTimestamp = 0) {
   const keyUpdatedAt = input?.keyUpdatedAt && typeof input.keyUpdatedAt === "object" && !Array.isArray(input.keyUpdatedAt) ? input.keyUpdatedAt : {};
   const savedAt = timestampMs(input?.savedAt) || maxKeyTimestamp(keyUpdatedAt) || Number(fallbackTimestamp) || 0;
@@ -78,117 +74,127 @@ function normalizeDatabase(input, fallbackTimestamp = 0) {
     savedAt
   };
 }
+
 function databaseTimestamp(value, fallbackTimestamp = 0) {
   return timestampMs(value?.savedAt) || maxKeyTimestamp(value?.keyUpdatedAt) || Number(fallbackTimestamp) || 0;
 }
-function fileHash(contents) {
-  return crypto.createHash("sha256").update(contents).digest("hex");
+
+function stateSignature(value) {
+  const normalized = normalizeDatabase(value);
+  return JSON.stringify({ version: normalized.version, state: normalized.state, keyUpdatedAt: normalized.keyUpdatedAt });
 }
-function queueSave({ syncGithub = true, preserveSavedAt = false } = {}) {
-  writeChain = writeChain.then(async () => {
-    await fs.promises.mkdir(DATA_DIR, { recursive: true });
-    if (!preserveSavedAt) db.savedAt = Math.max(Date.now(), timestampMs(db.savedAt) + 1);
-    const contents = JSON.stringify(db, null, 2);
-    const temporary = DB_FILE + ".tmp";
-    await fs.promises.writeFile(temporary, contents, "utf8");
-    await fs.promises.rename(temporary, DB_FILE);
-    lastDbFileHash = fileHash(contents);
-    if (syncGithub) scheduleAutomaticGithubSave();
-  });
-  return writeChain;
+
+function formatVancouverDateTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value ?? "");
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Vancouver", month: "long", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true
+  }).format(date);
 }
-function scheduleAutomaticGithubSave() {
-  if (!githubBackup.isAutoEnabled()) return;
-  if (githubAutoTimer) clearTimeout(githubAutoTimer);
-  githubAutoTimer = setTimeout(() => {
-    githubAutoTimer = null;
-    queueGithubOperation(async () => {
-      await writeChain;
-      const contents = await fs.promises.readFile(DB_FILE, "utf8");
-      const current = normalizeDatabase(JSON.parse(contents));
-      return githubBackup.saveLeagueData(current, "Kaiser Family Fantasy SMX: automatic league-data save");
-    }).then(result => {
+
+function githubStorageLabel() {
+  const cfg = githubBackup.getConfigSummary();
+  return `GitHub repository ${cfg.repository}/${cfg.dataPath} (${cfg.branch})`;
+}
+
+async function ensureGithubReady() {
+  if (!githubBackup.configured()) {
+    throw new Error("GitHub-only saving is not configured. Set GITHUB_TOKEN and GITHUB_REPOSITORY in the server environment.");
+  }
+  if (githubReady) return;
+  if (!githubLoadPromise) {
+    githubLoadPromise = (async () => {
+      const remote = await githubBackup.getLatestLeagueData();
+      if (remote.found) {
+        db = normalizeDatabase(remote.data, remote.savedAt);
+        lastGithubStateSignature = stateSignature(db);
+        githubLastSync = {
+          source: "GitHub",
+          at: new Date().toISOString(),
+          message: `Loaded the active league database from GitHub (${formatVancouverDateTime(remote.savedAt)}).`
+        };
+        console.log(`Loaded league data from GitHub (${remote.path}, ${remote.branch}).`);
+      } else {
+        db = { version: 1, state: {}, keyUpdatedAt: {}, savedAt: 0 };
+        lastGithubStateSignature = stateSignature(db);
+        githubLastSync = {
+          source: "GitHub",
+          at: new Date().toISOString(),
+          message: "No league-data file exists in GitHub yet. The first league save will create it."
+        };
+        console.log("GitHub repository is ready; no league-data JSON exists yet.");
+      }
+      githubReady = true;
+    })();
+  }
+  try {
+    await githubLoadPromise;
+  } finally {
+    githubLoadPromise = null;
+  }
+}
+
+async function saveDatabaseToGithub(message = "Kaiser Family Fantasy SMX: automatic league-data save") {
+  await ensureGithubReady();
+  return queueGithubOperation(async () => {
+    const pendingSignature = stateSignature(db);
+    if (pendingSignature === lastGithubStateSignature) {
+      return { ok: true, changed: false, savedAt: db.savedAt, path: githubBackup.getConfigSummary().dataPath, commit: null };
+    }
+    db.savedAt = Math.max(Date.now(), timestampMs(db.savedAt) + 1);
+    const snapshot = normalizeDatabase(JSON.parse(JSON.stringify(db)));
+    try {
+      const result = await githubBackup.saveLeagueData(snapshot, message);
+      lastGithubStateSignature = stateSignature(snapshot);
       githubAutoLastAt = new Date().toISOString();
       githubAutoLastError = "";
       if (result.changed) {
-        console.log(`Automatic GitHub league-data save: ${result.commit.shortSha || result.commit.sha.slice(0, 7)} (${result.path}).`);
+        console.log(`Saved league data directly to GitHub (${result.commit.shortSha || result.commit.sha.slice(0, 7)}; ${result.path}).`);
       }
-    }).catch(err => {
+      githubLastSync = {
+        source: "GitHub",
+        at: githubAutoLastAt,
+        message: result.changed ? `Committed the latest league data to GitHub (${result.commit.shortSha || result.commit.sha.slice(0, 7)}).` : "GitHub already contains the latest league data."
+      };
+      return result;
+    } catch (error) {
       githubAutoLastAt = new Date().toISOString();
-      githubAutoLastError = err.message || "Automatic GitHub league-data save failed.";
-      console.error("Automatic GitHub league-data save failed:", githubAutoLastError);
-    });
-  }, 1300);
-  if (githubAutoTimer.unref) githubAutoTimer.unref();
-}
-async function currentDiskDatabase() {
-  await writeChain;
-  const contents = await fs.promises.readFile(DB_FILE, "utf8");
-  const stat = await fs.promises.stat(DB_FILE);
-  return { data: normalizeDatabase(JSON.parse(contents), stat.mtimeMs), contents, stat };
-}
-async function syncNewestLeagueSave(sourceLabel = "manual scan") {
-  await writeChain;
-  if (!githubBackup.configured()) throw new Error("GitHub is not configured. Set GITHUB_TOKEN and GITHUB_REPOSITORY on the server.");
-  const local = await currentDiskDatabase();
-  const localSavedAt = databaseTimestamp(local.data, local.stat.mtimeMs);
-  const remote = await githubBackup.getLatestLeagueData();
-  const remoteSavedAt = remote.found ? databaseTimestamp(remote.data, remote.savedAt) : 0;
-
-  if (remote.found && remoteSavedAt > localSavedAt) {
-    db = normalizeDatabase(remote.data, remoteSavedAt);
-    await queueSave({ syncGithub: false, preserveSavedAt: true });
-    githubLastSync = { source: "GitHub", at: new Date().toISOString(), message: `Loaded the newer GitHub save (${formatVancouverDateTime(remoteSavedAt)}) into ${DATA_DIR}.` };
-    return { ok: true, source: "GitHub", localSavedAt, githubSavedAt: remoteSavedAt, savedAt: remoteSavedAt, message: githubLastSync.message };
-  }
-
-  // Render/local disk wins ties. When it is newer (or GitHub has no copy yet),
-  // update GitHub from the exact live JSON currently on disk.
-  const isSameData = remote.found && JSON.stringify(remote.data) === JSON.stringify(local.data);
-  let githubSave = null;
-  if (githubBackup.isAutoEnabled() && (!remote.found || localSavedAt > remoteSavedAt || !isSameData)) {
-    githubSave = await githubBackup.saveLeagueData(local.data, `Kaiser Family Fantasy SMX: ${sourceLabel} sync from Render`);
-  }
-  const message = remote.found
-    ? `Render is the newest save (${formatVancouverDateTime(localSavedAt)}); GitHub was checked${githubSave?.changed ? " and updated" : ""}.`
-    : `Only the Render save existed; ${githubSave?.changed ? "a GitHub copy was created" : "GitHub auto-backup is currently disabled"}.`;
-  githubLastSync = { source: "Render", at: new Date().toISOString(), message };
-  return { ok: true, source: "Render", localSavedAt, githubSavedAt: githubSave?.savedAt || remoteSavedAt, savedAt: localSavedAt, githubCommit: githubSave?.commit || null, message };
-}
-function startDatabaseFileWatcher() {
-  if (databaseWatchStarted || !githubBackup.isAutoEnabled()) return;
-  databaseWatchStarted = true;
-  fs.watchFile(DB_FILE, { interval: 1000, persistent: false }, async (current, previous) => {
-    if (current.mtimeMs === previous.mtimeMs && current.size === previous.size) return;
-    try {
-      const contents = await fs.promises.readFile(DB_FILE, "utf8");
-      const hash = fileHash(contents);
-      if (hash === lastDbFileHash) return;
-      const parsed = JSON.parse(contents);
-      const previousState = db.state;
-      db = normalizeDatabase(parsed, current.mtimeMs);
-      const externalStamp = Math.max(db.savedAt, Date.now(), current.mtimeMs);
-      db.savedAt = externalStamp;
-      for (const key of KEYS) {
-        if (JSON.stringify(previousState[key]) !== JSON.stringify(db.state[key])) db.keyUpdatedAt[key] = externalStamp;
-      }
-      lastDbFileHash = hash;
-      await queueSave({ syncGithub: true, preserveSavedAt: true });
-      console.log("Detected an external change to league-data.json; GitHub backup queued.");
-    } catch (err) {
-      console.warn("A change to league-data.json could not be read for GitHub backup:", err.message);
+      githubAutoLastError = error.message || "GitHub league-data save failed.";
+      throw error;
     }
   });
 }
+
+async function reloadLatestGithubSave() {
+  if (!githubBackup.configured()) throw new Error("GitHub is not configured. Set GITHUB_TOKEN and GITHUB_REPOSITORY on the server.");
+  return queueGithubOperation(async () => {
+    const remote = await githubBackup.getLatestLeagueData();
+    if (!remote.found) throw new Error(`No league-data save was found at ${remote.path || "the configured GitHub path"}.`);
+    db = normalizeDatabase(remote.data, remote.savedAt);
+    lastGithubStateSignature = stateSignature(db);
+    githubReady = true;
+    githubLastSync = {
+      source: "GitHub",
+      at: new Date().toISOString(),
+      message: `Loaded the latest GitHub league save (${formatVancouverDateTime(remote.savedAt)}).`
+    };
+    return { ok: true, source: "GitHub", savedAt: db.savedAt, message: githubLastSync.message };
+  });
+}
+
 async function readBody(req) {
-  const chunks = []; let size = 0;
+  const chunks = [];
+  let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 15 * 1024 * 1024) throw new Error("Request is too large (15 MB limit).");
+    if (size > 64 * 1024 * 1024) throw new Error("Request is too large (64 MB limit).");
     chunks.push(chunk);
   }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+  try { return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); }
+  catch { throw new Error("Request body is not valid JSON."); }
 }
+
 async function handleApi(req, res, url) {
   if (url.pathname === "/api/results/preview" && req.method === "POST") {
     const body = await readBody(req);
@@ -199,174 +205,159 @@ async function handleApi(req, res, url) {
     });
     return send(res, 200, result);
   }
+
   if (url.pathname === "/api/github/status" && req.method === "GET") {
-    const local = await currentDiskDatabase().catch(() => ({ data: db, stat: null }));
-    const localSavedAt = databaseTimestamp(local.data, local.stat?.mtimeMs || 0);
     const status = await githubBackup.getStatus({
-      localSavedAt,
-      localStorage: DATA_DIR === "/var/data" ? "Render persistent disk" : "Local server JSON file",
+      storageMode: "github-only",
+      storageLabel: githubStorageLabel(),
+      activeSavedAt: db.savedAt,
+      githubReady,
       autoSaveLastAt: githubAutoLastAt,
       autoSaveLastError: githubAutoLastError,
       lastSync: githubLastSync
     });
     return send(res, 200, status);
   }
+
   if (url.pathname === "/api/github/save" && req.method === "POST") {
     await readBody(req);
-    if (!githubBackup.authorize(req.headers["x-kf-github-backup-password"])) return send(res, 401, { error: "GitHub backup password is incorrect or not configured." });
-    const result = await queueGithubOperation(async () => {
-      const local = await currentDiskDatabase();
-      return githubBackup.saveLeagueData(local.data, "Kaiser Family Fantasy SMX: manual league-data save to GitHub");
-    });
-    githubAutoLastAt = new Date().toISOString(); githubAutoLastError = "";
+    if (!githubBackup.authorize(req.headers["x-kf-github-backup-password"])) {
+      return send(res, 401, { error: "GitHub backup password is incorrect or not configured." });
+    }
+    const result = await saveDatabaseToGithub("Kaiser Family Fantasy SMX: manual save to GitHub");
     return send(res, 200, result);
   }
-  if (url.pathname === "/api/github/sync" && req.method === "POST") {
+
+  if (url.pathname === "/api/github/reload" && req.method === "POST") {
     await readBody(req);
-    if (!githubBackup.authorize(req.headers["x-kf-github-backup-password"])) return send(res, 401, { error: "GitHub backup password is incorrect or not configured." });
-    const result = await queueGithubOperation(() => syncNewestLeagueSave("manual"));
+    if (!githubBackup.authorize(req.headers["x-kf-github-backup-password"])) {
+      return send(res, 401, { error: "GitHub backup password is incorrect or not configured." });
+    }
+    const result = await reloadLatestGithubSave();
     return send(res, 200, result);
   }
+
   if (url.pathname === "/api/state" && req.method === "GET") {
-    await writeChain;
+    await ensureGithubReady();
     return send(res, 200, {
-      version: db.version, state: db.state, keyUpdatedAt: db.keyUpdatedAt, savedAt: db.savedAt,
-      storageMode: DATA_DIR === "/var/data" ? "render" : "local",
-      storageLabel: DATA_DIR === "/var/data" ? "Render persistent disk (/var/data/league-data.json)" : (DATA_DIR === path.join(ROOT, "data") ? "project file data/league-data.json" : `server directory ${DATA_DIR}/league-data.json`)
+      version: db.version,
+      state: db.state,
+      keyUpdatedAt: db.keyUpdatedAt,
+      savedAt: db.savedAt,
+      storageMode: "github",
+      storageLabel: githubStorageLabel()
     });
   }
+
   if (url.pathname === "/api/state" && req.method === "PUT") {
+    await ensureGithubReady();
     const body = await readBody(req);
+    if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+      return send(res, 400, { error: "The submitted league state must be a JSON object." });
+    }
     const incoming = onlyKnownState(body.state);
     const stamp = Number(body.updatedAt) || Date.now();
     db = { version: 1, state: incoming, keyUpdatedAt: {}, savedAt: stamp };
     for (const key of KEYS) db.keyUpdatedAt[key] = stamp;
-    await queueSave();
-    return send(res, 200, { ok: true, keysSaved: Object.keys(incoming).length, savedAt: db.savedAt });
+    const saved = await saveDatabaseToGithub("Kaiser Family Fantasy SMX: league-data restore to GitHub");
+    return send(res, 200, { ok: true, keysSaved: Object.keys(incoming).length, savedAt: db.savedAt, storage: "GitHub", commit: saved.commit || null });
   }
+
   if (url.pathname === "/api/state" && req.method === "DELETE") {
+    await ensureGithubReady();
     const clearedAt = Date.now();
     db = { version: 1, state: {}, keyUpdatedAt: Object.fromEntries([...KEYS].map(key => [key, clearedAt])), savedAt: clearedAt };
-    await queueSave();
-    return send(res, 200, { ok: true, savedAt: db.savedAt });
+    const saved = await saveDatabaseToGithub("Kaiser Family Fantasy SMX: clear league data in GitHub");
+    return send(res, 200, { ok: true, savedAt: db.savedAt, storage: "GitHub", commit: saved.commit || null });
   }
+
   const match = url.pathname.match(/^\/api\/state\/([^/]+)$/);
   if (match && req.method === "PUT") {
+    await ensureGithubReady();
     const key = decodeURIComponent(match[1]);
     if (!KEYS.has(key)) return send(res, 400, { error: "Unknown data category." });
     const body = await readBody(req);
+    if (!Object.prototype.hasOwnProperty.call(body, "value")) return send(res, 400, { error: "The data category value is missing." });
     const stamp = Number(body.updatedAt) || Date.now();
     const current = Number(db.keyUpdatedAt[key] || 0);
     if (stamp >= current) {
       db.state[key] = body.value;
       db.keyUpdatedAt[key] = stamp;
-      await queueSave();
+      const saved = await saveDatabaseToGithub(`Kaiser Family Fantasy SMX: save ${key} to GitHub`);
+      return send(res, 200, { ok: true, applied: true, savedAt: db.savedAt, storage: "GitHub", commit: saved.commit || null });
     }
-    return send(res, 200, { ok: true, applied: stamp >= current, savedAt: db.savedAt || db.keyUpdatedAt[key] || current });
+    return send(res, 200, { ok: true, applied: false, savedAt: db.savedAt, storage: "GitHub" });
   }
+
   return send(res, 404, { error: "API endpoint not found." });
 }
+
 async function serve(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
   if (url.pathname === "/healthz" && req.method === "GET") {
-    return send(res, 200, { ok: true, storage: DATA_DIR === "/var/data" ? "render-persistent-disk" : "local-file", timestamp: new Date().toISOString() });
+    return send(res, 200, {
+      ok: true,
+      storage: "github-only",
+      githubConfigured: githubBackup.configured(),
+      githubReady,
+      timestamp: new Date().toISOString()
+    });
   }
   if (url.pathname.startsWith("/api/")) {
     try { return await handleApi(req, res, url); }
-    catch (err) { console.error("API error:", err); return send(res, 400, { error: err.message || "Request failed." }); }
+    catch (error) {
+      console.error("API error:", error);
+      const status = error.status === 401 ? 502 : (error.status === 403 || error.status === 404 ? 502 : 503);
+      return send(res, status, { error: error.message || "GitHub request failed." });
+    }
   }
+
   let pathname;
-  try { pathname = decodeURIComponent(url.pathname); } catch { return send(res, 400, "Bad URL", "text/plain; charset=utf-8"); }
+  try { pathname = decodeURIComponent(url.pathname); }
+  catch { return send(res, 400, "Bad URL", "text/plain; charset=utf-8"); }
   if (pathname === "/") pathname = "/index.html";
-  // Keep persistent league data, Git metadata, dependencies, and server secrets private.
   const pathParts = pathname.split("/").filter(Boolean);
   if (pathParts.some(part => part === "data" || part === ".git" || part === "node_modules" || part === ".env" || (part.startsWith(".env.") && part !== ".env.example"))) {
     return send(res, 404, "Not found", "text/plain; charset=utf-8");
   }
   const file = path.resolve(ROOT, "." + pathname);
-  if (!file.startsWith(ROOT + path.sep) || file === DB_FILE) return send(res, 403, "Forbidden", "text/plain; charset=utf-8");
+  if (!file.startsWith(ROOT + path.sep)) return send(res, 403, "Forbidden", "text/plain; charset=utf-8");
   try {
     const stat = await fs.promises.stat(file);
     if (!stat.isFile()) return send(res, 404, "Not found", "text/plain; charset=utf-8");
     const contents = await fs.promises.readFile(file);
     res.writeHead(200, { "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff" });
     res.end(contents);
-  } catch { return send(res, 404, "Not found", "text/plain; charset=utf-8"); }
-}
-async function main() {
-  await fs.promises.mkdir(DATA_DIR, { recursive: true });
-  let localFileExists = true;
-  try {
-    const contents = await fs.promises.readFile(DB_FILE, "utf8");
-    const stat = await fs.promises.stat(DB_FILE);
-    const parsed = JSON.parse(contents);
-    db = normalizeDatabase(parsed, stat.mtimeMs);
-    const embeddedSavedAt = databaseTimestamp(parsed);
-    if (stat.mtimeMs > embeddedSavedAt + 3000) {
-      db.savedAt = stat.mtimeMs;
-      for (const key of KEYS) db.keyUpdatedAt[key] = Math.max(Number(db.keyUpdatedAt[key] || 0), stat.mtimeMs);
-      // Persist the inferred timestamp before comparing against GitHub.
-      await queueSave({ syncGithub: false, preserveSavedAt: true });
-    } else {
-      lastDbFileHash = fileHash(contents);
-    }
-  } catch (err) {
-    if (err.code === "ENOENT") {
-      localFileExists = false;
-      db = { version: 1, state: {}, keyUpdatedAt: {}, savedAt: 0 };
-    } else {
-      console.error("Could not read Render/local league database; starting with an empty store.", err);
-      localFileExists = false;
-    }
+  } catch {
+    return send(res, 404, "Not found", "text/plain; charset=utf-8");
   }
+}
 
-  // On every server start, compare the live Render/local JSON with GitHub's JSON
-  // copy. Whichever has the later savedAt timestamp becomes the active database.
+async function main() {
   if (githubBackup.configured()) {
     try {
-      const remote = await githubBackup.getLatestLeagueData();
-      let localSavedAt = db.savedAt;
-      if (!localFileExists) localSavedAt = 0;
-      const remoteSavedAt = remote.found ? databaseTimestamp(remote.data, remote.savedAt) : 0;
-      if (remote.found && (!localFileExists || remoteSavedAt > localSavedAt)) {
-        db = normalizeDatabase(remote.data, remoteSavedAt);
-        await queueSave({ syncGithub: false, preserveSavedAt: true });
-        githubLastSync = { source: "GitHub", at: new Date().toISOString(), message: "Loaded the newer GitHub league-data JSON into Render/local storage." };
-        console.log(`Loaded newer GitHub league save (${new Date(remoteSavedAt).toISOString()}).`);
-      } else {
-        if (!localFileExists) {
-          db = { version: 1, state: {}, keyUpdatedAt: {}, savedAt: Date.now() };
-          await queueSave({ syncGithub: false });
-        }
-        const local = normalizeDatabase(db);
-        const same = remote.found && JSON.stringify(remote.data) === JSON.stringify(local);
-        if (githubBackup.isAutoEnabled() && (!remote.found || localSavedAt > remoteSavedAt || !same)) {
-          const saved = await githubBackup.saveLeagueData(local, "Kaiser Family Fantasy SMX: startup sync from Render");
-          console.log(saved.changed ? `Synced Render league save to GitHub (${saved.commit.shortSha}).` : "Render and GitHub league saves already match.");
-        }
-        githubLastSync = { source: "Render", at: new Date().toISOString(), message: remote.found ? "Render was the newest save." : "No GitHub JSON copy existed; Render is the active save." };
-      }
-    } catch (err) {
-      console.error("Could not compare Render and GitHub league saves; keeping the Render/local copy:", err.message);
-      githubLastSync = { source: "Render (GitHub check failed)", at: new Date().toISOString(), message: err.message };
-      if (!localFileExists) await queueSave({ syncGithub: false });
+      await ensureGithubReady();
+    } catch (error) {
+      console.error("Could not load the GitHub league database. Shared saving is disabled until GitHub is reachable:", error.message);
+      githubReady = false;
+      githubLastSync = { source: "GitHub unavailable", at: new Date().toISOString(), message: error.message };
     }
-  } else if (!localFileExists) {
-    await queueSave({ syncGithub: false });
-    githubLastSync = { source: "Render/local only", at: new Date().toISOString(), message: "GitHub is not configured; the local database was initialized." };
+  } else {
+    console.warn("GITHUB_TOKEN is not configured. The site will use browser-only storage until GitHub is configured.");
   }
 
-  // A file watcher also catches direct edits to league-data.json made outside the app.
-  startDatabaseFileWatcher();
-
   const server = http.createServer((req, res) => { serve(req, res); });
-  server.on("error", err => {
-    if (err.code === "EADDRINUSE") console.error(`Port ${PORT} is already in use. Stop Live Server in VS Code, then run npm start again.`);
-    else console.error(err);
+  server.on("error", error => {
+    if (error.code === "EADDRINUSE") console.error(`Port ${PORT} is already in use. Stop the other server, then run npm start again.`);
+    else console.error(error);
     process.exitCode = 1;
   });
   server.listen(PORT, HOST, () => {
-    console.log(`Kaiser Family Fantasy SMX is listening on ${HOST}:${PORT}/\nLeague data saves to: ${DB_FILE}\nGitHub JSON backup: ${githubBackup.configured() ? "connected" : "not configured"}\nPress Ctrl+C to stop the server.`);
+    console.log(`Kaiser Family Fantasy SMX is listening on ${HOST}:${PORT}/\nLeague-data persistence: GitHub only (${githubBackup.configured() ? "configured" : "not configured"})\nNo Render persistent disk is used for league data.\nPress Ctrl+C to stop the server.`);
   });
 }
-main().catch(err => { console.error("Server startup failed:", err); process.exit(1); });
+
+main().catch(error => {
+  console.error("Server startup failed:", error);
+  process.exit(1);
+});

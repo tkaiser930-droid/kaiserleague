@@ -17,53 +17,54 @@
     <p class="eyebrow">LEAGUE STORAGE</p>
     <h1>Data &amp; Backup</h1>
     <section class="panel">
-      <h2>Where your league saves</h2>
+      <h2>Primary league storage</h2>
       <p id="dataModeDetail" class="storage-detail">Checking the active storage mode…</p>
       <p id="dataCategoryCount" class="muted"></p>
-      <p class="muted">With local development, riders, teams, scores, trades, draft picks, settings, and schedule events are stored in <code>data/league-data.json</code>. On Render, the same database file is stored on the attached persistent disk at <code>/var/data/league-data.json</code>. The database file is not served directly to the browser.</p>
-      <button id="saveDataNow" class="btn">Save / Flush to Render or Local Server</button>
+      <p class="muted">Riders, teams, scores, trades, draft picks, settings, and schedule events are saved directly to <code>tkaiser930-droid/LeagueSave</code> at <code>league-data/league-data.json</code>. The Node server keeps only a temporary in-memory working copy; no Render persistent disk or local server JSON file is used. This browser also keeps a local working copy, and you can download a portable JSON backup below.</p>
+      <button id="saveDataNow" class="btn">Save Current Changes to GitHub</button>
       <p id="dataMessage" class="message" role="status" aria-live="polite"></p>
     </section>
     <section class="panel" id="githubBackupPanel">
-      <p class="eyebrow">SECONDARY LEAGUE-DATA BACKUP</p>
-      <h2>GitHub + Render Save Sync</h2>
-      <p>The server checks the live Render JSON file (<code>/var/data/league-data.json</code>) against the GitHub copy in <code>tkaiser930-droid/LeagueSave</code> when it starts. It loads whichever save has the newer <code>savedAt</code> timestamp. When the live league JSON changes, the server automatically commits that updated JSON file to GitHub after the write settles. A brand-new, empty GitHub repository is initialized automatically on the first save.</p>
-      <p id="githubBackupStatus" class="storage-detail warn" role="status" aria-live="polite">Checking Render and GitHub saves…</p>
+      <p class="eyebrow">PRIMARY LEAGUE-DATA STORE</p>
+      <h2>GitHub League Save</h2>
+      <p>GitHub is the only shared persistent store for league data. Every accepted change is committed directly to <code>tkaiser930-droid/LeagueSave</code> at <code>league-data/league-data.json</code>. The server does not read or write a Render persistent disk. A brand-new, empty GitHub repository is initialized automatically on the first save.</p>
+      <p id="githubBackupStatus" class="storage-detail warn" role="status" aria-live="polite">Checking GitHub league save…</p>
       <p id="githubBackupLatest" class="muted">The latest timestamps will appear here.</p>
       <label for="githubBackupPassword">GitHub manual-action password</label>
       <input id="githubBackupPassword" type="password" autocomplete="current-password" placeholder="Enter GITHUB_BACKUP_PASSWORD" maxlength="200">
       <div class="backup-actions">
-        <button id="syncNewestLeagueSave" class="btn" type="button" disabled>Scan GitHub &amp; Render — Load Newest Save</button>
+        <button id="syncNewestLeagueSave" class="btn" type="button" disabled>Load Latest GitHub Save</button>
         <button id="saveLeagueToGithub" class="btn alt" type="button" disabled>Save Current League JSON to GitHub</button>
         <button id="refreshGithubStatus" class="btn alt" type="button">Refresh Save Status</button>
       </div>
       <p id="githubBackupMessage" class="message" role="status" aria-live="polite"></p>
-      <p class="muted">Render remains the live working database and continues saving to its persistent disk. GitHub is a timestamp-compared mirror of the same JSON save. Manual JSON download/import and the Render/local Save / Flush option below remain available. The GitHub token is stored only in server environment variables.</p>
+      <p class="muted">GitHub is the sole shared server-side database. The website server holds only an in-memory copy while running. Download League Backup and Restore a Backup remain available for local/offline copies. The GitHub token is stored only in server environment variables.</p>
       <details class="github-setup"><summary>GitHub league-data setup instructions</summary>
         <ol>
           <li>The backup repository is preconfigured as <code>tkaiser930-droid/LeagueSave</code>. Its default branch is detected automatically. Set <code>GITHUB_BRANCH</code> only if you intentionally want to use a different branch.</li>
           <li>Create a fine-grained personal access token restricted to that repository with <b>Contents: Read and write</b> and <b>Metadata: Read</b>.</li>
           <li>On Render, set <code>GITHUB_TOKEN</code> and <code>GITHUB_BACKUP_PASSWORD</code> in the service Environment page. Confirm <code>GITHUB_REPOSITORY=tkaiser930-droid/LeagueSave</code>.</li>
-          <li>Leave <code>GITHUB_BRANCH</code> blank for automatic default-branch detection. Keep <code>GITHUB_DATA_PATH=league-data/league-data.json</code> and <code>GITHUB_AUTO_BACKUP=true</code>.</li>
-          <li>Restart/redeploy the Node service. On startup it compares the saved timestamps and selects the newest copy. Later changes to <code>league-data.json</code> are committed to GitHub automatically.</li>
+          <li>Leave <code>GITHUB_BRANCH</code> blank for automatic default-branch detection. Keep <code>GITHUB_DATA_PATH=league-data/league-data.json</code>. Automatic GitHub saving is always enabled when the token is configured; no auto-backup toggle is needed.</li>
+          <li>Restart/redeploy the Node service. On startup it loads the GitHub JSON file. Every subsequent league change is committed directly to GitHub before the save request is reported successful.</li>
         </ol>
         <p class="muted">Locally, copy <code>.env.example</code> to <code>.env</code> and enter the same values. Never put your GitHub token in browser code or commit it to the repository.</p>
       </details>
     </section>
     <section class="panel">
-      <h2>Export a backup</h2>
-      <p>Download a JSON backup of the saved league. Keep a backup before replacing project files, importing old data, or resetting the league.</p>
+      <h2>Local save download</h2>
+      <p>Download a portable JSON copy of the current league. This local save download is independent of GitHub and can be kept on your computer as an extra backup.</p>
       <button id="exportData" class="btn">Download League Backup</button>
     </section>
     <section class="panel">
-      <h2>Restore a backup</h2>
-      <p>Choose a backup JSON file previously downloaded from this page. Restoring replaces the current league data, so export a backup first if you need to keep the current version.</p>
+      <h2>Restore a local backup</h2>
+      <p>Choose a backup JSON file previously downloaded from this page. Restoring replaces the GitHub league data, so download a backup first if you need to keep the current version.</p>
       <label for="importData">Backup file (.json)</label>
       <input id="importData" type="file" accept="application/json,.json">
     </section>
     <section class="panel">
       <h2>Important</h2>
-      <p>Run locally with <code>npm start</code> for project-file saving. On Render, configure the service using the included <code>render.yaml</code> and keep the persistent disk mounted at <code>/var/data</code>. If you open the site with VS Code Live Server, the banner will say “Browser-only storage”; changes then stay in that browser's storage until exported. Render data persists across deploys only when a persistent disk is attached.</p>
-      <p>If your terminal reports that port 5500 is already in use, stop Live Server in VS Code first, then run <code>npm start</code> again.</p>
+      <p>For shared saving, run the Node service with <code>GITHUB_TOKEN</code> configured and use the included GitHub repository settings. The Render web service does not need a persistent disk. If GitHub is unavailable or you open the site with VS Code Live Server, the banner will say “Browser-only storage”; changes remain in that browser until GitHub reconnects or you download a JSON backup.</p>
+      <p>Before removing the old persistent disk from a deployment that previously used it, first save the current live league JSON to GitHub from this page and download a local JSON backup. Confirm that the GitHub save is present before detaching the disk.</p>
+      <p>If your terminal reports that port 10000 is already in use, stop the other Node server first, then run <code>npm start</code> again.</p>
     </section>
-  </section><section class="panel commissioner-yearly-reset"><h2>Yearly Reset</h2><p class="muted">Prepare for a new fantasy season by clearing every team roster, resetting all accumulated team and athlete points, and deleting all trade proposals and their notification history. This permanently deletes scoring records, including athlete profile results, averages, scoring history, and top-undrafted scoring totals. Athlete records, team names, owners and passwords, draft settings, and the event schedule remain unchanged.</p><div class="edit-actions"><button class="btn danger" id="yearlyReset" type="button">Reset Rosters, Points &amp; Trades</button></div><p aria-live="polite" class="message" id="yearlyResetMessage" role="status"></p></section><div class="commissioner-global-actions"><button class="btn danger" id="resetData">Reset All Local Data</button><button class="btn alt" id="commLogout">Sign Out</button></div></section></main><footer>Kaiser Family Fantasy SMX <span>Vancouver, BC · Pacific Time · data storage status shown above</span></footer><script src="bootstrap.js"></script></body></html>
+  </section><section class="panel commissioner-yearly-reset"><h2>Yearly Reset</h2><p class="muted">Prepare for a new fantasy season by clearing every team roster, resetting all accumulated team and athlete points, and deleting all trade proposals and their notification history. This permanently deletes scoring records, including athlete profile results, averages, scoring history, and top-undrafted scoring totals. Athlete records, team names, owners and passwords, draft settings, and the event schedule remain unchanged.</p><div class="edit-actions"><button class="btn danger" id="yearlyReset" type="button">Reset Rosters, Points &amp; Trades</button></div><p aria-live="polite" class="message" id="yearlyResetMessage" role="status"></p></section><div class="commissioner-global-actions"><button class="btn danger" id="resetData">Reset All League Data</button><button class="btn alt" id="commLogout">Sign Out</button></div></section></main><footer>Kaiser Family Fantasy SMX <span>Vancouver, BC · Pacific Time · data storage status shown above</span></footer><script src="bootstrap.js"></script></body></html>

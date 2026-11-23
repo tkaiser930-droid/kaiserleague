@@ -1,4 +1,4 @@
-KAISER FAMILY FANTASY SMX — RENDER / NODE.JS PROJECT
+KAISER FAMILY FANTASY SMX — GITHUB-ONLY / NODE.JS PROJECT
 
 This package restores the league's core structure to the version from the GASGAS-logo update, while retaining the requested additions: the site-wide motocross background, Triple Crown Series with CAN 250 and CAN 450, primary/secondary rider affiliations, MXON, and the Reigning Triple Crown Champion checkbox and number-plate color.
 
@@ -44,22 +44,27 @@ SCHEDULE
 - Triple Crown Series schedule badge uses forest green. MXON uses blue.
 - Team Management and Trade Center lock during scheduled event dates.
 
-RENDER DEPLOYMENT
-Recommended: Render native Node runtime. Build command: npm install. Start command: npm start. Health Check Path: /healthz. Set DATA_DIR=/var/data and attach the existing persistent disk at /var/data. Do not remove or reformat the disk; it contains the live league database.
-
-For Docker runtime, the package includes Dockerfile at the project root. Set Dockerfile Path to ./Dockerfile and attach the same persistent disk at /var/data.
+GITHUB-ONLY STORAGE / RENDER DEPLOYMENT
+- GitHub is the only shared persistent store for league data. Default repository: tkaiser930-droid/LeagueSave; JSON path: league-data/league-data.json.
+- The Node server loads the league JSON from GitHub into memory at startup and commits each accepted change directly back to GitHub.
+- No Render persistent disk or local server-side league-data JSON file is used. The Render service hosts the website and API only.
+- In Render > Service > Environment, set GITHUB_TOKEN, GITHUB_REPOSITORY=tkaiser930-droid/LeagueSave, GITHUB_BACKUP_PASSWORD, GITHUB_BRANCH (blank for default), and GITHUB_DATA_PATH=league-data/league-data.json. The token needs Contents: Read and write and Metadata: Read.
+- Do not set DATA_DIR. The included render.yaml no longer declares a persistent disk.
+- Before deploying this update from the former disk-based version, first use the current live site’s Commissioner > Data & Backup > Save Current League JSON to GitHub. Confirm the GitHub commit and download a JSON backup. Only then deploy and remove the old Render persistent disk.
+- Manual portable JSON download and restore remain available in Data & Backup. When GitHub is offline, the browser copy can still be downloaded; server-side shared saving reports an error rather than falling back to a Render disk.
+- For Docker deployment, use the included Dockerfile; no persistent disk is required.
 
 LOCAL DEVELOPMENT
 - Install Node.js 22 or newer.
-- Open this folder in VS Code.
-- Run npm start.
-- Open http://127.0.0.1:5500/.
-- The local database is stored under data/league-data.json.
+- Copy .env.example to .env and configure the GitHub token/repository/password for shared saving.
+- Run npm install and npm start.
+- Open the URL printed by the server (normally http://127.0.0.1:10000/).
+- Without a configured GitHub token, the site intentionally uses browser-only storage. The portable JSON download is still available; no local server-side league-data file is created.
 
 DATA SAFETY
-- Existing league data is not reset by this package.
-- Startup migration maps old class names to their retained parent where appropriate, archives WMX-only and SMX Next-only riders instead of deleting athlete records, removes archived riders from active rosters, and retains historic scores.
-- Download a league backup from Data & Backup before deploying any update.
+- Download a league backup from Data & Backup before deploying updates, importing old data, or resetting the league.
+- The GitHub repository is the only shared persistent source of truth. Browser localStorage retains a local working copy and supports portable backup downloads.
+- The server writes each accepted change directly to GitHub. If GitHub rejects a save, the browser copy is retained and the save failure is surfaced; there is no Render/local-file fallback.
 
 BACKGROUND AND BRANDING
 - The enhanced motocross action image remains at assets/site-background.webp and is applied across every page.
@@ -91,17 +96,8 @@ SCORING FORMATS
 - MotoGP: always has two scoring tabs, Grand Prix and Sprint. Grand Prix uses the standard 22-place points table. Sprint awards 12 points for 1st, 9 for 2nd, 7 for 3rd, then decreases by one point per place through 9th (1 point); 10th–22nd receive 0. Both tabs use Fastest Qualifier (+3) and Fastest Lap (+1).
 - The scoring form derives event type from the selected schedule event. MotoGP always displays both tabs; F1 displays separate tabs only for scheduled Sprint events.
 
-GITHUB + RENDER LEAGUE-DATA SYNC
-- Render remains the live working database at /var/data/league-data.json. GitHub stores a second copy of that same JSON save at league-data/league-data.json by default; it does not replace the website source files.
-- On every server startup, the server scans Render/local league-data.json and the GitHub JSON copy, compares their savedAt timestamps, and loads whichever save is newer. Render/local wins exact timestamp ties.
-- Every update written to league-data.json automatically queues a GitHub commit after the file write settles. A file watcher also detects direct edits to the save JSON file and backs those up.
-- Configure GITHUB_TOKEN, GITHUB_REPOSITORY (preconfigured as tkaiser930-droid/LeagueSave), GITHUB_BRANCH (leave blank to auto-detect the repository default branch), GITHUB_DATA_PATH (defaults to league-data/league-data.json), GITHUB_BACKUP_PASSWORD, and GITHUB_AUTO_BACKUP=true. The token needs Contents: Read and write and Metadata: Read. Use a fine-grained token restricted to tkaiser930-droid/LeagueSave.
-- The first save can initialize an empty GitHub repository by creating the first tree, commit, and branch. Existing repositories use their default branch automatically unless GITHUB_BRANCH explicitly overrides it.
-- For local development, copy .env.example to .env, fill in the token/password, and run npm start. On Render, confirm the existing GITHUB_REPOSITORY environment variable is exactly tkaiser930-droid/LeagueSave (an old environment value overrides the code default), set the secret token/password, and keep the persistent disk mounted at /var/data.
-- Data & Backup displays Render and GitHub saved timestamps. Its “Scan GitHub & Render — Load Newest Save” control performs the same comparison manually. “Save Current League JSON to GitHub” forces a manual JSON backup. Enter GITHUB_BACKUP_PASSWORD for these manual actions.
-- The existing “Save / Flush to Render or Local Server” button still flushes the live database to Render/local storage. “Download League Backup” and “Restore a Backup” remain the portable manual JSON export/import options.
-- GITHUB_AUTO_BACKUP=false disables automatic GitHub writes but leaves startup comparison and protected manual GitHub save/sync actions available.
-- Never put GITHUB_TOKEN in app.js, HTML, browser localStorage, or a committed file. The token is read only by server.js from environment variables or the untracked local .env file.
+GITHUB-ONLY SAVING
+- See GITHUB-BACKUP-SETUP.txt for token permissions, the one-time migration from the former Render-disk version, and local JSON download/restore instructions.
 
 
 NAVIGATION AND TIME DISPLAY UPDATE

@@ -1,47 +1,64 @@
-KAISER FAMILY FANTASY SMX — GITHUB + RENDER LEAGUE-DATA SYNC
+KAISER FAMILY FANTASY SMX — GITHUB-ONLY LEAGUE STORAGE
 
 PURPOSE
-- Render's persistent disk remains the live working database at /var/data/league-data.json.
-- GitHub stores a second copy of that same JSON file, by default at league-data/league-data.json in the configured repository.
-- On server startup, the server checks both files and loads whichever has the newer savedAt timestamp.
-- Whenever the live JSON file changes through the website or a direct file edit, the server automatically commits the updated JSON to GitHub after a short debounce.
-- The GitHub copy is a backup of league data, not a backup of website source code.
+- GitHub is the only shared persistent store for the league database.
+- Default repository: tkaiser930-droid/LeagueSave.
+- Default JSON path: league-data/league-data.json.
+- The Node server loads the latest JSON from GitHub into memory when it starts.
+- Each accepted league change is committed directly to GitHub before the API reports the save as successful.
+- The server does not read or write league data to a Render persistent disk or local server JSON file.
+- The browser keeps its normal local working copy. Data & Backup can download a portable JSON backup and restore a downloaded backup to GitHub.
 
 GITHUB SETUP
-1) The configured repository is tkaiser930-droid/LeagueSave. The service automatically detects that repository's default branch unless GITHUB_BRANCH is explicitly set.
-2) Create a fine-grained personal access token restricted to that repository.
-3) Grant Contents: Read and write, and Metadata: Read.
-4) Set these values in Render > Service > Environment:
-   - GITHUB_TOKEN = your fine-grained token
+1) Create a fine-grained personal access token restricted to tkaiser930-droid/LeagueSave.
+2) Grant Contents: Read and write and Metadata: Read.
+3) In Render > Service > Environment, set:
+   - GITHUB_TOKEN = the fine-grained token
    - GITHUB_REPOSITORY = tkaiser930-droid/LeagueSave
-   - GITHUB_BRANCH = (leave blank to auto-detect the repository default branch)
+   - GITHUB_BRANCH = leave blank to auto-detect the repository default branch
    - GITHUB_DATA_PATH = league-data/league-data.json
-   - GITHUB_BACKUP_PASSWORD = a separate long password for the manual Save/Sync buttons
-   - GITHUB_AUTO_BACKUP = true
-5) If GITHUB_REPOSITORY was previously set to a different name, edit the existing Render variable and change it to exactly tkaiser930-droid/LeagueSave. Save and restart/redeploy the service.
+   - GITHUB_BACKUP_PASSWORD = a separate long password for the commissioner-only manual Save / Load Latest buttons
+4) Do not set DATA_DIR. It is no longer used.
+5) Deploy the updated project. The service no longer requires a Render persistent disk.
+
+IMPORTANT ONE-TIME MIGRATION FROM THE PREVIOUS DISK-BASED VERSION
+Before deploying this version, open the current live site and sign in as commissioner:
+1) Open Commissioner > Data & Backup.
+2) Enter GITHUB_BACKUP_PASSWORD.
+3) Select Save Current League JSON to GitHub.
+4) Refresh the status and confirm that the GitHub save timestamp and commit are present.
+5) Also select Download League Backup and keep the JSON file on your computer.
+6) Only after the GitHub save is confirmed, deploy this GitHub-only version.
+7) After deployment and verification, remove/detach the old Render persistent disk in the Render dashboard if it is still attached. Do not delete it before confirming the GitHub save and local download.
+
+AUTOMATIC SAVING
+- Browser changes are sent to the Node service.
+- The Node service serializes saves and commits the updated league-data JSON directly to GitHub.
+- If the GitHub commit fails, the API reports an error and the browser retains the local copy for retry/download. The server does not silently fall back to a Render disk or local JSON file.
+- If GitHub is unavailable at startup, the service remains available for static pages/health checks, but shared data loading is disabled until GitHub can be reached. The browser operates in browser-only mode and keeps its local copy.
+- The first save can initialize an empty GitHub repository by creating the first Git tree, commit, and branch.
+
+LOCAL / OFFLINE BACKUPS
+- Commissioner > Data & Backup > Download League Backup downloads a portable JSON copy to the computer.
+- Restore a Backup uploads that JSON to GitHub and replaces the current shared league state.
+- Export remains available in browser-only mode even if GitHub cannot be reached; in that case it downloads the retained browser copy.
+- The browser also keeps its local working copy for recovery.
 
 LOCAL DEVELOPMENT
 1) Copy .env.example to .env.
-2) Fill in the same variables.
-3) Run npm start.
-
-HOW SAVING WORKS
-- Startup scan: the server reads Render/local league-data.json and the GitHub JSON copy. It compares savedAt timestamps. If GitHub is newer, it loads GitHub into the live data directory. If Render/local is newer (or GitHub has no file), it keeps the live file and updates GitHub when automatic backup is enabled. Render wins exact timestamp ties.
-- Automatic GitHub save: a change to league-data.json through the app is written to Render/local storage first, then the updated JSON is committed to GitHub. A file watcher also catches direct edits to the JSON file.
-- Manual Render/local save: use Save / Flush to Render or Local Server on the Data & Backup page.
-- Manual GitHub save: enter GITHUB_BACKUP_PASSWORD and use Save Current League JSON to GitHub.
-- Manual comparison: enter GITHUB_BACKUP_PASSWORD and use Scan GitHub & Render — Load Newest Save. The selected save is loaded and the page reloads.
-- Manual portable backup: Download League Backup and Restore a Backup (.json) remain available and unchanged.
+2) Add the GitHub token, repository, and manual-action password.
+3) Run npm install, then npm start.
+4) Open http://127.0.0.1:10000/ (or the port printed by the server).
+5) Without a valid GitHub token, the app intentionally uses browser-only storage; it does not create a local server-side league-data file.
 
 TROUBLESHOOTING
-- The Data & Backup status must show repository tkaiser930-droid/LeagueSave. If it shows a different repository, the Render Environment variable GITHUB_REPOSITORY is overriding the default; correct that variable and redeploy.
-- If status reports 401, create a valid token. If it reports 403, grant Contents: Read and write and Metadata: Read to this exact repository. If it reports 404, verify the repository spelling and that the token has access to it.
-- If the repository has no commits yet, the first backup now initializes the first tree, commit, and default branch. No README or starter file is required.
-- If the first backup has succeeded, the status should show a GitHub JSON save timestamp and the commit link/SHA.
+- HTTP 401: replace the expired/invalid GITHUB_TOKEN.
+- HTTP 403: grant Contents: Read and write plus Metadata: Read for the configured repository.
+- HTTP 404: verify GITHUB_REPOSITORY spelling, branch, data path, and token access.
+- GitHub save failure: keep the browser copy, download a JSON backup, check the server log and GitHub token permissions, then retry.
+- The repository is preconfigured as tkaiser930-droid/LeagueSave. GITHUB_BRANCH may be blank to use the default branch.
 
-IMPORTANT
-- GITHUB_TOKEN is only read by the Node server from environment variables or an untracked .env file. Never put it in app.js, HTML, browser storage, or a committed file.
-- Do not remove the Render persistent disk. It remains the live database location.
-- GitHub save path is controlled by GITHUB_DATA_PATH and defaults to league-data/league-data.json. The repository is preconfigured as tkaiser930-droid/LeagueSave. The service detects the repository's default branch; set GITHUB_BRANCH only if you intentionally want a different branch.
-- If the repository has no commits/branch yet, the first automatic save creates the initial Git tree, commit, and branch. This avoids the common empty-repository failure from the Contents API.
-- If GitHub cannot be reached during startup, the server keeps the Render/local file and logs the error rather than replacing live data with an empty save.
+SECURITY
+- GITHUB_TOKEN is read only by the Node server from environment variables or an untracked .env file.
+- Never put the token in app.js, HTML, browser storage, or a committed file.
+- GITHUB_BACKUP_PASSWORD is separate from the GitHub token and protects manual commissioner-only GitHub actions.

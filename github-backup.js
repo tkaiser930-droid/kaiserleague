@@ -41,8 +41,7 @@ function createGithubBackup(root) {
       // Empty means automatically use the repository's actual default branch.
       branchOverride: (process.env.GITHUB_BRANCH || "").trim(),
       dataPath,
-      backupPassword: process.env.GITHUB_BACKUP_PASSWORD || "",
-      autoEnabled: String(process.env.GITHUB_AUTO_BACKUP || "true").toLowerCase() !== "false"
+      backupPassword: process.env.GITHUB_BACKUP_PASSWORD || ""
     };
   };
   const repositoryParts = () => {
@@ -64,7 +63,7 @@ function createGithubBackup(root) {
 
   async function api(endpoint, options = {}) {
     const cfg = config();
-    if (!cfg.token) throw new Error("GitHub token is not configured. Set GITHUB_TOKEN on the Render server.");
+    if (!cfg.token) throw new Error("GitHub token is not configured. Set GITHUB_TOKEN in the hosting service environment.");
     const response = await fetch(`${API_ROOT}${endpoint}`, {
       ...options,
       headers: {
@@ -242,8 +241,8 @@ function createGithubBackup(root) {
     const result = {
       configured: configured(),
       writeReady: writeConfigured(),
-      autoBackupEnabled: cfg.autoEnabled,
-      automaticSave: !!(cfg.autoEnabled && configured()),
+      autoBackupEnabled: true,
+      automaticSave: configured(),
       repository: cfg.repository || "",
       branch: cfg.branchOverride || "repository default (auto-detect)",
       dataPath: cfg.dataPath,
@@ -288,7 +287,7 @@ function createGithubBackup(root) {
 
   return {
     configured,
-    isAutoEnabled: () => { try { return config().autoEnabled && configured(); } catch { return false; } },
+    isAutoEnabled: () => { try { return configured(); } catch { return false; } },
     authorize,
     getLatestLeagueData,
     saveLeagueData,
