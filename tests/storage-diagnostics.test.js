@@ -47,8 +47,8 @@ async function runBootstrap(fetchImpl) {
   });
   const banner = browserFailure.nodes.find(node => node.tagName === "div");
   assert.ok(banner, "storage banner should be created");
-  assert.match(banner.textContent, /Node\.js API at https:\/\/league\.example\/api\/state/,
-    "a browser-to-server failure must identify the Node.js API endpoint");
+  assert.match(banner.textContent, /Node\.js API at https:\/\/league\.example\/api\/github\/status/,
+    "a browser-to-server failure must identify the live GitHub status endpoint");
   assert.match(banner.textContent, /fails before GitHub is contacted/,
     "a browser-to-server failure must not be mislabeled as a GitHub API failure");
   assert.equal(calls, 4, "temporary browser network failures should be retried four times");
@@ -57,13 +57,51 @@ async function runBootstrap(fetchImpl) {
   for (const file of htmlFiles) {
     const html = fs.readFileSync(path.join(root, file), "utf8");
     if (/bootstrap\.js/.test(html)) {
-      assert.match(html, /bootstrap\.js\?v=kf-github-storage-diagnostics-20261123b/,
+      assert.match(html, /bootstrap\.js\?v=kf-github-status-consistency-20261123d/,
         `${file} must request the cache-busted storage bootstrap`);
     }
   }
-  assert.match(bootstrap, /app\.js\?v=kf-github-storage-diagnostics-20261123b/,
+  assert.match(bootstrap, /app\.js\?v=kf-github-status-consistency-20261123d/,
     "the dynamically loaded app must also be cache-busted");
-  console.log("Storage diagnostics tests passed: browser/API failure distinction, automatic retries, and cache-busting.");
+  assert.match(bootstrap, /One authoritative status is reflected everywhere/, "header and Data & Backup storage status should not contradict each other");
+  assert.match(bootstrap, /statusRevision/, "newer status operations must prevent stale async probes from overwriting the latest result");
+  assert.match(bootstrap, /fetchJson\(yearUrl\("\/api\/state\/"/, "GitHub writes should use the bounded retry wrapper");
+  assert.match(bootstrap, /status.build !== "kf-github-status-consistency-20261123d"/, "an older cached server deployment must not be accepted as connected");
+  const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
+  assert.match(app, /reportStatus\(text,state,statusTicket\)/, "a failed live status probe must update the header through the authoritative status helper");
+  assert.match(app, /!info\.writeReady\|\|!storageVerified/, "manual actions must be disabled when the active GitHub file cannot be verified");
+  assert.match(app, /info\.autoSaveLastError/, "the status UI must surface a previous GitHub write failure instead of saying Connected");
+  assert.match(app, /storageMode!=="server"/, "a direct GitHub probe must not display Connected if this browser is not connected to the season-state API");
+  assert.match(app, /pendingWrites>0/, "the status UI must show saving rather than Connected while edits are pending");
+  assert.match(bootstrap, /finalStatus\.autoSaveLastError/, "reconnect must preserve an outstanding server-side write failure");
+  // A warm server cache must not make the browser report Connected when the
+  // direct GitHub probe reports an outage.
+  const unavailable = await runBootstrap(async url => {
+    if (String(url).startsWith("/api/github/status")) {
+      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: false, build: "kf-github-status-consistency-20261123d", error: "Could not reach api.github.com" }) };
+    }
+    throw new Error(`Unexpected request after failed live GitHub probe: ${url}`);
+  });
+  const unavailableBanner = unavailable.nodes.find(node => node.tagName === "div");
+  assert.match(unavailableBanner.textContent, /Unavailable: Could not reach api\.github\.com/,
+    "the browser must not display Connected when GitHub itself cannot be verified");
+  assert.equal(unavailable.window.KFStorage?.mode, "browser", "failed live GitHub verification must use the retained browser copy");
+
+  // A successful GitHub status probe is not enough if the browser cannot load
+  // the selected season state through the same Node service.
+  const stateApiUnavailable = await runBootstrap(async url => {
+    if (String(url).startsWith("/api/github/status")) {
+      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123d", activeYear: 2027, statusYear: 2027 }) };
+    }
+    if (String(url).startsWith("/api/state")) throw new TypeError("Failed to fetch season state");
+    throw new Error(`Unexpected request after state API failure: ${url}`);
+  });
+  const stateFailureBanner = stateApiUnavailable.nodes.find(node => node.tagName === "div");
+  assert.match(stateFailureBanner.textContent, /Unavailable:/, "a GitHub status success must not hide a failed browser-to-season-state request");
+  assert.notEqual(stateFailureBanner.textContent, "Connected", "the overall site must not show Connected until both GitHub verification and season state loading succeed");
+  assert.equal(stateApiUnavailable.window.KFStorage?.mode, "browser", "failed season-state loading must retain the browser copy and disable shared mode");
+
+  console.log("Storage diagnostics tests passed: live GitHub and season-state verification, cached-state false-positive prevention, retries, and cache-busting.");
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

@@ -1341,7 +1341,7 @@ function submitTeamDraftPick(pass=false){const room=$("draftRoom").value,setting
  setDraftMessage(pass?`${tname(team)} passed pick ${pickNumber}.`:`${tname(team)} selected ${name(athlete)}.`);renderDraft();refresh();
 }
 function draftInit(){const room=$("draftRoom");room.onchange=()=>{setDraftMessage("");renderDraft()};options($("draftLoginTeam"),teams().filter(t=>t.passwordHash).map(t=>({value:key(t),label:tname(t)})),"Choose your team");$("draftLoginForm").onsubmit=async e=>{e.preventDefault();const team=teams().find(t=>key(t)===$("draftLoginTeam").value);if(!team||!team.passwordHash||await hash($("draftLoginPassword").value)!==team.passwordHash){$("draftLoginMessage").textContent="Team password is incorrect, or the team has not been claimed.";return}sessionStorage.setItem("draftTeam",key(team));$("draftLoginPassword").value="";$("draftLoginMessage").textContent="";renderDraft()};$("draftLogout").onclick=()=>{sessionStorage.removeItem("draftTeam");setDraftMessage("");renderDraft()};$("draftPickForm").onsubmit=e=>{e.preventDefault();submitTeamDraftPick(false)};$("draftPassButton").onclick=()=>{if(confirm("Pass this draft pick? The next team will be able to select an athlete."))submitTeamDraftPick(true)};renderDraft();startDraftSync()}
-function renderDraft(){if(!$("draftStatusCard"))return;const room=$("draftRoom").value,settings=read(K.DS,{})[room]||{status:"Not started"},data=draftData(),picks=draftRoomPicks(room,data),order=draftOrder(settings),expected=currentDraftTeam(room,settings,data),team=draftTeamSession(),pickNumber=picks.length+1,round=order.length?Math.floor((pickNumber-1)/order.length)+1:1;const status=settings.status||"Not started",scheduled=clean(settings.scheduledStart||(status==="Not started"?settings.start:"")),scheduledLabel=scheduled?formatVancouverDateTime(scheduled):"Not scheduled",syncNotice=window.KFStorage?.mode==="server"?"Connected to shared GitHub-backed league storage. This room checks for new picks every 2.5 seconds.":"Browser-only storage is active. Separate devices will not share live picks until this browser reconnects to the GitHub-backed site.";
+function renderDraft(){if(!$("draftStatusCard"))return;const room=$("draftRoom").value,settings=read(K.DS,{})[room]||{status:"Not started"},data=draftData(),picks=draftRoomPicks(room,data),order=draftOrder(settings),expected=currentDraftTeam(room,settings,data),team=draftTeamSession(),pickNumber=picks.length+1,round=order.length?Math.floor((pickNumber-1)/order.length)+1:1;const status=settings.status||"Not started",scheduled=clean(settings.scheduledStart||(status==="Not started"?settings.start:"")),scheduledLabel=scheduled?formatVancouverDateTime(scheduled):"Not scheduled",syncNotice=window.KFStorage?.mode==="server"&&!window.KFStorage?.lastError&&!window.KFStorage?.pendingWrites?"Connected to shared GitHub-backed league storage. This room checks for new picks every 2.5 seconds.":"GitHub storage is unavailable or a save is pending. The browser copy is retained until the connection is restored.";
  const firstRoundOrder=order.map(t=>esc(tname(t))).join(" → "),secondRoundOrder=order.slice().reverse().map(t=>esc(tname(t))).join(" → ");$("draftStatusCard").innerHTML=`<div class="summary draft-status-summary"><div><strong>${esc(room)}</strong><span>Draft room</span></div><div><strong>${esc(scheduledLabel)}</strong><span>Scheduled Start · Vancouver Time</span></div><div><strong>${esc(status)}</strong><span>Draft Room Status</span></div><div><strong>${expected?esc(tname(expected)):"—"}</strong><span>${status==="Open"?`Pick ${pickNumber} · Round ${round} · On the clock`:"Next team"}</span></div></div><p class="muted">${status==="Open"?`Round 1: ${firstRoundOrder}. Round 2: ${secondRoundOrder}. The order reverses every round. Pick ${pickNumber} is next.`:status==="Paused"?"The commissioner has paused this draft.":status==="Complete"?"The commissioner has marked this draft complete.":""} ${esc(syncNotice)}</p>`;
  options($("draftLoginTeam"),teams().filter(t=>t.passwordHash).map(t=>({value:key(t),label:tname(t)})),"Choose your team");const logged=!!team;$("draftLogin").hidden=logged;$("draftTeamPanel").hidden=!logged;if(logged){$("draftLoggedInTeam").textContent=tname(team);$("draftTurnNotice").textContent=status!=="Open"?(status==="Paused"?"Draft paused. Wait for the commissioner to resume it.":status==="Complete"?"This draft is complete.":`Draft not open yet. Scheduled for ${scheduledLabel}.`):expected&&key(expected)===key(team)?`It is your turn — Pick ${pickNumber}, Round ${round}.`:`You are signed in as ${tname(team)}. Waiting for ${expected?tname(expected):"the next team"} to pick.`;const canPick=status==="Open"&&expected&&key(expected)===key(team);$("draftPickForm").hidden=!canPick;$("draftPassButton").hidden=!canPick;const free=sortRiders(athletes().filter(a=>!a.seriesArchived&&draftEligibleForTeam(a,room,team,data)));options($("draftAthlete"),free.map(a=>({value:id(a),label:`${nationalityText(a.nationality,a.nationalityRegion)} #${clean(a.number)||"—"} ${name(a)} — ${seriesDisplayText(a)}`})),free.length?"Choose available athlete":"No eligible riders available");$("draftPickForm").querySelector("button[type=submit]").disabled=!free.length;$("draftPassButton").disabled=false}else{$("draftPickForm").hidden=true;$("draftPassButton").hidden=true}
  $("draftPicks").innerHTML=table(["Pick","Round","Team","Athlete","Class","Time"],picks.map(p=>{const a=p.athleteId?riderFromPick(p):null;return `<tr><td>${esc(p.number)}</td><td>${esc(p.round||Math.floor((Number(p.number)-1)/Math.max(1,order.length))+1)}</td><td>${esc(p.teamName||teams().find(t=>key(t)===p.teamKey)?.name||"Team")}</td><td>${p.passed||!p.athleteId?"Passed":athleteNameHTML(a||{name:p.athleteName,number:p.riderNumber,class:p.athleteClass,nationality:p.nationality,nationalityRegion:p.nationalityRegion})}</td><td>${p.athleteId?seriesDisplayHTML(a||{class:p.athleteClass,secondarySeries:p.athleteSecondarySeries||[]}):esc(p.athleteClass||"—")}</td><td>${formatVancouverDateTime(p.time)}</td></tr>`}))}
@@ -1353,8 +1353,8 @@ function startTeamTradeAlertSync(){if(document.body.dataset.page!=="teams")retur
 function scheduleDailyRosterLockRefresh(){const page=document.body.dataset.page;if(page!=="teams"&&page!=="manage"&&page!=="trades")return;setTimeout(()=>{refresh();scheduleDailyRosterLockRefresh()},60000)}
 function dataInit(){
  const status=$("dataModeDetail"),message=$("dataMessage");
- const mode=window.KFStorage?.mode||"browser";
- if(status){status.textContent=mode==="server"?`Connected: shared league data is saved directly to ${window.KFStorage?.location||"the GitHub repository"}.`:"Browser-only mode: GitHub is not connected. Changes stay in this browser until the connection is restored; use Download League Backup to keep a portable copy.";status.className=mode==="server"?"storage-detail good":"storage-detail warn";}
+ const mode=window.KFStorage?.mode||"browser",storageError=window.KFStorage?.lastError?.message||"",pendingWrites=Number(window.KFStorage?.pendingWrites||0);
+ if(status){const available=mode==="server"&&!storageError&&pendingWrites===0;status.textContent=available?"Connected":pendingWrites>0?"Saving changes to GitHub…":`Unavailable: ${storageError||"browser copy retained; reconnecting automatically."}`;status.className=available?"storage-detail good":"storage-detail warn";}
  const showCount=()=>{const target=$("dataCategoryCount");if(!target)return;const keys=["kaiserFantasyAthletes","kaiserFantasyTeams","kaiserFantasyScores","kaiserFantasyTrades","kaiserFantasyDraftState","kaiserFantasyDraftSettings","kaiserFantasySchedule"];const count=keys.filter(k=>localStorage.getItem(k)!==null).length;target.textContent=`${count} of ${keys.length} data categories currently have saved records.`};showCount();
  $("saveDataNow")?.addEventListener("click",async()=>{if(!window.KFStorage){message.textContent="Storage helper is unavailable. Refresh this page.";return}try{await window.KFStorage.flush();message.textContent=window.KFStorage.mode==="server"?`All pending changes have been committed to ${window.KFStorage.location||"the GitHub repository"}.`:"Browser data is saved in this browser, but GitHub is not connected. Download a JSON backup or reconnect to the GitHub-backed site.";showCount()}catch(err){message.textContent="Save failed: "+err.message}});
  $("exportData")?.addEventListener("click",async()=>{try{const state=await window.KFStorage.exportState();const backup={format:"kaiser-family-fantasy-smx-backup-v1",exportedAt:new Date().toISOString(),state};const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`kaiser-fantasy-backup-${window.KFStorage?.seasonYear||activeSeasonYear()}-${localDateISO()}.json`;a.click();URL.revokeObjectURL(url);message.textContent=window.KFStorage?.lastExportUsedBrowserCopy?"Backup downloaded from this browser's retained copy because the latest GitHub save could not be read."+ (window.KFStorage?.lastError?" GitHub error: "+window.KFStorage.lastError.message:" "):"Backup downloaded from the latest available league data."}catch(err){message.textContent="Could not create backup: "+err.message}});
@@ -1365,26 +1365,55 @@ function dataInit(){
  const saveGithubButton=$("saveLeagueToGithub"),syncButton=$("syncNewestLeagueSave"),refreshButton=$("refreshGithubStatus");
  async function refreshGithubStatus(){
   if(!githubStatus)return;
+  const statusTicket=window.KFStorage?.beginStatusCheck?.();
   githubStatus.textContent="Checking the GitHub league save…";githubStatus.className="storage-detail warn";
+  const publishStatus=(text,state)=>{
+   if(typeof window.KFStorage?.reportStatus==="function"){
+    const applied=window.KFStorage.reportStatus(text,state,statusTicket);
+    if(!applied)return false;
+   }else{
+    const banner=$("kfStorageBanner");if(banner){banner.textContent=text;banner.className="storage-banner "+(state==="good"?"good":"warn");}
+    const dataMode=$("dataModeDetail");if(dataMode){dataMode.textContent=text;dataMode.className="storage-detail "+(state==="good"?"good":"warn");}
+   }
+   githubStatus.textContent=text;githubStatus.className="storage-detail "+(state==="good"?"good":"warn");
+   return true;
+  };
   try{
-   const response=await fetch("/api/github/status",{cache:"no-store",credentials:"same-origin"});
+   const statusYear=window.KFStorage?.seasonYear||activeSeasonYear();
+   const response=await fetch(`/api/github/status?year=${encodeURIComponent(statusYear)}`,{cache:"no-store",credentials:"same-origin"});
    const info=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(info.error||`The Node.js API returned HTTP ${response.status} while checking GitHub connectivity. Open /healthz to verify the deployed server build.`);
-   if(!info.configured){githubStatus.textContent=`GitHub-only saving is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;githubStatus.className="storage-detail warn";githubLatest.textContent="GitHub is the only shared server-side league store. Configure the server token to enable cross-device saving.";saveGithubButton.disabled=true;syncButton.disabled=true;return;}
-   const autoText=info.automaticSave?"Automatic GitHub JSON saves are enabled.":"Automatic GitHub saving is enabled when the repository token is configured.";
-   if(info.error){githubStatus.textContent=`GitHub connection problem for ${info.repository}: ${info.error}`;githubStatus.className="storage-detail warn";}
-   else if(info.repositoryReadyForFirstSave){githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). Repository has no first commit yet; the first league save will initialize it. ${autoText}`;githubStatus.className="storage-detail good";}
-   else if(info.githubSaveFileMissing){githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). The repository is reachable but does not yet contain the league JSON file; the next save will create it. ${autoText}`;githubStatus.className="storage-detail good";}
-   else{githubStatus.textContent=`Connected to ${info.repository} (${info.branch}). ${autoText}`;githubStatus.className="storage-detail good";}
+   if(info.build!=="kf-github-status-consistency-20261123d")throw new Error("The deployed server is running an older storage-status build. Deploy the latest GitHub status consistency project ZIP and reopen the site.");
+   if(!info.configured){
+    const message=`Unavailable: GitHub-only saving is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;
+    if(!publishStatus(message,"warn"))return;
+    githubLatest.textContent="GitHub is the only shared server-side league store. Configure the server token to enable cross-device saving.";saveGithubButton.disabled=true;syncButton.disabled=true;return;
+   }
+   const storageMode=window.KFStorage?.mode||"browser";
+   const pendingWrites=Number(window.KFStorage?.pendingWrites||0);
+   if(storageMode!=="server" || info.error || info.verified!==true || info.autoSaveLastError){
+    const reason=info.error||info.autoSaveLastError||"The browser has not connected to the GitHub-backed season API.";
+    const message=`Unavailable: ${reason}`;
+    if(!publishStatus(message,"warn"))return;
+   }else if(pendingWrites>0){
+    if(!publishStatus("Saving changes to GitHub…","saving"))return;
+   }else{
+    if(!publishStatus("Connected","good"))return;
+   }
    const gh=info.latestGitHubSave;const githubWhen=gh?.savedAt?formatVancouverDateTime(gh.savedAt):"no GitHub JSON save yet";
    const activeWhen=info.activeSavedAt?formatVancouverDateTime(info.activeSavedAt):"not yet loaded";
-   githubLatest.textContent=`GitHub save: ${githubWhen}. Active in-memory copy: ${activeWhen}. Current season file: ${info.dataPath||`league-data/seasons/${info.activeYear||2027}.json`}.`;
-   saveGithubButton.disabled=!info.writeReady;syncButton.disabled=!info.writeReady;
+   githubLatest.textContent=`GitHub save: ${githubWhen}. Active in-memory copy: ${activeWhen}. Season file: ${info.dataPath||`league-data/seasons/${info.statusYear||info.activeYear||2027}.json`}. Verified at: ${info.verifiedAt?formatVancouverDateTime(info.verifiedAt):"not verified"}.`;
+   const storageVerified=!info.error&&info.verified===true;
+   saveGithubButton.disabled=!info.writeReady||!storageVerified;syncButton.disabled=!info.writeReady||!storageVerified;
    if(info.autoSaveLastError)githubMessage.textContent="Last automatic GitHub JSON save failed: "+info.autoSaveLastError;
    else if(info.autoSaveLastAt)githubMessage.textContent="Last automatic GitHub save check: "+formatVancouverDateTime(info.autoSaveLastAt);
    else if(!info.writeReady)githubMessage.textContent="Set GITHUB_BACKUP_PASSWORD on the server to enable manual GitHub save and sync actions.";
    else if(info.lastSync?.message)githubMessage.textContent=info.lastSync.message;
-  }catch(err){githubStatus.textContent=err.message;githubStatus.className="storage-detail warn";githubLatest.textContent="GitHub status is unavailable. The browser copy remains available, but shared saves require GitHub.";saveGithubButton.disabled=true;syncButton.disabled=true;}
+  }catch(err){
+   const message="Unavailable: "+err.message;
+   if(!publishStatus(message,"warn"))return;
+   githubLatest.textContent="The browser copy remains available for download. Shared saves require a successful live GitHub verification.";saveGithubButton.disabled=true;syncButton.disabled=true;
+  }
  }
  async function githubAction(path,body){
   const password=githubPassword();if(!password)throw new Error("Enter the GitHub backup action password first.");
@@ -1394,7 +1423,7 @@ function dataInit(){
  saveGithubButton?.addEventListener("click",async()=>{try{await window.KFStorage?.flush();saveGithubButton.disabled=true;githubMessage.textContent=`Confirming the ${window.KFStorage?.seasonYear||activeSeasonYear()} season file in GitHub…`;const result=await githubAction("/api/github/save",{year:window.KFStorage?.seasonYear||activeSeasonYear()});githubMessage.textContent=result.changed?`Saved season ${result.seasonYear||window.KFStorage?.seasonYear} to GitHub (${result.commit?.shortSha||result.commit?.sha?.slice(0,7)||"commit confirmed"}).`:`GitHub already has this exact season save.`;await refreshGithubStatus();}catch(err){githubMessage.textContent="GitHub league save failed: "+err.message;saveGithubButton.disabled=false;}});
  syncButton?.addEventListener("click",async()=>{if(prompt("Replace this site's current in-memory copy with the latest league-data JSON saved in GitHub? Type LOAD GITHUB to continue.")!=="LOAD GITHUB")return;try{await window.KFStorage?.flush();syncButton.disabled=true;githubMessage.textContent="Loading the latest GitHub league save…";const result=await githubAction("/api/github/reload",{year:window.KFStorage?.seasonYear||activeSeasonYear()});await window.KFStorage?.loadServerState();githubMessage.textContent=result.message+" Reloading the league data…";setTimeout(()=>location.reload(),300);}catch(err){githubMessage.textContent="GitHub reload failed: "+err.message;syncButton.disabled=false;}});
  refreshButton?.addEventListener("click",async()=>{
-  if(window.KFStorage?.mode!=="server"&&typeof window.KFStorage?.reconnect==="function"){
+  if((window.KFStorage?.mode!=="server"||window.KFStorage?.lastError)&&typeof window.KFStorage?.reconnect==="function"){
    refreshButton.disabled=true;githubMessage.textContent="Reconnecting to GitHub-backed league storage…";
    const connected=await window.KFStorage.reconnect();
    githubMessage.textContent=connected?"GitHub connection restored. Any retained unsynced browser changes were synchronized where safe.":"GitHub is still unavailable. The browser copy remains available; automatic reconnection will continue.";

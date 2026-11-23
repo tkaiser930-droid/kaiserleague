@@ -11,8 +11,26 @@ const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
 function testConnectedStatusIsConcise() {
   const bootstrap = read("bootstrap.js");
-  assert.match(bootstrap, /setStatus\("Connected", "good"\)/, "successful GitHub initialization should display only Connected");
+  assert.match(bootstrap, /setStatus\("Connected", "good"(?:, statusTicket)?\)/, "successful GitHub initialization should display only Connected");
   assert.doesNotMatch(bootstrap, /Connected — all shared league changes save directly to GitHub:/, "the detailed repository path should not appear in the connection banner");
+  assert.match(bootstrap, /await verifyGithubStatus\(\)/, "startup must verify GitHub itself before reporting Connected");
+  assert.match(bootstrap, /await verifyGithubStatus\(target\)/, "season switching must verify the selected season file directly in GitHub");
+  const server = read("server.js");
+  assert.match(server, /status\.verified = !!status\.configured && !status\.error/, "the server status endpoint must expose the live GitHub verification result");
+  assert.match(server, /status\.build = BUILD_ID/, "the status response must identify the deployed server build");
+  assert.match(server, /githubAutoLastError = `GitHub save for season/, "server write failures must be retained for subsequent status checks");
+  assert.match(server, /githubIndexSaveFailed/, "a failed season-index save must be retried instead of being forgotten by a later season write");
+  const statusRoute = server.slice(server.indexOf('if (url.pathname === "/api/github/status"'), server.indexOf('if (url.pathname === "/api/github/save"'));
+  assert.match(statusRoute, /await ensureIndexLoaded\(\)/, "status checks must resolve the active season index");
+  assert.match(statusRoute, /githubBackup\.getStatus\(/, "status checks must query GitHub directly");
+  assert.doesNotMatch(statusRoute, /await ensureGithubReady\(\)/, "status checks must not mistake the server's in-memory season cache for live GitHub availability");
+  const app = read("app.js");
+  assert.match(app, /github\/status\?year=/, "the Data & Backup status must check the currently selected season file");
+  assert.match(app, /publishStatus\("Connected","good"\)/, "the successful status label should remain concise");
+  assert.match(app, /const message=`Unavailable:/, "a failed live GitHub check must display Unavailable");
+  assert.match(app, /beginStatusCheck\?\.\(\)/, "Data & Backup status checks must use the same sequenced status state as the header");
+  assert.match(app, /reportStatus\(text,state,statusTicket\)/, "Data & Backup must publish through the shared status updater");
+  assert.match(bootstrap, /dirtyKeys\.size > 0/, "the shared status updater must not report Connected while writes remain pending");
 }
 
 testConnectedStatusIsConcise();
@@ -173,7 +191,10 @@ async function testGithubIsCanonicalOverStaleBrowserCache() {
     storageLabel: "GitHub repository test-owner/test-league"
   };
   const fetch = async (url, options = {}) => {
-    if (String(url) === "/api/state" && !options.method) {
+    if (String(url).startsWith("/api/github/status") && !options.method) {
+      return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123d", activeYear: 2027, statusYear: 2027 }) };
+    }
+    if (String(url).startsWith("/api/state") && !options.method) {
       return { ok: true, status: 200, json: async () => remote };
     }
     if (String(url).startsWith("/api/state/") && options.method === "PUT") {
@@ -214,6 +235,9 @@ async function testSameYearRefreshAppliesRemoteCopy() {
   let remoteAthletes = [{ id: "before-copy", name: "Before Copy" }];
   const fetch = async (url, options = {}) => {
     const textUrl = String(url);
+    if (textUrl.startsWith("/api/github/status")) {
+      return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123d", activeYear: 2027, statusYear: 2027 }) };
+    }
     if (textUrl === "/api/state" || textUrl.startsWith("/api/state?year=2027")) {
       return {
         ok: true, status: 200,
@@ -299,6 +323,7 @@ async function testBootstrapRetriesTemporaryServerFailure() {
   const fetch = async (url) => {
     requests++;
     if (requests === 1) return { ok: false, status: 503, json: async () => ({ error: "GitHub temporarily unavailable" }) };
+    if (String(url).startsWith("/api/github/status")) return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123d", activeYear: 2027, statusYear: 2027 }) };
     return { ok: true, status: 200, json: async () => remote };
   };
   const body = { prepend() {}, appendChild(node) { this.lastScript = node; } };
@@ -317,7 +342,7 @@ async function testBootstrapRetriesTemporaryServerFailure() {
   assert.equal(window.KFStorage.mode, "server", "a temporary 503 must not leave the site stuck in browser-only mode");
   assert.ok(requests >= 2, "the browser should retry the API request");
   assert.deepEqual(JSON.parse(values.get("kaiserFantasyAthletes")), remote.state.kaiserFantasyAthletes);
-  assert.equal(body.lastScript.src, "app.js?v=kf-github-storage-diagnostics-20261123b");
+  assert.equal(body.lastScript.src, "app.js?v=kf-github-status-consistency-20261123d");
 }
 
 function testNoServerSideDiskPersistence() {
@@ -341,7 +366,7 @@ function testNoServerSideDiskPersistence() {
   assert.match(bootstrap, /async function exportState\(\)/);
   assert.match(bootstrap, /UNSYNCED_PREFIX/);
   assert.match(bootstrap, /async function reconnect\(\)/, "the browser copy must be able to reconnect without a page reload");
-  assert.match(bootstrap, /setInterval\(\(\) => \{ if \(mode !== "server"\) reconnect\(\); \}, 30000\)/, "temporary startup outages should trigger automatic reconnects");
+  assert.match(bootstrap, /if \(mode === "server"\) verifyLiveConnection\(\);\s*else reconnect\(\);/, "the heartbeat must verify GitHub while online and reconnect while offline");
   assert.match(app, /window\.KFStorage\.reconnect\(\)/, "Data & Backup refresh should offer a manual reconnect");
   assert.doesNotMatch(bootstrap, /localTs > remoteTs/, "local wall-clock timestamps must not override the GitHub canonical copy");
   assert.match(commissioner, /id="exportData"/);

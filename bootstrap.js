@@ -13,6 +13,7 @@
   let lastExportUsedBrowserCopy = false;
   const dirtyKeys = new Set();
   let statusNode = null;
+  let statusRevision = 0;
   let storageLabel = "GitHub season files";
   let activeYear = 2027;
   let seasonYear = 2027;
@@ -21,10 +22,30 @@
     catch { return null; }
   };
   const localTime = key => Number(localStorage.getItem(TS_PREFIX + key) || 0) || 0;
-  function setStatus(text, state) {
-    if (!statusNode) return;
-    statusNode.textContent = text;
-    statusNode.className = "storage-banner " + (state || "info");
+  function beginStatusCheck() { return ++statusRevision; }
+  function isCurrentStatusCheck(ticket) { return ticket === statusRevision; }
+  function setStatus(text, state, ticket) {
+    if (ticket !== undefined) {
+      if (!isCurrentStatusCheck(ticket)) return false;
+    } else statusRevision++;
+    if (statusNode) {
+      statusNode.textContent = text;
+      statusNode.className = "storage-banner " + (state || "info");
+    }
+    // One authoritative status is reflected everywhere. This also prevents
+    // the header, Data & Backup panel, and draft status from disagreeing.
+    const detailClass = state === "good" ? "good" : "warn";
+    const backupStatus = typeof document.getElementById === "function" ? document.getElementById("githubBackupStatus") : null;
+    if (backupStatus) {
+      backupStatus.textContent = text;
+      backupStatus.className = "storage-detail " + detailClass;
+    }
+    const dataMode = typeof document.getElementById === "function" ? document.getElementById("dataModeDetail") : null;
+    if (dataMode) {
+      dataMode.textContent = text;
+      dataMode.className = "storage-detail " + detailClass;
+    }
+    return true;
   }
   function ensureBanner() {
     if (statusNode || !document.body) return;
@@ -57,7 +78,7 @@
     if (protocol === "file:") {
       return `This page is opened directly from a file. Open the deployed Render service URL or run the Node.js server with npm start; the browser cannot reach its /api/state endpoint. (${error?.message || "network failure"})`;
     }
-    return `The browser could not reach this site's Node.js API at ${endpoint} (page origin: ${pageOrigin}). This fails before GitHub is contacted. Open ${pageOrigin}/healthz: it must return JSON with \"ok\":true and build \"kf-github-storage-diagnostics-20261123b\". If /healthz does not load, verify the Render web service is live and that you are using its service URL, not a static/GitHub Pages URL. Browser error: ${error?.message || "Network request failed"}.`;
+    return `The browser could not reach this site's Node.js API at ${endpoint} (page origin: ${pageOrigin}). This fails before GitHub is contacted. Open ${pageOrigin}/healthz: it must return JSON with \"ok\":true and build \"kf-github-status-consistency-20261123d\". If /healthz does not load, verify the Render web service is live and that you are using its service URL, not a static/GitHub Pages URL. Browser error: ${error?.message || "Network request failed"}.`;
   }
   async function fetchJson(url, options = {}, fallbackMessage = "GitHub season storage is unavailable", attempts = 4) {
     let lastError = null;
@@ -109,12 +130,21 @@
     if (!body || typeof body.state !== "object" || !body.keyUpdatedAt) throw new Error("Invalid GitHub season response.");
     return body;
   }
+  async function verifyGithubStatus(year) {
+    const url = year == null ? "/api/github/status" : yearUrl("/api/github/status", year);
+    const status = await fetchJson(url, { credentials: "same-origin" }, "Could not verify live GitHub storage");
+    if (status.build !== "kf-github-status-consistency-20261123d") {
+      throw new Error("The deployed server is running an older storage-status build. Deploy the latest GitHub live-status project ZIP and reopen the site.");
+    }
+    if (!status.configured) throw new Error(status.error || "GitHub token or repository configuration is missing on the server.");
+    if (status.error || status.verified !== true) throw new Error(status.error || "The server could not verify the selected season file in GitHub.");
+    return status;
+  }
   async function apiPut(key, value, updatedAt, targetYear = seasonYear) {
-    const res = await fetch(yearUrl("/api/state/" + encodeURIComponent(key), targetYear), {
+    const result = await fetchJson(yearUrl("/api/state/" + encodeURIComponent(key), targetYear), {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ value, updatedAt }), keepalive: true, cache: "no-store", credentials: "same-origin"
-    });
-    const result = await readJson(res, "GitHub save failed for " + key);
+    }, "GitHub save failed for " + key, 4);
     if (result.applied === false) {
       const remote = await apiState(targetYear);
       if (Object.prototype.hasOwnProperty.call(remote.state, key)) {
@@ -155,11 +185,15 @@
     setStatus("Saving changes to GitHub…", "saving");
     pending = pending.then(() => apiPut(key, value, updatedAt, targetYear)).then(() => {
       dirtyKeys.delete(key);
-      lastError = null;
-      setStatus("Connected", "good");
+      if (dirtyKeys.size === 0) {
+        lastError = null;
+        setStatus("Connected", "good");
+      } else if (lastError) {
+        setStatus("GitHub save unavailable: " + lastError.message, "warn");
+      }
     }).catch(err => {
       lastError = err;
-      setStatus("GitHub save failed. The browser copy is retained; check GitHub access and retry from Data & Backup.", "error");
+      setStatus("GitHub save unavailable: " + err.message + ". The browser copy is retained; retry from Data & Backup.", "warn");
       throw err;
     });
     pending = pending.catch(err => { lastError = err; });
@@ -176,14 +210,23 @@
           lastError = null;
         } catch (error) { lastError = error; throw error; }
       }
+      if (dirtyKeys.size === 0) {
+        lastError = null;
+        setStatus("Connected", "good");
+      }
     }
-    if (lastError) throw lastError;
+    if (lastError && dirtyKeys.size) throw lastError;
   }
   async function loadServerState() {
+    const statusTicket = beginStatusCheck();
     if (mode !== "server") throw new Error("GitHub storage is not connected in this browser.");
+    const liveStatus = await verifyGithubStatus(seasonYear);
     const remote = await apiState(seasonYear);
     applyRemoteState(remote);
-    setStatus("Connected", "good");
+    if (liveStatus.autoSaveLastError) {
+      lastError = new Error(liveStatus.autoSaveLastError);
+      setStatus("GitHub save unavailable: " + liveStatus.autoSaveLastError, "warn", statusTicket);
+    } else setStatus("Connected", "good", statusTicket);
     return true;
   }
   async function refreshFromServer() {
@@ -267,6 +310,7 @@
     return result;
   }
   async function setSeasonYear(year) {
+    const statusTicket = beginStatusCheck();
     const target = Number(year);
     if (!Number.isInteger(target) || target < 2010 || target > 2099) throw new Error("Choose a season between 2010 and 2099.");
     if (mode !== "server") throw new Error("Season switching requires a connection to GitHub. Your browser copy remains available for download.");
@@ -274,12 +318,16 @@
     // changed. Copy-between-seasons and manual reload actions update GitHub first;
     // a same-year refresh prevents a stale browser copy from overwriting that file.
     await flush();
+    const liveStatus = await verifyGithubStatus(target);
     const remote = await apiState(target);
     applyRemoteState(remote);
     seasonYear = target;
     activeYear = Number(remote.activeYear || activeYear);
     storageLabel = remote.storageLabel || "GitHub season files";
-    setStatus("Connected", "good");
+    if (liveStatus.autoSaveLastError) {
+      lastError = new Error(liveStatus.autoSaveLastError);
+      setStatus("GitHub save unavailable: " + liveStatus.autoSaveLastError, "warn", statusTicket);
+    } else setStatus("Connected", "good", statusTicket);
     return remote;
   }
   async function archiveSeason(year) {
@@ -304,6 +352,20 @@
     get location() { return storageLabel; },
     get activeYear() { return activeYear; },
     get seasonYear() { return seasonYear; },
+    beginStatusCheck,
+    get pendingWrites() { return dirtyKeys.size; },
+    reportStatus: (text, state, ticket) => {
+      if (!isCurrentStatusCheck(ticket)) return false;
+      if (text === "Connected") {
+        // A successful GitHub probe alone is insufficient: /api/state must
+        // also have completed in this browser, and no local writes may remain.
+        if (mode !== "server" || dirtyKeys.size > 0) return false;
+        lastError = null;
+      } else if (/^Unavailable:|save unavailable|could not reach/i.test(text)) {
+        lastError = new Error(text);
+      }
+      return setStatus(text, state, ticket);
+    },
     write: storageWrite,
     flush, refreshFromServer, loadServerState, exportState, replaceState, clearAll,
     commissionerLogin, commissionerSession, commissionerLogout, getSeasonMeta, setSeasonYear, archiveSeason, copySeason, reconnect,
@@ -312,10 +374,14 @@
 
   let reconnecting = false;
   let reconnectTimer = null;
-  async function connectToServer() {
-    const remote = await apiState();
+  async function connectToServer(statusTicket = beginStatusCheck()) {
+    // /api/state may be served from the Node process cache. Probe GitHub itself
+    // first so a warm cache cannot produce a false Connected indication.
+    const liveStatus = await verifyGithubStatus();
+    activeYear = Number(liveStatus.activeYear || liveStatus.statusYear || 2027);
+    const remote = await apiState(activeYear);
     mode = "server";
-    activeYear = Number(remote.activeYear || remote.seasonYear || 2027);
+    activeYear = Number(remote.activeYear || remote.seasonYear || activeYear);
     seasonYear = activeYear;
     storageLabel = remote.storageLabel || "GitHub season files";
     const work = [];
@@ -332,43 +398,79 @@
       else clearLocal(key);
     }
     await Promise.all(work);
-    lastError = null;
+    // Recheck after any recovered offline writes. The first status response
+    // predates those commits and may still contain the previous save error.
+    const finalStatus = await verifyGithubStatus(seasonYear);
     dirtyKeys.clear();
-    setStatus("Connected", "good");
-    const dataModeDetail = typeof document.getElementById === "function" ? document.getElementById("dataModeDetail") : null;
-    if (dataModeDetail) { dataModeDetail.textContent = "Connected"; dataModeDetail.className = "storage-detail good"; }
+    if (finalStatus.autoSaveLastError) {
+      lastError = new Error(finalStatus.autoSaveLastError);
+      setStatus("GitHub save unavailable: " + finalStatus.autoSaveLastError, "warn", statusTicket);
+      return false;
+    }
+    lastError = null;
+    setStatus("Connected", "good", statusTicket);
     return true;
   }
   async function reconnect() {
     if (reconnecting) return false;
+    const statusTicket = beginStatusCheck();
     reconnecting = true;
     try {
-      await connectToServer();
-      return true;
+      return await connectToServer(statusTicket);
     } catch (err) {
+      if (!isCurrentStatusCheck(statusTicket)) return mode === "server";
       mode = "browser";
-      setStatus("GitHub storage is unavailable: " + err.message + ". The browser copy remains available for download; reconnecting automatically.", "warn");
-      const dataModeDetail = typeof document.getElementById === "function" ? document.getElementById("dataModeDetail") : null;
-      if (dataModeDetail) { dataModeDetail.textContent = "GitHub unavailable — browser copy retained; retrying"; dataModeDetail.className = "storage-detail warn"; }
+      lastError = err;
+      setStatus("Unavailable: " + err.message + ". The browser copy remains available for download; reconnecting automatically.", "warn", statusTicket);
       return false;
     } finally {
       reconnecting = false;
     }
   }
+  async function verifyLiveConnection() {
+    if (mode !== "server" || reconnecting) return mode === "server";
+    const statusTicket = beginStatusCheck();
+    try {
+      await flush();
+      const liveStatus = await verifyGithubStatus(seasonYear);
+      if (!isCurrentStatusCheck(statusTicket)) return mode === "server";
+      if (liveStatus.autoSaveLastError) {
+        lastError = new Error(liveStatus.autoSaveLastError);
+        setStatus("Unavailable: " + liveStatus.autoSaveLastError, "warn", statusTicket);
+        return false;
+      }
+      if (dirtyKeys.size) {
+        setStatus("Saving changes to GitHub…", "saving", statusTicket);
+        return false;
+      }
+      lastError = null;
+      setStatus("Connected", "good", statusTicket);
+      return true;
+    } catch (err) {
+      if (!isCurrentStatusCheck(statusTicket)) return mode === "server";
+      mode = "browser";
+      lastError = err;
+      setStatus("Unavailable: " + err.message + ". The browser copy remains available for download; reconnecting automatically.", "warn", statusTicket);
+      return false;
+    }
+  }
   function ensureReconnectLoop() {
     if (reconnectTimer || typeof setInterval !== "function") return;
-    reconnectTimer = setInterval(() => { if (mode !== "server") reconnect(); }, 30000);
+    reconnectTimer = setInterval(() => {
+      if (mode === "server") verifyLiveConnection();
+      else reconnect();
+    }, 30000);
   }
   async function start() {
     ensureBanner(); setStatus("Connecting to the GitHub league database…", "info");
     await reconnect();
     ensureReconnectLoop();
     if (typeof window.addEventListener === "function") {
-      window.addEventListener("online", () => { if (mode !== "server") reconnect(); });
-      window.addEventListener("focus", () => { if (mode !== "server") reconnect(); });
+      window.addEventListener("online", () => { if (mode !== "server") reconnect(); else verifyLiveConnection(); });
+      window.addEventListener("focus", () => { if (mode !== "server") reconnect(); else verifyLiveConnection(); });
     }
     const script = document.createElement("script");
-    script.src = "app.js?v=kf-github-storage-diagnostics-20261123b";
+    script.src = "app.js?v=kf-github-status-consistency-20261123d";
     script.onerror = () => setStatus("Could not load app.js. Make sure this page is opened from the project folder.", "error");
     document.body.appendChild(script);
   }

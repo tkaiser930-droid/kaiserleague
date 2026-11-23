@@ -189,3 +189,30 @@ GitHub storage diagnostics update (kf-github-storage-diagnostics-20261123b)
 - Every HTML page uses a unique cache-busting bootstrap query string; the dynamically loaded app.js is versioned too, preventing an older cached browser bootstrap from masking the active server/API diagnostics.
 - /healthz now reports service identity and build ID. Confirm the deployed site returns build kf-github-storage-diagnostics-20261123b before diagnosing GitHub token/repository settings.
 - Data & Backup now displays the JSON error returned by the Node API instead of replacing it with a generic “server does not expose sync” message.
+
+
+GitHub live status verification update (kf-github-live-status-20261123c)
+
+- Corrected a false-positive storage status: /api/state can return the Node.js process's in-memory season cache even while the GitHub API is unavailable. That response is no longer sufficient to display Connected.
+- /api/github/status now bypasses the in-memory database cache and performs a fresh GitHub API read of the currently selected season file. It reports a verified flag and verification timestamp.
+- Browser startup and reconnect now require a successful live GitHub status probe before changing to GitHub/server mode or displaying Connected.
+- Season switching verifies that specific season file in GitHub before loading the cached/server state.
+- A 30-second heartbeat now rechecks GitHub while connected; if verification fails, the application switches to retained browser-copy mode and reconnects automatically.
+- The Data & Backup status panel checks the selected season file and uses the same concise Connected / Unavailable labels.
+- Added regression tests for the exact false-positive case: a warm Node.js cache must not report Connected when the direct GitHub API probe fails.
+- Server-side season-file and season-index commit failures are now retained and reflected in both connection indicators; a successful subsequent commit clears the warning. A failed index write is explicitly retried on the next season save.
+- A readable GitHub repository is no longer reported as fully Connected when the last league-data commit failed. The browser copy remains available and retry actions remain enabled when live GitHub reads are available.
+
+
+GitHub status consistency update (kf-github-status-consistency-20261123d)
+- All visible storage status labels now use one sequenced status update path; stale asynchronous probes cannot overwrite newer save failures.
+- GitHub write requests use the same bounded retry wrapper as reads.
+- The site reports Connected only after the current live GitHub verification succeeds and there are no pending failed writes.
+- A successful write does not clear a different pending failed season/key write.
+- Refresh Save Status retries retained unsynced browser edits even when the API is still reachable.
+- Manual Save can be retried after a server-side status error when no local dirty keys remain.
+
+Additional status consistency safeguard (kf-github-status-consistency-20261123d)
+- A GitHub status endpoint read cannot mark the site Connected unless the browser's /api/state connection is also active.
+- A status probe is not allowed to overwrite a newer save error or pending write; status updates share a monotonic request ticket.
+- The header banner, Data & Backup status labels, and draft status now reflect the same storage state.

@@ -15,7 +15,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-github-storage-diagnostics-20261123b";
+const BUILD_ID = "kf-github-status-consistency-20261123d";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -39,6 +39,7 @@ const seasonCache = new Map();
 const seasonLoadPromises = new Map();
 let githubOperationQueue = Promise.resolve();
 let githubAutoLastError = "";
+let githubIndexSaveFailed = false;
 let githubAutoLastAt = "";
 let githubLastSync = { source: "not checked", at: "", message: "" };
 const publicHistoryCache = new Map();
@@ -192,7 +193,15 @@ async function ensureIndexLoaded() {
 }
 async function persistSeasonIndex(message = "Kaiser Family Fantasy SMX: update season index") {
   seasonIndex.activeYear = activeYear;
-  await queueGithubOperation(() => githubBackup.saveJsonFile(seasonIndex, message, SEASON_INDEX_PATH));
+  try {
+    await queueGithubOperation(() => githubBackup.saveJsonFile(seasonIndex, message, SEASON_INDEX_PATH));
+    githubIndexSaveFailed = false;
+    githubAutoLastError = "";
+  } catch (error) {
+    githubIndexSaveFailed = true;
+    githubAutoLastError = `GitHub season-index save failed: ${error.message || "Unknown GitHub error"}`;
+    throw error;
+  }
 }
 async function loadSeasonDatabase(year) {
   const target = Number(year);
@@ -232,7 +241,13 @@ async function saveSeasonDatabase(year, database, message = "Kaiser Family Fanta
   if (!validYear(target)) throw new Error("Invalid season year.");
   const normalized = normalizeDatabase({ ...database, savedAt: Math.max(Date.now(), Number(database.savedAt || 0) + 1) }, target);
   const wasIndexed = !!seasonIndex.seasons[String(target)];
-  const result = await queueGithubOperation(() => githubBackup.saveLeagueData(normalized, message, seasonPath(target)));
+  let result;
+  try {
+    result = await queueGithubOperation(() => githubBackup.saveLeagueData(normalized, message, seasonPath(target)));
+  } catch (error) {
+    githubAutoLastError = `GitHub save for season ${target} failed: ${error.message || "Unknown GitHub error"}`;
+    throw error;
+  }
   seasonCache.set(target, normalized);
   const entry = seasonIndex.seasons[String(target)] || { year: target, createdAt: new Date().toISOString() };
   const historical = target < activeYear || normalized.archived;
@@ -248,9 +263,9 @@ async function saveSeasonDatabase(year, database, message = "Kaiser Family Fanta
   if (target === activeYear) seasonIndex.activeYear = activeYear;
   // Register a newly-created year file as soon as its first successful save commits.
   // Existing index entries are not rewritten for every ordinary score edit.
-  if (!wasIndexed) await persistSeasonIndex(`Kaiser Family Fantasy SMX: register ${target} season file`);
+  if (!wasIndexed || githubIndexSaveFailed) await persistSeasonIndex(`Kaiser Family Fantasy SMX: register ${target} season file`);
+  else githubAutoLastError = "";
   githubAutoLastAt = new Date().toISOString();
-  githubAutoLastError = "";
   githubLastSync = { source: "GitHub", at: githubAutoLastAt, message: `Saved season ${target} directly to GitHub (${result.path}).` };
   return { ...result, seasonYear: target };
 }
@@ -552,16 +567,25 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === "/api/github/status" && req.method === "GET") {
-    await ensureGithubReady();
+    // This endpoint is a live GitHub API probe, not a report of the server's
+    // in-memory season cache. Resolve the active year, then read the selected
+    // season file from GitHub before allowing the UI to display Connected.
+    await ensureIndexLoaded();
+    const statusYear = url.searchParams.has("year") ? selectedYear(url) : activeYear;
+    requireYearAccess(req, statusYear);
     const status = await githubBackup.getStatus({
-      dataPath: seasonPath(activeYear),
+      dataPath: seasonPath(statusYear),
       storageMode: "github-only", storageLabel: `GitHub season files in ${githubBackup.getConfigSummary().repository}`,
-      activeSavedAt: seasonCache.get(activeYear)?.savedAt || 0,
+      activeSavedAt: seasonCache.get(statusYear)?.savedAt || 0,
       activeYear,
+      statusYear,
       autoSaveLastAt: githubAutoLastAt,
       autoSaveLastError: githubAutoLastError,
       lastSync: githubLastSync
     });
+    status.verified = !!status.configured && !status.error;
+    status.verifiedAt = status.verified ? new Date().toISOString() : "";
+    status.build = BUILD_ID;
     return send(res, 200, status);
   }
 
