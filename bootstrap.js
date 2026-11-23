@@ -47,21 +47,54 @@
   }
   const retryWait = ms => new Promise(resolve => setTimeout(resolve, ms));
   function retryableStatus(status) { return [408, 429, 500, 502, 503, 504].includes(Number(status)); }
+  function absoluteApiUrl(url) {
+    try { return new URL(url, location.origin).href; } catch { return String(url); }
+  }
+  function browserApiFailure(error, url) {
+    const endpoint = absoluteApiUrl(url);
+    const pageOrigin = String(location.origin || "unknown origin");
+    const protocol = String(location.protocol || "");
+    if (protocol === "file:") {
+      return `This page is opened directly from a file. Open the deployed Render service URL or run the Node.js server with npm start; the browser cannot reach its /api/state endpoint. (${error?.message || "network failure"})`;
+    }
+    return `The browser could not reach this site's Node.js API at ${endpoint} (page origin: ${pageOrigin}). This fails before GitHub is contacted. Open ${pageOrigin}/healthz: it must return JSON with \"ok\":true and build \"kf-github-storage-diagnostics-20261123b\". If /healthz does not load, verify the Render web service is live and that you are using its service URL, not a static/GitHub Pages URL. Browser error: ${error?.message || "Network request failed"}.`;
+  }
   async function fetchJson(url, options = {}, fallbackMessage = "GitHub season storage is unavailable", attempts = 4) {
     let lastError = null;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
         const response = await fetch(url, { ...options, cache: "no-store", credentials: options.credentials || "same-origin" });
-        const body = await response.json().catch(() => ({}));
-        if (response.ok) return body;
-        const error = new Error(body.error || `${fallbackMessage} (HTTP ${response.status}).`);
+        const contentType = response.headers?.get?.("content-type") || "";
+        let body = {};
+        let responseText = "";
+        try {
+          if (/application\/json/i.test(contentType) || typeof response.text !== "function") body = await response.json();
+          else {
+            responseText = await response.text();
+            try { body = responseText ? JSON.parse(responseText) : {}; } catch { body = {}; }
+          }
+        } catch { body = {}; }
+        if (response.ok) {
+          if (!body || typeof body !== "object" || Array.isArray(body)) {
+            throw new Error(`The Node.js API at ${absoluteApiUrl(url)} returned an invalid JSON response.`);
+          }
+          return body;
+        }
+        const serverDetail = body.error || body.message || (responseText ? responseText.slice(0, 240) : "");
+        let message = serverDetail || `${fallbackMessage} (HTTP ${response.status}).`;
+        if (response.status === 404 && !/application\/json/i.test(contentType)) {
+          message = `The Node.js API endpoint ${absoluteApiUrl(url)} returned HTTP 404 or an HTML page. This usually means the site is being served by a static host or an older deployment without the GitHub API routes.`;
+        } else if (response.status === 401) {
+          message = `The Node.js API returned HTTP 401 for ${absoluteApiUrl(url)}. The commissioner session or API authorization must be checked. ${serverDetail}`;
+        }
+        const error = new Error(message);
         error.status = response.status;
         if (!retryableStatus(response.status) || attempt === attempts) throw error;
         lastError = error;
       } catch (error) {
         if (error.status && !retryableStatus(error.status)) throw error;
-        if (!error.status && (error.name === "TypeError" || /Failed to fetch|NetworkError/i.test(error.message || ""))) {
-          lastError = new Error(`Could not reach this site's Node.js API at ${url}. Confirm the Render web service is running and this page is being served by that Node.js service.`);
+        if (!error.status && (error.name === "TypeError" || /Failed to fetch|NetworkError|fetch failed/i.test(error.message || ""))) {
+          lastError = new Error(browserApiFailure(error, url));
         } else lastError = error;
         if (attempt === attempts) break;
       }
@@ -335,7 +368,7 @@
       window.addEventListener("focus", () => { if (mode !== "server") reconnect(); });
     }
     const script = document.createElement("script");
-    script.src = "app.js";
+    script.src = "app.js?v=kf-github-storage-diagnostics-20261123b";
     script.onerror = () => setStatus("Could not load app.js. Make sure this page is opened from the project folder.", "error");
     document.body.appendChild(script);
   }

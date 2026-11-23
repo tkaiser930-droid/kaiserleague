@@ -1367,9 +1367,9 @@ function dataInit(){
   if(!githubStatus)return;
   githubStatus.textContent="Checking the GitHub league save…";githubStatus.className="storage-detail warn";
   try{
-   const response=await fetch("/api/github/status",{cache:"no-store"});
-   if(!response.ok)throw new Error("The Node.js server does not expose GitHub league-data sync. Use the GitHub-backed Node.js site started with npm start.");
-   const info=await response.json();
+   const response=await fetch("/api/github/status",{cache:"no-store",credentials:"same-origin"});
+   const info=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(info.error||`The Node.js API returned HTTP ${response.status} while checking GitHub connectivity. Open /healthz to verify the deployed server build.`);
    if(!info.configured){githubStatus.textContent=`GitHub-only saving is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;githubStatus.className="storage-detail warn";githubLatest.textContent="GitHub is the only shared server-side league store. Configure the server token to enable cross-device saving.";saveGithubButton.disabled=true;syncButton.disabled=true;return;}
    const autoText=info.automaticSave?"Automatic GitHub JSON saves are enabled.":"Automatic GitHub saving is enabled when the repository token is configured.";
    if(info.error){githubStatus.textContent=`GitHub connection problem for ${info.repository}: ${info.error}`;githubStatus.className="storage-detail warn";}

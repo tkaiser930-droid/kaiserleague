@@ -317,7 +317,7 @@ async function testBootstrapRetriesTemporaryServerFailure() {
   assert.equal(window.KFStorage.mode, "server", "a temporary 503 must not leave the site stuck in browser-only mode");
   assert.ok(requests >= 2, "the browser should retry the API request");
   assert.deepEqual(JSON.parse(values.get("kaiserFantasyAthletes")), remote.state.kaiserFantasyAthletes);
-  assert.equal(body.lastScript.src, "app.js");
+  assert.equal(body.lastScript.src, "app.js?v=kf-github-storage-diagnostics-20261123b");
 }
 
 function testNoServerSideDiskPersistence() {

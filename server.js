@@ -15,6 +15,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
+const BUILD_ID = "kf-github-storage-diagnostics-20261123b";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -652,7 +653,7 @@ async function handleApi(req, res, url) {
 async function serve(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
   if (url.pathname === "/healthz" && req.method === "GET") {
-    return send(res, 200, { ok: true, storage: "github-only-season-files", activeYear, timestamp: new Date().toISOString() });
+    return send(res, 200, { ok: true, service: "kaiser-family-fantasy-smx-node-api", build: BUILD_ID, storage: "github-only-season-files", activeYear, timestamp: new Date().toISOString() });
   }
   if (url.pathname.startsWith("/api/")) {
     try { return await handleApi(req, res, url); }

@@ -182,3 +182,10 @@ GITHUB CONNECTION RECOVERY (NOVEMBER 23, 2026)
 - Unsynced browser edits remain marked locally and are synchronized after a successful reconnect only when their explicit unsynced marker and timestamp qualify; stale browser cache is not allowed to replace newer GitHub data.
 - Local JSON download and restore remain available. No Render persistent disk or server-side local database was introduced.
 - Added regression tests for transient GitHub API disconnects, permanent DNS failures with actionable diagnostics, and browser recovery after a temporary 503 response.
+
+
+GitHub storage diagnostics update (kf-github-storage-diagnostics-20261123b)
+- The storage loader retries temporary API/network failures and reports whether the browser could not reach the Node.js API or the Node.js service returned a GitHub/API error.
+- Every HTML page uses a unique cache-busting bootstrap query string; the dynamically loaded app.js is versioned too, preventing an older cached browser bootstrap from masking the active server/API diagnostics.
+- /healthz now reports service identity and build ID. Confirm the deployed site returns build kf-github-storage-diagnostics-20261123b before diagnosing GitHub token/repository settings.
+- Data & Backup now displays the JSON error returned by the Node API instead of replacing it with a generic “server does not expose sync” message.
