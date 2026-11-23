@@ -147,3 +147,11 @@ MotoGP 403 diagnostics update:
 - Added season-to-season rider and schedule copying. Rider number, race-team, and manufacturer changes remain isolated to the selected season; copied schedule dates are adjusted to the destination year.
 - Kept GitHub as the only shared persistent database, browser working-copy recovery, the concise Connected status banner, and local JSON download/restore. No Render persistent disk or local server-side league data file is used.
 - Added automated integration tests for separate season files, 2010+ commissioner access control, isolated rider details, copy operations, round averages, public historical rider results, and archive reset behavior.
+
+
+2026-11-22 Commissioner table filtering:
+- Added live search, series-affiliation and fantasy-owner filters to Commissioner > Athletes > All Athletes. Series filtering includes primary and secondary series; owner filtering supports each team, Free Agent, and All Owners.
+- Added live search, series, event-type and calendar-year filters to Commissioner > Schedule > Scheduled Events. Search covers event name, round, venue, country/region, series, and dates.
+- The Select a scheduled event to edit dropdown now follows the active schedule filters, so edit selection and the visible table stay consistent.
+- Added result counts and Clear Filters controls. Filters only change the visible lists and do not modify league records or GitHub save data.
+- Added automated UI-wiring regression checks for all commissioner athlete and scheduled-event filters.

@@ -130,3 +130,8 @@ The commissioner dashboard provides season workspaces from 2010 through the acti
 Only the active season is served to public team, draft, schedule and current standings endpoints. Accessing any previous-year workspace requires a commissioner session cookie. The public athlete profile API returns a sanitized subset of archived rider results and per-series/class average points; it does not return historical team passwords, owner details, trades or draft information. Keep the LeagueSave repository private because it contains the underlying season save files.
 
 Archive Current Season saves the year snapshot, carries forward independent copies of the rider directory and team identities, and creates the next year without rosters, scores, trades, draft state or schedule. Copy Between Seasons can copy rider records or schedule events to the selected year. Local JSON backup download and restore apply to the currently selected year.
+
+
+COMMISSIONER TABLE FILTERS
+--------------------------
+Commissioner > Athletes includes live search by athlete name, number, race team, manufacturer, country/region, series affiliation and owner, plus series and fantasy-owner dropdowns. Series filtering includes secondary-series affiliations. Commissioner > Schedule includes live search, series, event-type and year filters. The scheduled-event edit dropdown follows the same active filters. Clear Filters resets each section. These are view-only controls and do not alter or save league data.

@@ -5,7 +5,7 @@
   "description": "Kaiser Family Fantasy SMX Node.js web service with GitHub-only league-data JSON storage",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check github-backup.js && node --check bootstrap.js && node --check app.js && node --check race-results-import.js && node tests/github-only-storage.test.js && node tests/season-management.test.js && node tests/race-results-import-smx.test.js && node tests/race-results-import-f1.test.js && node tests/race-results-import-series.test.js",
+    "check": "node --check server.js && node --check github-backup.js && node --check bootstrap.js && node --check app.js && node --check race-results-import.js && node tests/github-only-storage.test.js && node tests/season-management.test.js && node tests/commissioner-filters.test.js && node tests/race-results-import-smx.test.js && node tests/race-results-import-f1.test.js && node tests/race-results-import-series.test.js",
     "test:results": "node tests/race-results-import-smx.test.js && node tests/race-results-import-f1.test.js && node tests/race-results-import-series.test.js"
   },
   "engines": {

@@ -415,3 +415,14 @@ body[data-page="home"] #topUndraftedAthletes {
 .historical-profile-season h4{margin:14px 0 8px}
 #commTabPanel-history>.panel{margin-bottom:16px}
 @media(max-width:700px){.commissioner-season-workspace{grid-template-columns:1fr}.commissioner-season-workspace label{max-width:none}}
+
+
+/* Commissioner table filters */
+.commissioner-filter-bar{display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(150px,1fr)) auto;gap:10px;align-items:end;margin:12px 0 8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#11131a}
+.commissioner-filter-bar label{display:block;margin:0;min-width:0;color:var(--muted);font-size:11px;font-weight:700}
+.commissioner-filter-bar input,.commissioner-filter-bar select{display:block;width:100%;min-width:0;margin-top:5px}
+.commissioner-filter-bar .filter-clear{min-height:40px;margin:0;white-space:nowrap}
+.schedule-commissioner-filters{grid-template-columns:minmax(220px,2fr) repeat(3,minmax(130px,1fr)) auto}
+.filter-summary{min-height:16px;margin:5px 0 9px;color:var(--muted);font-size:11px}
+@media(max-width:850px){.commissioner-filter-bar,.schedule-commissioner-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.commissioner-filter-bar label:first-child{grid-column:1/-1}.commissioner-filter-bar .filter-clear{justify-self:start}}
+@media(max-width:520px){.commissioner-filter-bar,.schedule-commissioner-filters{grid-template-columns:1fr}.commissioner-filter-bar label:first-child{grid-column:auto}.commissioner-filter-bar .filter-clear{width:auto}}
