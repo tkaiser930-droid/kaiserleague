@@ -15,7 +15,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-draft-projection-20261123a";
+const BUILD_ID = "kf-draft-team-number-colors-20261123b";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -573,6 +573,7 @@ async function handleApi(req, res, url) {
         nationality: String(athlete.nationality || ""),
         nationalityRegion: String(athlete.nationalityRegion || ""),
         manufacturer: String(athlete.manufacturer || ""),
+        raceTeam: String(athlete.raceTeam || athlete.riderRaceTeam || ""),
         average: rounds.size ? totalPoints / rounds.size : 0,
         rounds: rounds.size,
         totalPoints,

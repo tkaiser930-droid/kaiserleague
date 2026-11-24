@@ -21,7 +21,13 @@ function compareRiderNumbers(a,b){const an=raceNumberValue(a),bn=raceNumberValue
 const sortRiders=list=>list.slice().sort(compareRiderNumbers);
 function riderFromRecord(r){const found=athletes().find(a=>(r?.riderId&&id(a)===String(r.riderId))||(r?.riderName&&norm(name(a))===norm(r.riderName)&&(!r?.riderClass||norm(cls(a))===norm(r.riderClass))));return found||{name:r?.riderName||r?.athleteName||"Athlete",number:r?.riderNumber||"",class:r?.riderClass||r?.athleteClass||"",primarySeries:r?.riderClass||r?.athleteClass||"",secondarySeries:r?.riderSecondarySeries||[],manufacturer:r?.manufacturer||"",nationality:r?.nationality||"",nationalityRegion:r?.nationalityRegion||""}}
 function compareScoreRiders(a,b){return compareRiderNumbers(riderFromRecord(a),riderFromRecord(b))||new Date(b.recordedAt||0)-new Date(a.recordedAt||0)}
-function riderFromPick(p){return athletes().find(a=>(p?.athleteId&&id(a)===String(p.athleteId))||(p?.athleteName&&norm(name(a))===norm(p.athleteName)&&(!p?.athleteClass||norm(cls(a))===norm(p.athleteClass))))||{name:p?.athleteName||"Athlete",number:p?.riderNumber||"",class:p?.athleteClass||"",primarySeries:p?.athleteClass||"",secondarySeries:p?.athleteSecondarySeries||[],nationality:p?.nationality||"",nationalityRegion:p?.nationalityRegion||""}}
+function riderFromPick(p){
+ const current=athletes(),byId=current.find(a=>p?.athleteId&&id(a)===String(p.athleteId));
+ const byName=p?.athleteName?current.filter(a=>norm(name(a))===norm(p.athleteName)):[];
+ const byNameAndClass=byName.find(a=>!p?.athleteClass||norm(cls(a))===norm(p.athleteClass));
+ const matched=byId||byNameAndClass||(byName.length===1?byName[0]:null);
+ return matched||{name:p?.athleteName||"Athlete",number:p?.riderNumber||"",class:p?.athleteClass||"",primarySeries:p?.athleteClass||"",secondarySeries:p?.athleteSecondarySeries||[],raceTeam:p?.raceTeam||p?.riderRaceTeam||"",manufacturer:p?.manufacturer||"",nationality:p?.nationality||"",nationalityRegion:p?.nationalityRegion||""};
+}
 function comparePicksByRiderNumber(a,b){return compareRiderNumbers(riderFromPick(a),riderFromPick(b))||Number(a.number||0)-Number(b.number||0)}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clean=s=>String(s??"").trim(),norm=s=>clean(s).toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -294,12 +300,27 @@ const RACE_TEAM_BRANDS={
  "Superfile Trackhouse MotoGP Team":{"color":"#0876B9","accent":"#D7EF00","number":"#43AEE4","image":"assets/logos/race-teams/superfile-trackhouse-motogp-user.png","fit":"wide"}
 };
 function raceTeamBrand(value){
- const key=norm(value);
- const aliases={lcrhondacastrol:"Castrol Honda LCR",hondalcrcastrol:"Castrol Honda LCR",hondalcr:"Castrol Honda LCR",gresiniracingmotogp:"BK8 Gresini Racing MotoGP"};
- const canonical=aliases[key]||value;
- const lookup=norm(canonical);
- for(const [label,config] of Object.entries(RACE_TEAM_BRANDS)){if(norm(label)===lookup)return config;}
- return null;
+ const lookup=norm(value);
+ if(!lookup)return null;
+ const aliases={
+  lcrhondacastrol:"Castrol Honda LCR",hondalcrcastrol:"Castrol Honda LCR",hondalcr:"Castrol Honda LCR",gresiniracingmotogp:"BK8 Gresini Racing MotoGP",
+  oracleRedBullRacing:"Red Bull Racing",visaCashAppRacingBulls:"Racing Bulls",visaCashAppRB:"Racing Bulls",
+  mercedesAMGPetronasF1Team:"Mercedes AMG Petronas",kickSauber:"Audi",stakeF1TeamKickSauber:"Audi",
+  ducatiLenovo:"Ducati Lenovo Team",gresiniRacing:"BK8 Gresini Racing MotoGP",vr46RacingTeam:"Pertamina Enduro VR46 Racing Team",
+  pramacRacing:"Prima Pramac Yamaha MotoGP",trackhouseMotoGP:"Superfile Trackhouse MotoGP Team",lcrHonda:"Castrol Honda LCR",
+  hondaHRC:"Honda HRC Castrol",ktmTech3:"Red Bull KTM Tech3",redBullKTMTech3:"Red Bull KTM Tech3"
+ };
+ const aliasKey=Object.keys(aliases).find(key=>norm(key)===lookup);
+ const canonical=aliasKey?aliases[aliasKey]:"";
+ if(canonical){const exact=Object.entries(RACE_TEAM_BRANDS).find(([label])=>norm(label)===norm(canonical));if(exact)return exact[1];}
+ // Team names are often saved with sponsor prefixes or series suffixes.
+ // Match the longest configured team label first to avoid confusing Racing Bulls
+ // with Red Bull Racing or confusing factory and satellite MotoGP teams.
+ const matches=Object.entries(RACE_TEAM_BRANDS)
+  .map(([label,config])=>({label,config,key:norm(label)}))
+  .filter(item=>item.key&&lookup.includes(item.key))
+  .sort((a,b)=>b.key.length-a.key.length);
+ return matches[0]?.config||null;
 }
 function isTeamColorSeries(athlete){return ["F1","MOTOGP"].includes(cls(athlete).toUpperCase());}
 function athleteSidebarColor(athlete){if(isTeamColorSeries(athlete)&&clean(athlete?.raceTeam)){const team=raceTeamBrand(athlete.raceTeam);if(team?.color)return team.color;if(team?.accent)return team.accent;}return mcolor(athlete?.manufacturer);}
@@ -352,7 +373,13 @@ function numberHTML(value,manufacturer,athlete={}){
  let colors;
  if(["250","MX2","CAN 250"].includes(series)) colors=["#000000","#FFFFFF"];
  else if(["450","MXGP","CAN 450"].includes(series)) colors=["#FFFFFF","#000000"];
- else if(["MOTOGP","F1"].includes(series)){const teamColors=raceTeamBrand(athlete.raceTeam);colors=["#000000",teamColors?.number||teamColors?.accent||mcolor(manufacturer)];}
+ else if(["MOTOGP","F1"].includes(series)){
+  const teamColors=raceTeamBrand(athlete.raceTeam||athlete.riderRaceTeam);
+  // F1 and MotoGP number plates are team-branded, never manufacturer-branded.
+  // Unknown team labels use a neutral plate ink instead of silently falling
+  // back to the bike/engine manufacturer color.
+  colors=["#000000",teamColors?.number||teamColors?.accent||teamColors?.color||"#D1D5DB"];
+ }
  else colors=[mcolor(manufacturer),"#FFFFFF"];
  if(athlete.pointsLeader) colors=["#E60012","#FFFFFF"];
  else if(athlete.reigningTripleCrownChampion) colors=["#6B2FB9","#F2D16B"];
@@ -1335,7 +1362,7 @@ function draftEligibleForTeam(a,room,t,data){if(!a||owner(a)||!draftEligibleForR
 function draftTeamSession(){const k=sessionStorage.getItem("draftTeam");return teams().find(t=>key(t)===k)||null}
 function setDraftMessage(message){const el=$("draftMessage");if(el)el.textContent=message}
 function submitTeamDraftPick(pass=false){const room=$("draftRoom").value,settings=read(K.DS,{})[room]||{status:"Not started"},data=draftData(),picks=draftRoomPicks(room,data),expected=currentDraftTeam(room,settings,data),team=draftTeamSession();if(settings.status!=="Open"){setDraftMessage(settings.status==="Paused"?"This draft is paused by the commissioner.":settings.status==="Complete"?"This draft is complete.":"The commissioner has not started this draft yet.");return}if(!team){setDraftMessage("Sign in with your team password before making a pick.");return}if(!expected||key(expected)!==key(team)){setDraftMessage(`It is not your turn. The next pick belongs to ${expected?tname(expected):"the next team"}.`);return}let athlete=null;if(!pass){athlete=athletes().find(a=>id(a)===$("draftAthlete").value);if(!athlete||!draftEligibleForTeam(athlete,room,team,data)){setDraftMessage("Choose an available athlete who fits your team's remaining roster spots.");return}}
- const pickNumber=picks.length+1,order=draftOrder(settings),entry={id:uid(),room,number:pickNumber,round:Math.floor((pickNumber-1)/Math.max(1,order.length))+1,teamKey:key(team),teamName:tname(team),passed:!!pass,athleteId:athlete?id(athlete):"",athleteName:athlete?name(athlete):"Passed",athleteClass:athlete?cls(athlete):"",athleteSecondarySeries:athlete?[...(athlete.secondarySeries||[])]:[],riderNumber:athlete?clean(athlete.number):"",nationality:athlete?normalizeNationality(athlete.nationality):"",nationalityRegion:athlete?normalizeRegion(athlete.nationality,athlete.nationalityRegion):"",time:new Date().toISOString()};
+ const pickNumber=picks.length+1,order=draftOrder(settings),entry={id:uid(),room,number:pickNumber,round:Math.floor((pickNumber-1)/Math.max(1,order.length))+1,teamKey:key(team),teamName:tname(team),passed:!!pass,athleteId:athlete?id(athlete):"",athleteName:athlete?name(athlete):"Passed",athleteClass:athlete?cls(athlete):"",athleteSecondarySeries:athlete?[...(athlete.secondarySeries||[])]:[],riderNumber:athlete?clean(athlete.number):"",raceTeam:athlete?clean(athlete.raceTeam):"",manufacturer:athlete?clean(athlete.manufacturer):"",nationality:athlete?normalizeNationality(athlete.nationality):"",nationalityRegion:athlete?normalizeRegion(athlete.nationality,athlete.nationalityRegion):"",time:new Date().toISOString()};
  // Save the turn advancement first so every connected draft room sees the next team immediately.
  data.picks.push(entry);write(K.D,data);
  if(athlete){team.roster=[...roster(team),{...athlete}];saveTeams(teams().map(t=>key(t)===key(team)?team:t))}
@@ -1424,7 +1451,7 @@ function dataInit(){
    const response=await fetch(`/api/github/status?year=${encodeURIComponent(statusYear)}`,{cache:"no-store",credentials:"same-origin"});
    const info=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(info.error||`The Node.js API returned HTTP ${response.status} while checking GitHub connectivity. Open /healthz to verify the deployed server build.`);
-   if(info.build!=="kf-draft-projection-20261123a")throw new Error("The deployed server is running an older storage-status build. Deploy the latest GitHub status consistency project ZIP and reopen the site.");
+   if(info.build!=="kf-draft-team-number-colors-20261123b")throw new Error("The deployed server is running an older storage-status build. Deploy the latest GitHub status consistency project ZIP and reopen the site.");
    if(!info.configured){
     const message=`Unavailable: GitHub-only saving is waiting for GITHUB_TOKEN. Repository is set to ${info.repository||"tkaiser930-droid/LeagueSave"}; add a fine-grained token with Contents: Read and write and Metadata: Read.`;
     if(!publishStatus(message,"warn"))return;
