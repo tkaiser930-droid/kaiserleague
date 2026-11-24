@@ -192,7 +192,7 @@ async function testGithubIsCanonicalOverStaleBrowserCache() {
   };
   const fetch = async (url, options = {}) => {
     if (String(url).startsWith("/api/github/status") && !options.method) {
-      return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123e", activeYear: 2027, statusYear: 2027 }) };
+      return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-draft-projection-20261123a", activeYear: 2027, statusYear: 2027 }) };
     }
     if (String(url).startsWith("/api/state") && !options.method) {
       return { ok: true, status: 200, json: async () => remote };
@@ -236,7 +236,7 @@ async function testSameYearRefreshAppliesRemoteCopy() {
   const fetch = async (url, options = {}) => {
     const textUrl = String(url);
     if (textUrl.startsWith("/api/github/status")) {
-      return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123e", activeYear: 2027, statusYear: 2027 }) };
+      return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-draft-projection-20261123a", activeYear: 2027, statusYear: 2027 }) };
     }
     if (textUrl === "/api/state" || textUrl.startsWith("/api/state?year=2027")) {
       return {
@@ -323,7 +323,7 @@ async function testBootstrapRetriesTemporaryServerFailure() {
   const fetch = async (url) => {
     requests++;
     if (requests === 1) return { ok: false, status: 503, json: async () => ({ error: "GitHub temporarily unavailable" }) };
-    if (String(url).startsWith("/api/github/status")) return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-github-status-consistency-20261123e", activeYear: 2027, statusYear: 2027 }) };
+    if (String(url).startsWith("/api/github/status")) return { ok: true, status: 200, json: async () => ({ configured: true, verified: true, build: "kf-draft-projection-20261123a", activeYear: 2027, statusYear: 2027 }) };
     return { ok: true, status: 200, json: async () => remote };
   };
   const body = { prepend() {}, appendChild(node) { this.lastScript = node; } };
@@ -342,7 +342,7 @@ async function testBootstrapRetriesTemporaryServerFailure() {
   assert.equal(window.KFStorage.mode, "server", "a temporary 503 must not leave the site stuck in browser-only mode");
   assert.ok(requests >= 2, "the browser should retry the API request");
   assert.deepEqual(JSON.parse(values.get("kaiserFantasyAthletes")), remote.state.kaiserFantasyAthletes);
-  assert.equal(body.lastScript.src, "app.js?v=kf-github-status-consistency-20261123e");
+  assert.equal(body.lastScript.src, "app.js?v=kf-draft-projection-20261123a");
 }
 
 function testNoServerSideDiskPersistence() {

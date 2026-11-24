@@ -10,6 +10,7 @@ const { spawn } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "..");
 const APP_SOURCE = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
 const COMMISSIONER_HTML = fs.readFileSync(path.join(ROOT, "commissioner.html"), "utf8");
+const DRAFT_HTML = fs.readFileSync(path.join(ROOT, "draft.html"), "utf8");
 const REPO_PREFIX = "/repos/test-owner/test-league";
 assert.match(APP_SOURCE, /Most Recent Scored Results/, "athlete profiles show recent results across published seasons");
 assert.match(APP_SOURCE, /Career average \/ round/, "athlete profiles display a career average per round");
@@ -19,6 +20,13 @@ assert.doesNotMatch(APP_SOURCE, /Historical Workspace|Historical workspace/, "co
 assert.match(APP_SOURCE, /· Archived/, "every non-current year is labeled as an archived season in the commissioner selector");
 assert.match(COMMISSIONER_HTML, /Every year before the current season is an archived season/, "commissioner page explains that every prior year is an archived season");
 assert.doesNotMatch(COMMISSIONER_HTML, /previous-year workspaces|full previous-season workspaces/i, "commissioner page does not describe a separate historical workspace state");
+assert.match(DRAFT_HTML, />Draft<\/button>/, "the existing draft interface is available under the Draft tab");
+assert.match(DRAFT_HTML, /Projected Draft Pick/, "draft page includes a separate Projected Draft Pick tab");
+assert.match(DRAFT_HTML, /id="draftProjectionTable"/, "projected picks have a dedicated table container");
+assert.match(APP_SOURCE, /api\/public\/draft-projections\?room=/, "the projection table loads room-specific career averages from the public API");
+assert.match(APP_SOURCE, /Number\(b\.average\|\|0\)-Number\(a\.average\|\|0\)/, "projected pick ranks athletes by descending average points per round");
+assert.match(APP_SOURCE, /\["Projected Pick Number","Athlete","Average Points \/ Round"\]/, "projected pick table shows the requested three columns");
+
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -260,6 +268,30 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(result.body.records.find(record => record.seasonYear === 2025).riderNumber, "12", "historical number is retained on old score records");
     assert.equal(result.body.records.find(record => record.seasonYear === 2025).riderRaceTeam, "2025 Factory Team", "historical race team is retained on old score records");
 
+    result = await api(baseUrl, "/api/state/kaiserFantasyAthletes?year=2027", {
+      method: "PUT", body: JSON.stringify({ value: [...initialLegacy.state.kaiserFantasyAthletes, { id: "rider-2", name: "Projection Leader", number: "44", class: "450", primarySeries: "450", secondarySeries: [] }], updatedAt: Date.now() })
+    }, cookie);
+    assert.equal(result.response.status, 200);
+    result = await api(baseUrl, "/api/state/kaiserFantasyScores?year=2027", {
+      method: "PUT", body: JSON.stringify({ value: [...initialLegacy.state.kaiserFantasyScores, { id: "score-rider-2", riderId: "rider-2", riderName: "Projection Leader", riderClass: "450", series: "SMX", division: "450", event: "Anaheim 1", round: 1, scheduledEventId: "event-2027-1", seasonYear: 2027, place: 1, points: 50, teamName: "Unrostered / Free Agent", riderNumber: "44", recordedAt: "2027-01-08T22:00:00.000Z" }], updatedAt: Date.now() })
+    }, cookie);
+    assert.equal(result.response.status, 200);
+    result = await api(baseUrl, "/api/public/draft-projections?room=SMX");
+    assert.equal(result.response.status, 200, result.body.error || "public draft projections should load without exposing archived workspaces");
+    assert.equal(result.body.room, "SMX");
+    assert.equal(result.body.athletes[0].id, "rider-2", "projected pick numbers rank higher class-specific average points per round first");
+    assert.equal(result.body.athletes[1].id, "rider-1", "lower average athletes follow higher average athletes");
+    const projectedRider = result.body.athletes.find(athlete => athlete.id === "rider-1");
+    assert.ok(projectedRider, "current SMX riders appear in the projection table");
+    assert.equal(projectedRider.averageClass, "450", "draft projection uses the rider's primary class within the selected draft room");
+    assert.equal(projectedRider.totalPoints, 53, "projection points combine active and archived scores in the same series and class");
+    assert.equal(projectedRider.rounds, 2, "projection counts one round per event across seasons, not one per moto");
+    assert.equal(projectedRider.average, 26.5, "projected pick average uses the cross-season class-specific average");
+    assert.equal(Object.prototype.hasOwnProperty.call(projectedRider, "passwordHash"), false, "public projections do not expose private authentication fields");
+    assert.equal(Object.prototype.hasOwnProperty.call(projectedRider, "owner"), false, "public projections do not expose team ownership");
+    result = await api(baseUrl, "/api/public/draft-projections?room=not-a-room");
+    assert.equal(result.response.status, 400, "unknown draft rooms are rejected");
+
     result = await api(baseUrl, "/api/seasons/archive", { method: "POST", body: JSON.stringify({ year: 2027 }) }, cookie);
     assert.equal(result.response.status, 200, result.body.error || "archiving the current season should succeed");
     assert.equal(result.body.currentYear, 2028);
@@ -294,6 +326,12 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(result.body.career.rounds, 3);
     assert.equal(result.body.career.average, 26);
     assert.equal(result.body.career.currentSeasonPoints, 0, "archived points do not carry into the new active season total");
+    result = await api(baseUrl, "/api/public/draft-projections?room=SMX");
+    assert.equal(result.response.status, 200);
+    const projectionAfterArchive = result.body.athletes.find(athlete => athlete.id === "rider-1");
+    assert.equal(projectionAfterArchive.average, 26.5, "projected draft averages remain cumulative after the current season is archived");
+    assert.equal(projectionAfterArchive.rounds, 2, "projected round counts persist after the season archive transition");
+    assert.equal(result.body.athletes[0].id, "rider-2", "projection ranking remains sorted after the active season is archived");
     assert.equal(Object.prototype.hasOwnProperty.call(historic.records[0], "teamKey"), false, "public history omits internal team keys");
     assert.equal(Object.prototype.hasOwnProperty.call(historic.athlete, "passwordHash"), false);
 

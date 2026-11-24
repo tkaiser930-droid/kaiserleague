@@ -223,3 +223,11 @@ Large scoring save request fix (kf-github-status-consistency-20261123e)
 - Browser keepalive requests have a small aggregate body quota (typically 64 KiB); large kaiserFantasyScores arrays could be rejected locally as Failed to fetch before the Node API was contacted.
 - Normal saves remain awaited, serialized, retried, and retained in the browser copy if the request fails.
 - Added a regression test that sends a score payload larger than 64 KiB and asserts keepalive is not enabled.
+
+Projected Draft Pick tab (kf-draft-projection-20261123a)
+- Added a second Draft page tab titled “Projected Draft Pick”; the existing draft room workflow remains under the “Draft” tab.
+- The shared draft-room selector drives both tabs for SMX, Triple Crown Series, MXGP, MotoGP, and F1.
+- Added a public aggregate endpoint that ranks current athletes by career average points per round in their draft-eligible primary class, using active and archived season files.
+- Multiple scoring sessions at the same scheduled event count as one round; historical scores remain in their original season/class buckets.
+- The projected table shows Projected Pick Number, Athlete, and Average Points / Round, ordered by average descending. Ties are resolved by rounds scored, total points, then athlete name.
+- The endpoint returns only public athlete identity fields and scoring aggregates; it does not expose team owners, passwords, rosters, or archived workspaces.

@@ -15,7 +15,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-github-status-consistency-20261123e";
+const BUILD_ID = "kf-draft-projection-20261123a";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -333,6 +333,22 @@ function scoreRoundKey(record) {
   if (record.scheduledEventId) return `${year}|${series}|event:${record.scheduledEventId}`;
   return `${year}|${series}|event:${normalizedName(record.event || "")}|round:${record.round ?? ""}`;
 }
+const DRAFT_PROJECTION_ROOMS = {
+  SMX: ["250", "450"],
+  "Triple Crown Series": ["CAN 250", "CAN 450"],
+  MXGP: ["MXGP", "MX2"],
+  MotoGP: ["MotoGP"],
+  F1: ["F1"]
+};
+function draftProjectionRoomForSeries(value) {
+  const key = normalizedName(value);
+  if (["smx", "supercross", "motocross", "250", "450", "smxnext", "usawmx"].includes(key)) return "SMX";
+  if (["triplecrownseries", "tcs", "can", "can250", "can450"].includes(key)) return "Triple Crown Series";
+  if (["mxgp", "mx2", "wmx"].includes(key)) return "MXGP";
+  if (["motogp", "moto2", "moto3"].includes(key)) return "MotoGP";
+  if (["f1", "f2", "f3", "f1academy"].includes(key)) return "F1";
+  return "";
+}
 function summarizeHistoricalRider(database, riderId, riderName, riderClass, year) {
   const state = database.state || {};
   const athletes = Array.isArray(state.kaiserFantasyAthletes) ? state.kaiserFantasyAthletes : [];
@@ -499,6 +515,76 @@ async function handleApi(req, res, url) {
     const saved = await saveSeasonDatabase(destinationYear, destination, `Kaiser Family Fantasy SMX: copy ${parts.join(" and ")} from ${sourceYear} to ${destinationYear}`);
     publicHistoryCache.delete(sourceYear);
     return send(res, 200, { ok: true, sourceYear, destinationYear, copied: parts, riderCount: destination.state.kaiserFantasyAthletes.length, scheduleCount: destination.state.kaiserFantasySchedule.length, path: saved.path });
+  }
+
+  if (url.pathname === "/api/public/draft-projections" && req.method === "GET") {
+    await ensureGithubReady();
+    const room = url.searchParams.get("room") || "SMX";
+    const roomClasses = DRAFT_PROJECTION_ROOMS[room];
+    if (!roomClasses) return send(res, 400, { error: "Choose a valid draft room." });
+
+    const activeDatabase = await loadSeasonDatabase(activeYear);
+    const currentAthletes = Array.isArray(activeDatabase.state.kaiserFantasyAthletes)
+      ? activeDatabase.state.kaiserFantasyAthletes : [];
+    const years = [...new Set([
+      activeYear,
+      ...Object.keys(seasonIndex.seasons || {}).map(Number).filter(year => validYear(year) && year < activeYear)
+    ])].sort((a, b) => b - a);
+    const databases = [];
+    for (const year of years) {
+      try { databases.push({ year, database: year === activeYear ? activeDatabase : await loadSeasonDatabase(year) }); }
+      catch (error) { console.warn(`Could not read ${year} for public draft projections: ${error.message}`); }
+    }
+
+    const projections = [];
+    for (const athlete of currentAthletes) {
+      if (!athlete || athlete.seriesArchived) continue;
+      const primaryClass = String(athlete.primarySeries || athlete.class || athlete.riderClass || athlete.category || "").trim();
+      const secondaryClasses = Array.isArray(athlete.secondarySeries) ? athlete.secondarySeries.map(value => String(value || "").trim()) : [];
+      const athleteClasses = [primaryClass, ...secondaryClasses].filter(Boolean);
+      if (!athleteClasses.some(value => roomClasses.includes(value))) continue;
+      // Use the primary class whenever it belongs to this room. If the rider is
+      // draft-eligible only through a secondary class, use that class for the
+      // room-specific historical average. This matches roster scoring rules.
+      const projectionClass = roomClasses.includes(primaryClass) ? primaryClass : roomClasses.find(value => athleteClasses.includes(value));
+      const riderId = athlete.id || athlete.riderId || "";
+      const riderName = athlete.name || athlete.riderName || "Unnamed athlete";
+      const rounds = new Set();
+      let totalPoints = 0;
+
+      for (const { year, database } of databases) {
+        const summary = summarizeHistoricalRider(database, riderId, riderName, projectionClass, year);
+        for (const record of summary.records) {
+          const division = String(record.division || record.riderClass || "").trim();
+          const recordRoom = draftProjectionRoomForSeries(record.series || record.riderClass || division);
+          if (normalizedName(division) !== normalizedName(projectionClass) || recordRoom !== room) continue;
+          totalPoints += Number(record.points || 0);
+          rounds.add(scoreRoundKey({ ...record, seasonYear: year }));
+        }
+      }
+
+      projections.push({
+        id: String(riderId || normalizedName(riderName) + "-" + normalizedName(primaryClass)),
+        name: riderName,
+        number: String(athlete.number || ""),
+        primarySeries: primaryClass,
+        class: primaryClass,
+        secondarySeries: secondaryClasses,
+        nationality: String(athlete.nationality || ""),
+        nationalityRegion: String(athlete.nationalityRegion || ""),
+        manufacturer: String(athlete.manufacturer || ""),
+        average: rounds.size ? totalPoints / rounds.size : 0,
+        rounds: rounds.size,
+        totalPoints,
+        averageClass: projectionClass
+      });
+    }
+
+    projections.sort((a, b) => Number(b.average) - Number(a.average)
+      || Number(b.rounds) - Number(a.rounds)
+      || Number(b.totalPoints) - Number(a.totalPoints)
+      || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    return send(res, 200, { ok: true, room, activeYear, athletes: projections });
   }
 
   if (url.pathname === "/api/public/athlete-history" && req.method === "GET") {
