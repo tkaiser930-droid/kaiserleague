@@ -9,6 +9,8 @@ const { spawn } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const APP_SOURCE = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
+const SERVER_SOURCE = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+const BOOTSTRAP_SOURCE = fs.readFileSync(path.join(ROOT, "bootstrap.js"), "utf8");
 const COMMISSIONER_HTML = fs.readFileSync(path.join(ROOT, "commissioner.html"), "utf8");
 const DRAFT_HTML = fs.readFileSync(path.join(ROOT, "draft.html"), "utf8");
 const REPO_PREFIX = "/repos/test-owner/test-league";
@@ -26,6 +28,11 @@ assert.match(DRAFT_HTML, /id="draftProjectionTable"/, "projected picks have a de
 assert.match(APP_SOURCE, /api\/public\/draft-projections\?room=/, "the projection table loads room-specific career averages from the public API");
 assert.match(APP_SOURCE, /Number\(b\.average\|\|0\)-Number\(a\.average\|\|0\)/, "projected pick ranks athletes by descending average points per round");
 assert.match(APP_SOURCE, /\["Projected Pick Number","Athlete","Average Points \/ Round"\]/, "projected pick table shows the requested three columns");
+assert.match(COMMISSIONER_HTML, /id="copyRiderSeries"/, "commissioner can select the athlete series to transfer");
+assert.match(COMMISSIONER_HTML, /id="copyScheduleSeries"/, "commissioner can select the schedule series to transfer independently");
+assert.match(BOOTSTRAP_SOURCE, /riderSeries: filters\.riderSeries \|\| "all", scheduleSeries: filters\.scheduleSeries \|\| "all"/, "season copy sends independent athlete and schedule series filters");
+assert.match(SERVER_SOURCE, /function athleteMatchesCopySeries/, "server filters athlete transfers using primary and secondary series affiliations");
+assert.match(SERVER_SOURCE, /function eventMatchesCopySeries/, "server filters schedule transfers by event series");
 
 
 function listen(server) {
@@ -249,6 +256,81 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     assert.equal(result.body.state.kaiserFantasyAthletes[0].number, "21", "editing a previous year does not change the current season rider number");
     assert.equal(result.body.state.kaiserFantasyAthletes[0].raceTeam, "2027 Factory Team");
 
+    // Create a separate archived source year covering all series and a secondary-series athlete.
+    const transferSourceState = {
+      kaiserFantasyAthletes: [
+        { id: "transfer-smx", name: "Transfer SMX Rider", number: "7", class: "250", primarySeries: "250", secondarySeries: [], raceTeam: "SMX Team", manufacturer: "KTM" },
+        { id: "transfer-f1", name: "Transfer F1 Driver", number: "44", class: "F1", primarySeries: "F1", secondarySeries: [], raceTeam: "F1 Team", manufacturer: "Mercedes" },
+        { id: "transfer-motogp", name: "Transfer MotoGP Rider", number: "93", class: "MotoGP", primarySeries: "MotoGP", secondarySeries: [], raceTeam: "MotoGP Team", manufacturer: "Ducati" },
+        { id: "transfer-secondary-f1", name: "Multi Series Driver", number: "8", class: "450", primarySeries: "450", secondarySeries: ["F1"], raceTeam: "Dual Series Team", manufacturer: "Honda" },
+        { id: "transfer-mxon", name: "MXON Entry", number: "9", class: "MX2", primarySeries: "MX2", secondarySeries: ["MXON MXGP"], raceTeam: "MXGP Team", manufacturer: "KTM" }
+      ],
+      kaiserFantasyTeams: [], kaiserFantasyScores: [], kaiserFantasyTrades: [],
+      kaiserFantasyDraftState: { picks: [] }, kaiserFantasyDraftSettings: {},
+      kaiserFantasySchedule: [
+        { id: "transfer-event-smx", name: "Transfer Supercross", date: "2024-01-06", series: "SMX", round: 1 },
+        { id: "transfer-event-f1", name: "Transfer Grand Prix", date: "2024-03-10", series: "F1", round: 1 },
+        { id: "transfer-event-motogp", name: "Transfer MotoGP GP", date: "2024-04-14", series: "MotoGP", round: 1 },
+        { id: "transfer-event-mxon", name: "Transfer MXON", date: "2024-09-29", series: "MXON", round: 1 }
+      ]
+    };
+    result = await api(baseUrl, "/api/state?year=2024", { method: "PUT", body: JSON.stringify({ state: transferSourceState, updatedAt: Date.now() }) }, cookie);
+    assert.equal(result.response.status, 200, result.body.error || "the source season for series-specific transfers should save");
+    result = await api(baseUrl, "/api/state/kaiserFantasySchedule?year=2026", {
+      method: "PUT", body: JSON.stringify({ value: [
+        { id: "event-2026-1", name: "Anaheim 1", date: "2026-01-08", endDate: "2026-01-08", series: "SMX", round: 1 },
+        { id: "old-destination-f1", name: "Old Destination GP", date: "2026-03-01", series: "F1", round: 1 }
+      ], updatedAt: Date.now() })
+    }, cookie);
+    assert.equal(result.response.status, 200, result.body.error || "destination schedule setup for series transfer should save");
+
+    result = await api(baseUrl, "/api/seasons/copy", {
+      method: "POST", body: JSON.stringify({ sourceYear: 2024, destinationYear: 2026, parts: ["riders"], riderSeries: "F1" })
+    }, cookie);
+    assert.equal(result.response.status, 200, result.body.error || "F1-only athlete copy should succeed");
+    assert.equal(result.body.copiedRiderCount, 2, "F1 copy includes primary F1 riders and riders with F1 as a secondary affiliation");
+    result = await api(baseUrl, "/api/state?year=2026", {}, cookie);
+    const afterF1Copy = result.body.state.kaiserFantasyAthletes;
+    assert.ok(afterF1Copy.some(rider => rider.id === "transfer-f1"));
+    assert.ok(afterF1Copy.some(rider => rider.id === "transfer-secondary-f1"));
+    assert.ok(afterF1Copy.some(rider => rider.id === "rider-1"), "F1-only athlete copy preserves destination SMX athletes");
+    assert.ok(!afterF1Copy.some(rider => rider.id === "transfer-motogp" || rider.id === "transfer-smx"), "F1-only athlete copy excludes unrelated series");
+
+    result = await api(baseUrl, "/api/seasons/copy", {
+      method: "POST", body: JSON.stringify({ sourceYear: 2024, destinationYear: 2026, parts: ["riders"], riderSeries: "MotoGP" })
+    }, cookie);
+    assert.equal(result.response.status, 200, result.body.error || "MotoGP-only athlete copy should succeed");
+    assert.equal(result.body.copiedRiderCount, 1);
+    result = await api(baseUrl, "/api/state?year=2026", {}, cookie);
+    const afterMotoGPCopy = result.body.state.kaiserFantasyAthletes;
+    assert.ok(afterMotoGPCopy.some(rider => rider.id === "transfer-f1"), "copying MotoGP after F1 does not remove F1 athletes");
+    assert.ok(afterMotoGPCopy.some(rider => rider.id === "transfer-motogp"));
+    assert.ok(afterMotoGPCopy.some(rider => rider.id === "rider-1"), "series-specific transfers preserve the pre-existing destination roster directory");
+    assert.ok(!afterMotoGPCopy.some(rider => rider.id === "transfer-smx"));
+
+    result = await api(baseUrl, "/api/seasons/copy", {
+      method: "POST", body: JSON.stringify({ sourceYear: 2024, destinationYear: 2026, parts: ["schedule"], scheduleSeries: "F1" })
+    }, cookie);
+    assert.equal(result.response.status, 200, result.body.error || "F1-only schedule copy should succeed");
+    assert.equal(result.body.copiedScheduleCount, 1);
+    result = await api(baseUrl, "/api/state?year=2026", {}, cookie);
+    const afterF1ScheduleCopy = result.body.state.kaiserFantasySchedule;
+    assert.ok(afterF1ScheduleCopy.some(event => event.series === "SMX" && event.name === "Anaheim 1"), "F1 schedule copy preserves destination SMX events");
+    assert.ok(afterF1ScheduleCopy.some(event => event.series === "F1" && event.name === "Transfer Grand Prix" && event.date === "2026-03-10"));
+    assert.ok(!afterF1ScheduleCopy.some(event => event.id === "old-destination-f1"), "F1 schedule transfer replaces old destination F1 events");
+    assert.ok(!afterF1ScheduleCopy.some(event => event.series === "MotoGP"));
+
+    result = await api(baseUrl, "/api/seasons/copy", {
+      method: "POST", body: JSON.stringify({ sourceYear: 2024, destinationYear: 2026, parts: ["schedule"], scheduleSeries: "MotoGP" })
+    }, cookie);
+    assert.equal(result.response.status, 200, result.body.error || "MotoGP-only schedule copy should succeed");
+    assert.equal(result.body.copiedScheduleCount, 1);
+    result = await api(baseUrl, "/api/state?year=2026", {}, cookie);
+    const afterMotoGPScheduleCopy = result.body.state.kaiserFantasySchedule;
+    assert.ok(afterMotoGPScheduleCopy.some(event => event.series === "F1" && event.name === "Transfer Grand Prix"), "copying MotoGP schedule preserves already-copied F1 events");
+    assert.ok(afterMotoGPScheduleCopy.some(event => event.series === "MotoGP" && event.name === "Transfer MotoGP GP" && event.date === "2026-04-14"));
+    assert.ok(afterMotoGPScheduleCopy.some(event => event.series === "SMX" && event.name === "Anaheim 1"));
+
     result = await api(baseUrl, "/api/public/athlete-history?riderId=rider-1&name=Historic%20Racer&class=450");
     assert.equal(result.response.status, 200);
     assert.deepEqual(result.body.seasons.map(season => season.year), [2027, 2026, 2025], "public profile history includes active and all archived seasons, including years previously labeled historical workspaces");
@@ -344,8 +426,8 @@ async function api(baseUrl, route, options = {}, cookie = "") {
 
     // Separate save files are the only league-data JSON persistence destinations.
     const seasonFiles = [...fakeGithub.files.keys()].filter(file => /^league-data\/seasons\/\d{4}\.json$/.test(file)).sort();
-    assert.deepEqual(seasonFiles, ["league-data/seasons/2025.json", "league-data/seasons/2026.json", "league-data/seasons/2027.json", "league-data/seasons/2028.json"]);
-    console.log("Historical season integration tests passed: per-year GitHub files, workspace-to-archive normalization, commissioner-only archived season editing/scoring, isolated rider edits, cross-season rider/schedule copy, event-round averages, public history for every archived season, and archive/new-season reset behavior.");
+    assert.deepEqual(seasonFiles, ["league-data/seasons/2024.json", "league-data/seasons/2025.json", "league-data/seasons/2026.json", "league-data/seasons/2027.json", "league-data/seasons/2028.json"]);
+    console.log("Historical season integration tests passed: per-year GitHub files, workspace-to-archive normalization, commissioner-only archived season editing/scoring, isolated rider edits, all-series and series-scoped athlete/schedule transfers with preservation of other series, event-round averages, public history for every archived season, and archive/new-season reset behavior.");
   } finally {
     child.kill("SIGTERM");
     await new Promise(resolve => {

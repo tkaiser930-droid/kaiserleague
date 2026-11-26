@@ -15,7 +15,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-draft-team-number-colors-20261123b";
+const BUILD_ID = "kf-series-season-transfer-20261125a";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -319,6 +319,45 @@ function cleanSeasonDate(value, year) {
 }
 function cloneJson(value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value)); }
 function normalizedName(value) { return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+const COPY_SERIES = new Set(["all", "SMX", "Triple Crown Series", "MXGP", "MXON", "MotoGP", "F1"]);
+const COPY_RIDER_CLASS_GROUPS = {
+  SMX: ["250", "450"],
+  "Triple Crown Series": ["CAN", "CAN 250", "CAN 450"],
+  MXGP: ["MXGP", "MX2"],
+  MXON: ["MXON", "MXON MXGP", "MXON MX2", "MXON Open"],
+  MotoGP: ["MotoGP"],
+  F1: ["F1"]
+};
+function athleteMatchesCopySeries(athlete, selectedSeries) {
+  if (!selectedSeries || selectedSeries === "all") return true;
+  const allowed = new Set((COPY_RIDER_CLASS_GROUPS[selectedSeries] || []).map(normalizedName));
+  const affiliations = [
+    athlete?.primarySeries, athlete?.class, athlete?.riderClass, athlete?.category,
+    ...(Array.isArray(athlete?.secondarySeries) ? athlete.secondarySeries : []),
+    ...(Array.isArray(athlete?.additionalSeries) ? athlete.additionalSeries : [])
+  ].map(normalizedName).filter(Boolean);
+  return affiliations.some(value => allowed.has(value));
+}
+function canonicalCopyScheduleSeries(value) {
+  const series = String(value || "").trim();
+  if (["CAN", "CAN 250", "CAN 450", "CAN WMX"].includes(series)) return "Triple Crown Series";
+  if (["250", "450"].includes(series)) return "SMX";
+  if (["MXGP", "MX2"].includes(series)) return "MXGP";
+  return series;
+}
+function eventMatchesCopySeries(event, selectedSeries) {
+  return !selectedSeries || selectedSeries === "all" || canonicalCopyScheduleSeries(event?.series) === selectedSeries;
+}
+function sameRiderIdentity(left, right) {
+  const leftId = String(left?.id || left?.riderId || "");
+  const rightId = String(right?.id || right?.riderId || "");
+  if (leftId && rightId && leftId === rightId) return true;
+  const leftName = normalizedName(left?.name || left?.riderName);
+  const rightName = normalizedName(right?.name || right?.riderName);
+  const leftClass = normalizedName(left?.primarySeries || left?.class || left?.riderClass);
+  const rightClass = normalizedName(right?.primarySeries || right?.class || right?.riderClass);
+  return !!leftName && leftName === rightName && leftClass === rightClass;
+}
 function scoreMatchesRider(record, riderId, riderName, riderClass) {
   if (riderId && String(record.riderId || "") === String(riderId)) return true;
   // Rider IDs normally survive season copies. The name fallback also includes
@@ -489,32 +528,77 @@ async function handleApi(req, res, url) {
     await ensureGithubReady();
     const body = await readBody(req);
     const sourceYear = Number(body.sourceYear), destinationYear = Number(body.destinationYear);
-    const parts = Array.isArray(body.parts) ? body.parts.filter(part => ["riders", "schedule"].includes(part)) : [];
+    const parts = Array.isArray(body.parts) ? [...new Set(body.parts.filter(part => ["riders", "schedule"].includes(part)))] : [];
+    const riderSeries = String(body.riderSeries || "all");
+    const scheduleSeries = String(body.scheduleSeries || "all");
     if (!validYear(sourceYear) || !validYear(destinationYear) || sourceYear === destinationYear || !parts.length) throw new Error("Choose two different valid seasons and at least one copy type.");
+    if (parts.includes("riders") && !COPY_SERIES.has(riderSeries)) throw new Error("Choose a valid athlete series to copy.");
+    if (parts.includes("schedule") && !COPY_SERIES.has(scheduleSeries)) throw new Error("Choose a valid schedule series to copy.");
     const source = await loadSeasonDatabase(sourceYear);
     const destination = await loadSeasonDatabase(destinationYear);
+    let copiedRiderCount = 0, copiedScheduleCount = 0;
     if (parts.includes("riders")) {
-      const riders = Array.isArray(source.state.kaiserFantasyAthletes) ? cloneJson(source.state.kaiserFantasyAthletes) : [];
-      destination.state.kaiserFantasyAthletes = riders;
-      const byId = new Map(riders.map(rider => [String(rider.id || rider.riderId || ""), rider]));
+      const sourceRiders = Array.isArray(source.state.kaiserFantasyAthletes) ? cloneJson(source.state.kaiserFantasyAthletes) : [];
+      const riders = sourceRiders.filter(rider => athleteMatchesCopySeries(rider, riderSeries));
+      copiedRiderCount = riders.length;
+      if (riderSeries === "all") {
+        // Preserve the original all-series operation: replace the full directory.
+        destination.state.kaiserFantasyAthletes = riders;
+      } else {
+        // A series-scoped operation upserts only that series' athletes. Other
+        // destination series remain untouched, and multi-series athletes remain
+        // one record because the model stores a single shared athlete profile.
+        const merged = Array.isArray(destination.state.kaiserFantasyAthletes) ? cloneJson(destination.state.kaiserFantasyAthletes) : [];
+        for (const rider of riders) {
+          const existingIndex = merged.findIndex(existing => sameRiderIdentity(existing, rider));
+          if (existingIndex >= 0) merged[existingIndex] = cloneJson(rider);
+          else merged.push(cloneJson(rider));
+        }
+        destination.state.kaiserFantasyAthletes = merged;
+      }
+      const byId = new Map(riders.map(rider => [String(rider.id || rider.riderId || ""), rider]).filter(([key]) => key));
       const byNameClass = new Map(riders.map(rider => [`${normalizedName(rider.name || rider.riderName)}|${normalizedName(rider.primarySeries || rider.class || rider.riderClass)}`, rider]));
       destination.state.kaiserFantasyTeams = (Array.isArray(destination.state.kaiserFantasyTeams) ? destination.state.kaiserFantasyTeams : []).map(team => ({
         ...team,
-        roster: (Array.isArray(team.roster) ? team.roster : []).map(rider => {
-          const replacement = byId.get(String(rider.id || rider.riderId || "")) || byNameClass.get(`${normalizedName(rider.name || rider.riderName)}|${normalizedName(rider.primarySeries || rider.class || rider.riderClass)}`);
-          return replacement ? cloneJson(replacement) : rider;
+        roster: (Array.isArray(team.roster) ? team.roster : []).map(rosterRider => {
+          const replacement = byId.get(String(rosterRider.id || rosterRider.riderId || "")) || byNameClass.get(`${normalizedName(rosterRider.name || rosterRider.riderName)}|${normalizedName(rosterRider.primarySeries || rosterRider.class || rosterRider.riderClass)}`);
+          return replacement ? cloneJson(replacement) : rosterRider;
         })
       }));
     }
     if (parts.includes("schedule")) {
-      const events = Array.isArray(source.state.kaiserFantasySchedule) ? source.state.kaiserFantasySchedule : [];
-      destination.state.kaiserFantasySchedule = events.map(event => ({
+      const sourceEvents = Array.isArray(source.state.kaiserFantasySchedule) ? source.state.kaiserFantasySchedule : [];
+      const events = sourceEvents.filter(event => eventMatchesCopySeries(event, scheduleSeries));
+      copiedScheduleCount = events.length;
+      const copiedEvents = events.map(event => ({
         ...cloneJson(event), id: crypto.randomUUID(), date: cleanSeasonDate(event.date, destinationYear), endDate: cleanSeasonDate(event.endDate, destinationYear)
       }));
+      if (scheduleSeries === "all") {
+        // Preserve the original all-series operation: replace the full calendar.
+        destination.state.kaiserFantasySchedule = copiedEvents;
+      } else {
+        // Replace only the selected destination series, retaining every other
+        // series' events and giving copied events fresh IDs in the new season.
+        const existingEvents = Array.isArray(destination.state.kaiserFantasySchedule) ? destination.state.kaiserFantasySchedule : [];
+        destination.state.kaiserFantasySchedule = existingEvents.filter(event => !eventMatchesCopySeries(event, scheduleSeries)).concat(copiedEvents);
+      }
     }
-    const saved = await saveSeasonDatabase(destinationYear, destination, `Kaiser Family Fantasy SMX: copy ${parts.join(" and ")} from ${sourceYear} to ${destinationYear}`);
+    const copyDescription = [
+      parts.includes("riders") ? `athletes (${riderSeries})` : "",
+      parts.includes("schedule") ? `schedule (${scheduleSeries})` : ""
+    ].filter(Boolean).join(" and ");
+    const saved = await saveSeasonDatabase(destinationYear, destination, `Kaiser Family Fantasy SMX: copy ${copyDescription} from ${sourceYear} to ${destinationYear}`);
     publicHistoryCache.delete(sourceYear);
-    return send(res, 200, { ok: true, sourceYear, destinationYear, copied: parts, riderCount: destination.state.kaiserFantasyAthletes.length, scheduleCount: destination.state.kaiserFantasySchedule.length, path: saved.path });
+    publicHistoryCache.delete(destinationYear);
+    return send(res, 200, {
+      ok: true, sourceYear, destinationYear, copied: parts,
+      riderSeries: parts.includes("riders") ? riderSeries : null,
+      scheduleSeries: parts.includes("schedule") ? scheduleSeries : null,
+      copiedRiderCount, copiedScheduleCount,
+      riderCount: destination.state.kaiserFantasyAthletes.length,
+      scheduleCount: destination.state.kaiserFantasySchedule.length,
+      path: saved.path
+    });
   }
 
   if (url.pathname === "/api/public/draft-projections" && req.method === "GET") {

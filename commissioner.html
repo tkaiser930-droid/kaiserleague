@@ -28,9 +28,20 @@
 </section>
 <section class="panel">
 <h2>Copy Between Seasons</h2>
-<p class="muted">Copy rider records or the schedule from another season into the currently selected season. Rider numbers, race teams and manufacturers remain season-specific. Schedule dates are moved to the destination year.</p>
+<p class="muted">Copy athletes or scheduled events from another season into the currently selected season. Choose each transfer's series independently. Athlete transfers include primary and secondary series affiliations; copying one series adds or updates those athletes while preserving destination athletes in other series. Schedule transfers replace only the selected destination series, leaving other series calendars unchanged. Rider numbers, race teams and manufacturers remain season-specific, and schedule dates move to the destination year.</p>
 <label for="copySeasonSource">Copy from season<select id="copySeasonSource"><option value="">Choose source season…</option></select></label>
-<div class="edit-actions"><button class="btn alt" id="copySeasonRiders" type="button">Copy Riders to Selected Season</button><button class="btn alt" id="copySeasonSchedule" type="button">Copy Schedule to Selected Season</button></div>
+<div class="cols season-copy-grid">
+<div class="season-copy-option">
+<h3>Copy Athletes</h3>
+<label for="copyRiderSeries">Athlete series<select id="copyRiderSeries"><option value="all">All series</option><option value="SMX">SMX (250 / 450)</option><option value="Triple Crown Series">Triple Crown Series (CAN 250 / CAN 450)</option><option value="MXGP">MXGP (MXGP / MX2)</option><option value="MXON">MXON affiliations</option><option value="MotoGP">MotoGP</option><option value="F1">F1</option></select></label>
+<button class="btn alt" id="copySeasonRiders" type="button">Copy Athletes to Selected Season</button>
+</div>
+<div class="season-copy-option">
+<h3>Copy Scheduled Events</h3>
+<label for="copyScheduleSeries">Schedule series<select id="copyScheduleSeries"><option value="all">All series</option><option value="SMX">SMX</option><option value="Triple Crown Series">Triple Crown Series</option><option value="MXGP">MXGP</option><option value="MXON">MXON</option><option value="MotoGP">MotoGP</option><option value="F1">F1</option></select></label>
+<button class="btn alt" id="copySeasonSchedule" type="button">Copy Schedule to Selected Season</button>
+</div>
+</div>
 <p aria-live="polite" class="message" id="historicalActionMessage" role="status"></p>
 </section>
 <section class="panel">
@@ -92,4 +103,4 @@
 <p>Before removing the old persistent disk from a deployment that previously used it, first save the current live league JSON to GitHub from this page and download a local JSON backup. Confirm that the GitHub save is present before detaching the disk.</p>
 <p>If your terminal reports that port 10000 is already in use, stop the other Node server first, then run <code>npm start</code> again.</p>
 </section>
-</section><section class="panel commissioner-yearly-reset"><h2>Yearly Reset</h2><p class="muted">Prepare for a new fantasy season by clearing every team roster, resetting all accumulated team and athlete points, and deleting all trade proposals and their notification history. This permanently deletes scoring records, including athlete profile results, averages, scoring history, and top-undrafted scoring totals. Athlete records, team names, owners and passwords, draft settings, and the event schedule remain unchanged.</p><div class="edit-actions"><button class="btn danger" id="yearlyReset" type="button">Reset Rosters, Points &amp; Trades</button></div><p aria-live="polite" class="message" id="yearlyResetMessage" role="status"></p></section><div class="commissioner-global-actions"><button class="btn danger" id="resetData">Reset All League Data</button><button class="btn alt" id="commLogout">Sign Out</button></div></section></main><footer>Kaiser Family Fantasy SMX <span>Vancouver, BC · Pacific Time · data storage status shown above</span></footer><script src="bootstrap.js?v=kf-draft-team-number-colors-20261123b"></script></body></html>
+</section><section class="panel commissioner-yearly-reset"><h2>Yearly Reset</h2><p class="muted">Prepare for a new fantasy season by clearing every team roster, resetting all accumulated team and athlete points, and deleting all trade proposals and their notification history. This permanently deletes scoring records, including athlete profile results, averages, scoring history, and top-undrafted scoring totals. Athlete records, team names, owners and passwords, draft settings, and the event schedule remain unchanged.</p><div class="edit-actions"><button class="btn danger" id="yearlyReset" type="button">Reset Rosters, Points &amp; Trades</button></div><p aria-live="polite" class="message" id="yearlyResetMessage" role="status"></p></section><div class="commissioner-global-actions"><button class="btn danger" id="resetData">Reset All League Data</button><button class="btn alt" id="commLogout">Sign Out</button></div></section></main><footer>Kaiser Family Fantasy SMX <span>Vancouver, BC · Pacific Time · data storage status shown above</span></footer><script src="bootstrap.js?v=kf-series-season-transfer-20261125a"></script></body></html>

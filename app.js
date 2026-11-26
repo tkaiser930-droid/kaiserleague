@@ -1192,17 +1192,21 @@ async function switchCommissionerSeason(year){
  }catch(error){if(message)message.textContent=`Could not open ${target}: ${error.message}. The previous season remains selected.`;$("commissionerSeasonYear").value=String(selectedSeasonYear);}
 }
 async function copyRidersFromSeason(){
- const source=String($("copySeasonSource")?.value||activeSeasonYear()),target=String(selectedSeasonYear),message=$("historicalActionMessage");
+ const source=String($("copySeasonSource")?.value||activeSeasonYear()),target=String(selectedSeasonYear),message=$("historicalActionMessage"),series=$("copyRiderSeries")?.value||"all";
  if(source===target){message.textContent="Choose a different source season.";return;}
- if(!confirm(`Copy the rider directory from ${source} into ${target}? This replaces only the destination rider list and updates matching roster copies. Rider numbers and race-team details remain independent in each year's file.`))return;
- try{const result=await window.KFStorage.copySeason(source,target,["riders"]);await window.KFStorage.setSeasonYear(target);selectedSeasonYear=Number(target);sessionStorage.setItem("commSeasonYear",target);message.textContent=`Copied ${result.riderCount} riders from ${source} to ${target}.`;await renderCommissionerSeasonControls();renderComm();renderHistoricalSeasonPanel();refresh();}
- catch(error){message.textContent=`Rider copy failed: ${error.message}`;}
+ const label=series==="all"?"all series":series;
+ const behavior=series==="all"?"This replaces the destination athlete directory and updates matching roster copies.":"This adds or updates athletes with this primary or secondary series affiliation, preserves destination athletes in other series, and updates matching roster copies.";
+ if(!confirm(`Copy ${label} athletes from ${source} into ${target}? ${behavior} Rider numbers, race teams and manufacturers remain independent in each year's file.`))return;
+ try{const result=await window.KFStorage.copySeason(source,target,["riders"],{riderSeries:series});await window.KFStorage.setSeasonYear(target);selectedSeasonYear=Number(target);sessionStorage.setItem("commSeasonYear",target);message.textContent=`Copied/updated ${result.copiedRiderCount??result.riderCount} ${label} athletes from ${source} to ${target}. Destination athletes outside the selected series were preserved.`;await renderCommissionerSeasonControls();renderComm();renderHistoricalSeasonPanel();refresh();}
+ catch(error){message.textContent=`Athlete copy failed: ${error.message}`;}
 }
 async function copyScheduleFromSeason(){
- const source=String($("copySeasonSource")?.value||activeSeasonYear()),target=String(selectedSeasonYear),message=$("historicalActionMessage");
+ const source=String($("copySeasonSource")?.value||activeSeasonYear()),target=String(selectedSeasonYear),message=$("historicalActionMessage"),series=$("copyScheduleSeries")?.value||"all";
  if(source===target){message.textContent="Choose a different source season.";return;}
- if(!confirm(`Copy the full schedule from ${source} into ${target}? This replaces only the destination schedule. Dates are shifted to ${target}; the source schedule remains unchanged.`))return;
- try{const result=await window.KFStorage.copySeason(source,target,["schedule"]);await window.KFStorage.setSeasonYear(target);selectedSeasonYear=Number(target);sessionStorage.setItem("commSeasonYear",target);message.textContent=`Copied ${result.scheduleCount} schedule events from ${source} to ${target}.`;await renderCommissionerSeasonControls();renderCommSchedule();renderSchedule();renderHistoricalSeasonPanel();}
+ const label=series==="all"?"all series":series;
+ const behavior=series==="all"?"This replaces the entire destination schedule.":`This replaces only the destination ${series} events and preserves all other destination series events.`;
+ if(!confirm(`Copy the ${label} schedule from ${source} into ${target}? ${behavior} Dates are shifted to ${target}; the source schedule remains unchanged.`))return;
+ try{const result=await window.KFStorage.copySeason(source,target,["schedule"],{scheduleSeries:series});await window.KFStorage.setSeasonYear(target);selectedSeasonYear=Number(target);sessionStorage.setItem("commSeasonYear",target);message.textContent=`Copied ${result.copiedScheduleCount??result.scheduleCount} ${label} schedule events from ${source} to ${target}. Other destination series calendars were preserved.`;await renderCommissionerSeasonControls();renderCommSchedule();renderSchedule();renderHistoricalSeasonPanel();}
  catch(error){message.textContent=`Schedule copy failed: ${error.message}`;}
 }
 async function archiveCurrentSeason(){

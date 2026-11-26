@@ -426,3 +426,9 @@ body[data-page="home"] #topUndraftedAthletes {
 .filter-summary{min-height:16px;margin:5px 0 9px;color:var(--muted);font-size:11px}
 @media(max-width:850px){.commissioner-filter-bar,.schedule-commissioner-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.commissioner-filter-bar label:first-child{grid-column:1/-1}.commissioner-filter-bar .filter-clear{justify-self:start}}
 @media(max-width:520px){.commissioner-filter-bar,.schedule-commissioner-filters{grid-template-columns:1fr}.commissioner-filter-bar label:first-child{grid-column:auto}.commissioner-filter-bar .filter-clear{width:auto}}
+
+/* Series-scoped season transfer controls */
+.season-copy-grid{margin-top:12px}
+.season-copy-option{min-width:0;padding:14px;border:1px solid var(--line);border-radius:10px;background:#11131b}
+.season-copy-option h3{margin:0 0 8px;color:var(--gold);font-size:16px}
+.season-copy-option .btn{margin-top:8px}

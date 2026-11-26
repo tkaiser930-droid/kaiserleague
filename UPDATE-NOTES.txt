@@ -239,3 +239,12 @@ F1 / MotoGP draft number-plate team-color correction (kf-draft-team-number-color
 - The public Projected Draft Pick API now includes raceTeam so the projected table renders F1/MotoGP numbers in the correct team color.
 - Draft pick history snapshots raceTeam and manufacturer, and legacy pick rendering can recover race-team information from the current athlete directory when available.
 - Added regression tests for F1, MotoGP, Racing Bulls, unknown-team fallback, and race-team data in projected draft responses.
+
+Series-specific season transfer update (kf-series-season-transfer-20261125a)
+- Commissioner > Historical Results > Copy Between Seasons now has independent series selectors for athlete transfers and schedule transfers.
+- Athlete series choices: All Series, SMX (250/450), Triple Crown Series (CAN 250/CAN 450), MXGP (MXGP/MX2), MXON affiliations, MotoGP and F1.
+- Athlete filters include both primary and secondary affiliations. A selected-series transfer adds or updates matching athlete profiles and matching roster snapshots while preserving destination athletes in other series; the shared athlete profile is not duplicated when the same rider has multiple affiliations.
+- Schedule series choices are independently filtered for SMX, Triple Crown Series, MXGP, MXON, MotoGP and F1. A series-specific schedule transfer replaces only destination events in that series, preserves all other destination-series events, and shifts copied dates into the destination year with fresh event IDs.
+- Selecting All Series retains the previous behavior: the full athlete directory or full schedule is replaced.
+- The server validates transfer series values and saves the destination year to its existing individual GitHub season JSON file. Source season files are not modified.
+- Added integration tests for primary/secondary athlete affiliations, separate F1 and MotoGP athlete transfers, selective schedule replacement, preserving other destination series and destination-year date shifting.

@@ -57,16 +57,16 @@ async function runBootstrap(fetchImpl) {
   for (const file of htmlFiles) {
     const html = fs.readFileSync(path.join(root, file), "utf8");
     if (/bootstrap\.js/.test(html)) {
-      assert.match(html, /bootstrap\.js\?v=kf-draft-team-number-colors-20261123b/,
+      assert.match(html, /bootstrap\.js\?v=kf-series-season-transfer-20261125a/,
         `${file} must request the cache-busted storage bootstrap`);
     }
   }
-  assert.match(bootstrap, /app\.js\?v=kf-draft-team-number-colors-20261123b/,
+  assert.match(bootstrap, /app\.js\?v=kf-series-season-transfer-20261125a/,
     "the dynamically loaded app must also be cache-busted");
   assert.match(bootstrap, /One authoritative status is reflected everywhere/, "header and Data & Backup storage status should not contradict each other");
   assert.match(bootstrap, /statusRevision/, "newer status operations must prevent stale async probes from overwriting the latest result");
   assert.match(bootstrap, /fetchJson\(yearUrl\("\/api\/state\/"/, "GitHub writes should use the bounded retry wrapper");
-  assert.match(bootstrap, /status.build !== "kf-draft-team-number-colors-20261123b"/, "an older cached server deployment must not be accepted as connected");
+  assert.match(bootstrap, /status.build !== "kf-series-season-transfer-20261125a"/, "an older cached server deployment must not be accepted as connected");
   const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
   assert.match(app, /reportStatus\(text,state,statusTicket\)/, "a failed live status probe must update the header through the authoritative status helper");
   assert.match(app, /!info\.writeReady\|\|!storageVerified/, "manual actions must be disabled when the active GitHub file cannot be verified");
@@ -78,7 +78,7 @@ async function runBootstrap(fetchImpl) {
   // direct GitHub probe reports an outage.
   const unavailable = await runBootstrap(async url => {
     if (String(url).startsWith("/api/github/status")) {
-      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: false, build: "kf-draft-team-number-colors-20261123b", error: "Could not reach api.github.com" }) };
+      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: false, build: "kf-series-season-transfer-20261125a", error: "Could not reach api.github.com" }) };
     }
     throw new Error(`Unexpected request after failed live GitHub probe: ${url}`);
   });
@@ -91,7 +91,7 @@ async function runBootstrap(fetchImpl) {
   // the selected season state through the same Node service.
   const stateApiUnavailable = await runBootstrap(async url => {
     if (String(url).startsWith("/api/github/status")) {
-      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: true, build: "kf-draft-team-number-colors-20261123b", activeYear: 2027, statusYear: 2027 }) };
+      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ configured: true, verified: true, build: "kf-series-season-transfer-20261125a", activeYear: 2027, statusYear: 2027 }) };
     }
     if (String(url).startsWith("/api/state")) throw new TypeError("Failed to fetch season state");
     throw new Error(`Unexpected request after state API failure: ${url}`);
@@ -114,7 +114,7 @@ async function runBootstrap(fetchImpl) {
       json: async () => value
     });
     if (parsed.pathname === "/api/github/status" && method === "GET") {
-      return jsonResponse({ configured: true, verified: true, build: "kf-draft-team-number-colors-20261123b", activeYear: 2027, statusYear: 2027 });
+      return jsonResponse({ configured: true, verified: true, build: "kf-series-season-transfer-20261125a", activeYear: 2027, statusYear: 2027 });
     }
     if (parsed.pathname === "/api/state" && method === "GET") {
       return jsonResponse({ state: {}, keyUpdatedAt: {}, savedAt: 0, activeYear: 2027, seasonYear: 2027 });

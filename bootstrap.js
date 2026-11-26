@@ -78,7 +78,7 @@
     if (protocol === "file:") {
       return `This page is opened directly from a file. Open the deployed Render service URL or run the Node.js server with npm start; the browser cannot reach its /api/state endpoint. (${error?.message || "network failure"})`;
     }
-    return `The browser could not reach this site's Node.js API at ${endpoint} (page origin: ${pageOrigin}). This fails before GitHub is contacted. Open ${pageOrigin}/healthz: it must return JSON with \"ok\":true and build \"kf-draft-team-number-colors-20261123b\". If /healthz does not load, verify the Render web service is live and that you are using its service URL, not a static/GitHub Pages URL. Browser error: ${error?.message || "Network request failed"}.`;
+    return `The browser could not reach this site's Node.js API at ${endpoint} (page origin: ${pageOrigin}). This fails before GitHub is contacted. Open ${pageOrigin}/healthz: it must return JSON with \"ok\":true and build \"kf-series-season-transfer-20261125a\". If /healthz does not load, verify the Render web service is live and that you are using its service URL, not a static/GitHub Pages URL. Browser error: ${error?.message || "Network request failed"}.`;
   }
   async function fetchJson(url, options = {}, fallbackMessage = "GitHub season storage is unavailable", attempts = 4) {
     let lastError = null;
@@ -133,7 +133,7 @@
   async function verifyGithubStatus(year) {
     const url = year == null ? "/api/github/status" : yearUrl("/api/github/status", year);
     const status = await fetchJson(url, { credentials: "same-origin" }, "Could not verify live GitHub storage");
-    if (status.build !== "kf-draft-team-number-colors-20261123b") {
+    if (status.build !== "kf-series-season-transfer-20261125a") {
       throw new Error("The deployed server is running an older storage-status build. Deploy the latest GitHub live-status project ZIP and reopen the site.");
     }
     if (!status.configured) throw new Error(status.error || "GitHub token or repository configuration is missing on the server.");
@@ -344,9 +344,16 @@
     applyRemoteState(remote);
     return result;
   }
-  async function copySeason(sourceYear, destinationYear, parts) {
+  async function copySeason(sourceYear, destinationYear, parts, filters = {}) {
     await flush();
-    const res = await fetch("/api/seasons/copy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceYear: Number(sourceYear), destinationYear: Number(destinationYear), parts }), credentials: "same-origin", cache: "no-store" });
+    const res = await fetch("/api/seasons/copy", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sourceYear: Number(sourceYear), destinationYear: Number(destinationYear), parts,
+        riderSeries: filters.riderSeries || "all", scheduleSeries: filters.scheduleSeries || "all"
+      }),
+      credentials: "same-origin", cache: "no-store"
+    });
     return readJson(res, "Season copy failed");
   }
   window.KFStorage = {
@@ -474,7 +481,7 @@
       window.addEventListener("focus", () => { if (mode !== "server") reconnect(); else verifyLiveConnection(); });
     }
     const script = document.createElement("script");
-    script.src = "app.js?v=kf-draft-team-number-colors-20261123b";
+    script.src = "app.js?v=kf-series-season-transfer-20261125a";
     script.onerror = () => setStatus("Could not load app.js. Make sure this page is opened from the project folder.", "error");
     document.body.appendChild(script);
   }
