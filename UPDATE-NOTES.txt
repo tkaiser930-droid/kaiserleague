@@ -248,3 +248,17 @@ Series-specific season transfer update (kf-series-season-transfer-20261125a)
 - Selecting All Series retains the previous behavior: the full athlete directory or full schedule is replaced.
 - The server validates transfer series values and saves the destination year to its existing individual GitHub season JSON file. Source season files are not modified.
 - Added integration tests for primary/secondary athlete affiliations, separate F1 and MotoGP athlete transfers, selective schedule replacement, preserving other destination series and destination-year date shifting.
+
+
+Secondary-series racing numbers and SMX Supercross bonus import (kf-secondary-series-numbers-smx-import-20261126a)
+- Athlete records support an optional secondary racing number for every selected secondary series. The primary-series number remains the main number shown on the All Athletes directory.
+- Commissioner add/edit forms expose separate number inputs for each selected secondary affiliation; unconfigured secondary numbers safely use the primary number.
+- Official result matching, scoring athlete selectors, and scored-record snapshots use the selected class's number, so an athlete such as Sacha Coenen can be #19 in MX2 and #109 in SMX 250.
+- Live and projected draft rows select the number and number-plate class for the draft room; public projected-pick data includes the secondary-number map needed to render the correct number. F1/MotoGP number plates continue to use race-team colors, not manufacturer colors.
+- Public athlete-profile results now include a number column and render the number snapshot used for each historical series/class result. The All Athletes page continues to show the primary number.
+- Standard SMX Supercross imports now fetch both class-specific Heat 1/Heat 2 classifications and the Combined Qualifying page from the official event page. Heat winners are preselected for the existing heat-winner bonus, Combined Qualifying's P1 is preselected for fastest qualifier, and the main-event Best Lap (Lap #) column supplies fastest lap. Triple Crown events remain isolated from standard Supercross heat/qualifying bonuses.
+- Lap parsing supports official Best Lap cells formatted as a lap time followed by a lap number in parentheses.
+- Added regression tests for secondary-number forms, scoring and draft usage, public projection payloads, and official standard-Supercross heat/qualifying/fastest-lap imports.
+
+- Commissioner scoring-import help now explains the Standard Supercross Heat 1/2, Combined Qualifying and Main Event Best Lap lookups, and distinguishes them from Triple Crown scoring.
+- Added the Standard Supercross heat/qualifying/fastest-lap workflow to RESULTS-IMPORT-SETUP.txt.

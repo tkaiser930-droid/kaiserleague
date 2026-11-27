@@ -136,7 +136,7 @@ async function api(baseUrl, route, options = {}, cookie = "") {
   const initialLegacy = {
     version: 1,
     state: {
-      kaiserFantasyAthletes: [{ id: "rider-1", name: "Historic Racer", number: "21", class: "450", primarySeries: "450", raceTeam: "2027 Factory Team", manufacturer: "KTM" }],
+      kaiserFantasyAthletes: [{ id: "rider-1", name: "Historic Racer", number: "21", class: "450", primarySeries: "450", secondarySeries: ["250"], secondaryNumbers: { "250": "109", "MotoGP": "12" }, raceTeam: "2027 Factory Team", manufacturer: "KTM" }],
       kaiserFantasyTeams: [{ key: "team-1", name: "Team One", owner: "League Owner", passwordHash: "team-password-hash", roster: [{ id: "rider-1", name: "Historic Racer", number: "21", class: "450", primarySeries: "450", raceTeam: "2027 Factory Team" }] }],
       kaiserFantasyScores: [
         { id: "score-1", riderId: "rider-1", riderName: "Historic Racer", riderClass: "450", series: "SMX", division: "450", event: "Anaheim 1", round: 1, scheduledEventId: "event-2027-1", seasonYear: 2027, place: 1, points: 20, teamName: "Team One", teamKey: "team-1", riderNumber: "21", riderRaceTeam: "2027 Factory Team", recordedAt: "2027-01-08T20:00:00.000Z" },
@@ -366,6 +366,7 @@ async function api(baseUrl, route, options = {}, cookie = "") {
     const projectedRider = result.body.athletes.find(athlete => athlete.id === "rider-1");
     assert.ok(projectedRider, "current SMX riders appear in the projection table");
     assert.equal(projectedRider.averageClass, "450", "draft projection uses the rider's primary class within the selected draft room");
+    assert.deepEqual(projectedRider.secondaryNumbers, { "250": "109" }, "SMX draft projection exposes its secondary 250 number and excludes numbers for other series");
     assert.equal(projectedRider.totalPoints, 53, "projection points combine active and archived scores in the same series and class");
     assert.equal(projectedRider.rounds, 2, "projection counts one round per event across seasons, not one per moto");
     assert.equal(projectedRider.average, 26.5, "projected pick average uses the cross-season class-specific average");

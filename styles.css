@@ -432,3 +432,5 @@ body[data-page="home"] #topUndraftedAthletes {
 .season-copy-option{min-width:0;padding:14px;border:1px solid var(--line);border-radius:10px;background:#11131b}
 .season-copy-option h3{margin:0 0 8px;color:var(--gold);font-size:16px}
 .season-copy-option .btn{margin-top:8px}
+
+.secondary-number-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,220px));gap:10px;margin-top:10px}.secondary-number-field{min-width:0}.secondary-number-field input{margin-top:5px}

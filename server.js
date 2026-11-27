@@ -15,7 +15,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-series-season-transfer-20261125a";
+const BUILD_ID = "kf-secondary-series-numbers-smx-import-20261126a";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -654,6 +654,9 @@ async function handleApi(req, res, url) {
         primarySeries: primaryClass,
         class: primaryClass,
         secondarySeries: secondaryClasses,
+        secondaryNumbers: athlete.secondaryNumbers && typeof athlete.secondaryNumbers === "object" && !Array.isArray(athlete.secondaryNumbers)
+          ? Object.fromEntries(Object.entries(athlete.secondaryNumbers).filter(([series]) => secondaryClasses.includes(String(series)) && roomClasses.includes(String(series))))
+          : {},
         nationality: String(athlete.nationality || ""),
         nationalityRegion: String(athlete.nationalityRegion || ""),
         manufacturer: String(athlete.manufacturer || ""),

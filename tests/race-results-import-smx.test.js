@@ -113,20 +113,54 @@ async function withMockFetch(map, callback) {
   // Main-event and Overall routes use distinct class-specific URL patterns.
   const sxEventUrl = "https://www.supermotocross.com/results/2026/san-diego/";
   const sxEventPage = `<!doctype html><html><head><title>San Diego Results | SuperMotocross</title></head><body>
-    <h1>San Diego</h1><h2>250</h2><a href="/results/2026/san-diego/250-main-event/">Results</a><a href="/results/2026/san-diego/overall/250/">250 Overall Results</a>
+    <h1>San Diego</h1><h2>250</h2>
+    <a href="/results/2026/san-diego/250-heat-1/">Results</a>
+    <a href="/results/2026/san-diego/250-heat-2/">Results</a>
+    <a href="/results/2026/san-diego/250-main-event/">Results</a>
+    <a href="/results/2026/san-diego/combined/250/">250 Combined Qualifying</a>
+    <a href="/results/2026/san-diego/overall/250/">250 Overall Results</a>
     <h2>450</h2><a href="/results/2026/san-diego/450-main-event/">Results</a><a href="/results/2026/san-diego/overall/450/">450 Overall Results</a>
   </body></html>`;
   const sx250Url = "https://www.supermotocross.com/results/2026/san-diego/250-main-event/";
-  const sx250Page = resultPage("250", [[1, 1, "HAIDEN DEEGAN", "0:53.297"]], "Main Event");
-  await withMockFetch({ [sxEventUrl]: sxEventPage, [sx250Url]: sx250Page }, async calls => {
+  const sx250Heat1Url = "https://www.supermotocross.com/results/2026/san-diego/250-heat-1/";
+  const sx250Heat2Url = "https://www.supermotocross.com/results/2026/san-diego/250-heat-2/";
+  const sx250CombinedUrl = "https://www.supermotocross.com/results/2026/san-diego/combined/250/";
+  const sx250Page = resultPage("250", [[1, 1, "HAIDEN DEEGAN", "0:53.297 (6)"], [2, 47, "LEVI KITCHEN", "0:52.950 (5)"]], "Main Event");
+  const sx250Heat1Page = resultPage("250", [[1, 61, "MAX ANSTIE", "0:52.870 (4)"]], "Heat #1");
+  const sx250Heat2Page = resultPage("250", [[1, 37, "COLE DAVIES", "0:53.100 (3)"]], "Heat #2");
+  const sx250CombinedPage = resultPage("250", [[1, "1W", "HAIDEN DEEGAN", "0:51.012"]], "Combined Qualifying");
+  const sxImportMap = { [sxEventUrl]: sxEventPage, [sx250Url]: sx250Page, [sx250Heat1Url]: sx250Heat1Page, [sx250Heat2Url]: sx250Heat2Page, [sx250CombinedUrl]: sx250CombinedPage };
+  await withMockFetch(sxImportMap, async calls => {
     const result = await fetchOfficialResults({ url: sxEventUrl, series: "SMX", division: "250", eventType: "Supercross", supercrossFormat: "Standard" });
-    assert.deepEqual(calls, [sxEventUrl, sx250Url]);
+    assert.deepEqual(calls, [sxEventUrl, sx250Url, sx250Heat1Url, sx250Heat2Url, sx250CombinedUrl]);
     assert.equal(result.sessionTitle, "250 Main Event");
+    assert.deepEqual(result.heatWinners.map(winner => [winner.heatNumber, winner.name, winner.number]), [[1, "MAX ANSTIE", "61"], [2, "COLE DAVIES", "37"]]);
+    assert.equal(result.fastestQualifier.name, "HAIDEN DEEGAN");
+    assert.equal(result.fastestQualifierSessionTitle, "Combined Qualifying");
+    assert.equal(result.fastestLap.name, "LEVI KITCHEN", "the fastest main-event Best Lap value should be selected, including the lap-number suffix");
+  });
+
+  // A direct Main Event result URL should also discover and fetch both heats and Combined Qualifying.
+  await withMockFetch(sxImportMap, async calls => {
+    const result = await fetchOfficialResults({ url: sx250Url, series: "SMX", division: "250", eventType: "Supercross", supercrossFormat: "Standard" });
+    assert.deepEqual(calls, [sxEventUrl, sx250Url, sx250Heat1Url, sx250Heat2Url, sx250CombinedUrl]);
+    assert.equal(result.heatWinners.length, 2);
+  });
+
+  // Triple Crown Supercross must not try to award standard heat-winner or combined-qualifying bonuses.
+  const sxTriplePage = `<!doctype html><html><head><title>San Diego Results</title></head><body><h1>San Diego</h1><h2>250</h2><a href="/results/2026/san-diego/250-main-event/">Main</a><a href="/results/2026/san-diego/overall/250/">Overall</a><a href="/results/2026/san-diego/250-heat-1/">Heat</a><a href="/results/2026/san-diego/250-heat-2/">Heat</a><a href="/results/2026/san-diego/combined/250/">Combined</a></body></html>`;
+  const sxOverallUrl = "https://www.supermotocross.com/results/2026/san-diego/overall/250/";
+  const sxOverallPage = resultPage("250", [[1, 1, "HAIDEN DEEGAN", "0:53.297"]], "Overall Results");
+  await withMockFetch({ [sxEventUrl]: sxTriplePage, [sxOverallUrl]: sxOverallPage }, async calls => {
+    const result = await fetchOfficialResults({ url: sxEventUrl, series: "SMX", division: "250", eventType: "Supercross", supercrossFormat: "Triple Crown" });
+    assert.deepEqual(calls, [sxEventUrl, sxOverallUrl]);
+    assert.deepEqual(result.heatWinners, []);
+    assert.equal(result.fastestQualifier, null);
   });
 
   const csv = "Position,Number,Rider,Class,Team\n1,37,Cole Davies,250,Star Yamaha\n1,38,Haiden Deegan,450,Star Yamaha";
   const csv250 = require("../race-results-import").parseCsv(csv, "SMX export", { series: "SMX", division: "250" });
   assert.deepEqual(csv250.rows.map(row => row.name), ["Cole Davies"]);
 
-  console.log("SMX importer tests passed: official SuperMotocross archive, direct event/session routes, strict 250/450 filtering, rider-image names, best-lap extraction, Supercross main-event routing and CSV class filtering.");
+  console.log("SMX importer tests passed: official event archive, separate heat winners, combined qualifying, main-event Best Lap extraction, direct Supercross links, Triple Crown isolation, strict 250/450 filtering and CSV class filtering.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -908,7 +908,8 @@ async function resolveMxgpOfficialPage(inputUrl, context = {}) {
 }
 
 function parseMxgpLapTime(value) {
-  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2}(?:\.\d{1,3})?)$/);
+  const token = String(value || "").trim().replace(/\s*\(\s*\d+\s*\)\s*$/, "");
+  const match = token.match(/^(\d{1,2}):(\d{2}(?:\.\d{1,3})?)$/);
   return match ? Number(match[1]) * 60000 + Number(match[2]) * 1000 : Infinity;
 }
 
@@ -2124,6 +2125,8 @@ function smxSessionLabelFromUrl(value) {
   if (match) return `${match[1]} Overall Results`;
   match = path.match(/\/(250|450)-combined-qualifying$/);
   if (match) return `${match[1]} Combined Qualifying`;
+  match = path.match(/\/combined\/(250|450)$/);
+  if (match) return `${match[1]} Combined Qualifying`;
   return "";
 }
 
@@ -2135,6 +2138,14 @@ function isModernSmxEventPage(url) {
 
 function isModernSmxEventLink(value) {
   try { return isModernSmxEventPage(new URL(value)); } catch { return false; }
+}
+function modernSmxEventRootFromSessionUrl(value) {
+  let url; try { url = new URL(value); } catch { return null; }
+  if (!hostIsAllowed(url.hostname, "SMX") || !url.hostname.endsWith("supermotocross.com")) return null;
+  const match = url.pathname.match(/^(\/results\/\d{4}\/[^/]+)\/(?:250|450)-(?:main-event|heat-[12]|lcq|moto-[12])\/?$/i);
+  if (!match) return null;
+  url.pathname = `${match[1]}/`; url.search = ""; url.hash = "";
+  return url;
 }
 
 function parseAnchorLinks(html, baseUrl) {
@@ -2274,7 +2285,25 @@ async function resolveSmxEventPage(eventUrl, context) {
     const available = links.map(link => link.text).filter(Boolean).slice(0, 12).join(", ");
     throw new Error(`The official SuperMotocross event page did not contain one unambiguous ${division} ${eventType} ${phase || "overall / main-event"} result link. Available sessions: ${available || "none found"}. Choose the matching class/session in the event page.`);
   }
-  return { url: selected[0].href, eventTitle: extractEventHeading(eventPage), sessionTitle: selected[0].text || selected[0].linkText };
+  const resolved = { url: selected[0].href, eventTitle: extractEventHeading(eventPage), sessionTitle: selected[0].text || selected[0].linkText };
+  const standardSupercross = String(context.eventType || "").toLowerCase() === "supercross" && String(context.supercrossFormat || "").toLowerCase() !== "triple crown";
+  if (standardSupercross) {
+    const division = divisionKey(context.division);
+    const findUnique = label => {
+      const matches = links.filter(link => normalizeHeader(smxSessionLabelFromUrl(link.href)) === normalizeHeader(label));
+      return matches.length === 1 ? matches[0].href : "";
+    };
+    const heat1Url = findUnique(`${division} Heat #1`);
+    const heat2Url = findUnique(`${division} Heat #2`);
+    const combinedQualifyingUrl = findUnique(`${division} Combined Qualifying`);
+    resolved.auxiliaryUrls = { heat1Url, heat2Url, combinedQualifyingUrl };
+    resolved.auxiliaryLinkErrors = {
+      heat1: heat1Url ? "" : `The official event page did not expose one ${division} Heat #1 result link.`,
+      heat2: heat2Url ? "" : `The official event page did not expose one ${division} Heat #2 result link.`,
+      qualifying: combinedQualifyingUrl ? "" : `The official event page did not expose one ${division} Combined Qualifying link.`
+    };
+  }
+  return resolved;
 }
 
 async function resolveSmxArchiveUrl(archiveUrl, context) {
@@ -2497,6 +2526,8 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
       resolved = await resolveSmxEventPage(url, context);
     } else if (isModernSmxEventPage(url)) {
       resolved = await resolveSmxEventPage(url, context);
+    } else if (String(eventType || "").toLowerCase() === "supercross" && modernSmxEventRootFromSessionUrl(url)) {
+      resolved = await resolveSmxEventPage(modernSmxEventRootFromSessionUrl(url), context);
     } else if (isSmxArchiveLanding(url)) {
       const archiveUrl = new URL(url.href);
       if (archiveUrl.hostname.endsWith("supermotocross.com") && /^\/results$/i.test(archiveUrl.pathname)) archiveUrl.pathname = "/results/";
@@ -2584,6 +2615,46 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     fastestLap = lapRows.sort((a, b) => parseMxgpLapTime(a.bestLap) - parseMxgpLapTime(b.bestLap))[0] || null;
     if (fastestLap) fastestLap.sourceUrl = fetchedUrl;
   }
+  let heatWinners = [];
+  let heatWinnerErrors = [];
+  let smxFastestQualifierError = "";
+  const standardSupercross = series === "SMX" && String(eventType || "").toLowerCase() === "supercross" && String(supercrossFormat || "").toLowerCase() !== "triple crown";
+  if (standardSupercross) {
+    const auxiliary = resolved?.auxiliaryUrls || {};
+    const linkErrors = resolved?.auxiliaryLinkErrors || {};
+    for (const heatNumber of [1, 2]) {
+      const key = `heat${heatNumber}`;
+      const sourceUrl = auxiliary[`${key}Url`];
+      if (!sourceUrl) { heatWinnerErrors.push(linkErrors[key] || `The official Heat #${heatNumber} link was unavailable.`); continue; }
+      try {
+        const heatPage = await readOfficialPage(new URL(sourceUrl), "SMX");
+        const heatResults = parseHtml(heatPage.body, heatPage.title, { series: "SMX", division, url: heatPage.finalUrl.href });
+        const winner = heatResults.rows.find(row => Number(row.position) === 1) || heatResults.rows[0] || null;
+        if (!winner) throw new Error(`The ${division} Heat #${heatNumber} page did not contain a classified winner.`);
+        heatWinners.push({ ...winner, heatNumber, sourceUrl: heatPage.finalUrl.href });
+      } catch (error) {
+        heatWinnerErrors.push(error.message || `Could not parse the official ${division} Heat #${heatNumber} winner.`);
+      }
+    }
+    const qualifierUrl = auxiliary.combinedQualifyingUrl;
+    if (!qualifierUrl) {
+      smxFastestQualifierError = linkErrors.qualifying || `The official ${division} Combined Qualifying link was unavailable.`;
+    } else {
+      try {
+        const qualifierPage = await readOfficialPage(new URL(qualifierUrl), "SMX");
+        const qualifierResults = parseHtml(qualifierPage.body, qualifierPage.title, { series: "SMX", division, url: qualifierPage.finalUrl.href });
+        fastestQualifier = qualifierResults.rows.find(row => Number(row.position) === 1) || qualifierResults.rows[0] || null;
+        fastestQualifierSessionTitle = "Combined Qualifying";
+        if (!fastestQualifier) throw new Error(`The official ${division} Combined Qualifying page did not contain a fastest qualifier row.`);
+        fastestQualifier.sourceUrl = qualifierPage.finalUrl.href;
+      } catch (error) {
+        smxFastestQualifierError = error.message || `Could not read the official ${division} Combined Qualifying classification.`;
+      }
+    }
+    const lapRows = result.rows.filter(row => row.bestLap && Number.isFinite(parseMxgpLapTime(row.bestLap)));
+    fastestLap = lapRows.sort((a, b) => parseMxgpLapTime(a.bestLap) - parseMxgpLapTime(b.bestLap))[0] || null;
+    if (fastestLap) fastestLap.sourceUrl = fetchedUrl;
+  }
   const outputDivision = series === "Triple Crown Series" ? `CAN ${tcsDivisionKey(division)}` : (divisionKey(division) || (series === "MXGP" || series === "MXON" ? String(division || "") : ""));
   return {
     ...result,
@@ -2597,7 +2668,9 @@ async function fetchOfficialResults({ url: inputUrl, series, division, csv, csvN
     fastestLap,
     fastestQualifier,
     fastestQualifierSessionTitle,
-    fastestQualifierError
+    fastestQualifierError: fastestQualifierError || smxFastestQualifierError,
+    heatWinners,
+    heatWinnerErrors
   };
 }
 
@@ -2612,6 +2685,7 @@ module.exports = {
   MOTOGP_API_BASES,
   hostIsAllowed,
   divisionKey,
+  parseMxgpLapTime,
   parseCsv,
   parseHtml,
   parseJsonResults,
