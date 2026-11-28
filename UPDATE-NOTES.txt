@@ -262,3 +262,13 @@ Secondary-series racing numbers and SMX Supercross bonus import (kf-secondary-se
 
 - Commissioner scoring-import help now explains the Standard Supercross Heat 1/2, Combined Qualifying and Main Event Best Lap lookups, and distinguishes them from Triple Crown scoring.
 - Added the Standard Supercross heat/qualifying/fastest-lap workflow to RESULTS-IMPORT-SETUP.txt.
+
+Batch athlete creation and team research from season result lists (kf-batch-season-athlete-import-20261127b)
+- The Commissioner official-results preview now includes a batch athlete setup table for the selected season, series and class.
+- A batch operation creates missing athlete profiles from the result list and updates racing numbers for existing athletes by normalized rider name or a unique class-specific number match. It handles both free agents and rostered athletes, updates matching team-roster snapshots, and stores primary versus secondary series numbers in the appropriate fields.
+- A number already assigned to a different rider in the selected class is treated as a conflict rather than overwritten. Rows without a rider name cannot create a profile and are flagged for attention.
+- Missing race teams can be researched from the Node.js server using Bing RSS, with DuckDuckGo HTML fallback. Search results and source links are displayed; recognized or snippet-inferred team names are suggestions only and require commissioner confirmation before being applied.
+- Team research requests are commissioner-authenticated, constrained to the selected season and series, and limited to 40 riders per request with bounded concurrency and request timeouts.
+- Batch research and athlete changes are bound to the exact year, series, class, event, round and scoring segment that was selected when the result preview was loaded. Changing that context requires a fresh results preview before applying changes.
+- This workflow creates or updates athlete profiles only. To record race scoring, use “Load Matched Positions into Scoring Table”, verify positions/bonuses, and then record results through the normal scoring flow.
+- The feature uses the existing season-scoped GitHub state and does not introduce a separate data store. Local JSON backup/restore remains unchanged.

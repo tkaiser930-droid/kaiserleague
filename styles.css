@@ -434,3 +434,18 @@ body[data-page="home"] #topUndraftedAthletes {
 .season-copy-option .btn{margin-top:8px}
 
 .secondary-number-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,220px));gap:10px;margin-top:10px}.secondary-number-field{min-width:0}.secondary-number-field input{margin-top:5px}
+
+/* Batch creation from official season result lists */
+.batch-season-results-tools{margin:16px 0 18px;padding:16px;border:1px solid rgba(214,180,92,.32);border-radius:12px;background:rgba(18,20,31,.5)}
+.batch-season-results-tools h3{margin-top:0}
+.batch-season-results-tools .edit-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.batch-season-results-tools .table{max-height:520px;overflow:auto}
+.batch-season-results-tools table{min-width:920px}
+.batch-season-results-tools td,.batch-season-results-tools th{vertical-align:top;padding:7px 9px}
+.batch-season-results-tools input{width:100%;min-width:95px;padding:7px 8px;font-size:12px}
+.batch-team-research-cell{min-width:230px;max-width:380px;white-space:normal}
+.batch-team-research-cell a{display:block;margin:5px 0;color:var(--gold,#d6b45c);font-size:12px;font-weight:700}
+.batch-team-research-cell small{display:block;margin:4px 0;color:var(--muted,#aeb4c0);line-height:1.35;white-space:normal}
+.batch-team-candidate{display:inline-block;margin:3px 4px 3px 0;padding:5px 7px;font-size:11px}
+.batch-team-research-results{margin-top:8px}
+@media(max-width:680px){.batch-season-results-tools{padding:10px}.batch-season-results-tools .edit-actions .btn{width:100%}}

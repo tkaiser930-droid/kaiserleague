@@ -132,6 +132,7 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
   let numberIndex = findColumn(headers, [/^(no|nr|number|racenumber|carnumber|ridernumber|ridernum|platenumber|plate)$/]);
   if (numberIndex < 0) numberIndex = headers.findIndex(header => String(header || "").trim() === "#");
   const teamIndex = findColumn(headers, [/^team/, /^raceteam/, /^constructor$/]);
+  const manufacturerIndex = findColumn(headers, [/^manufacturer$/, /^make$/]);
   const bestLapIndex = findColumn(headers, [/^bestlap/, /^fastestlap/]);
   const divisionIndex = findColumn(headers, [/^(class|division|category|raceclass|seriesclass)$/]);
   const requestedDivision = options.series === "SMX" ? divisionKey(options.division) : "";
@@ -163,6 +164,8 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
       number,
       name: riderName,
       team: teamIndex >= 0 ? String(cells[teamIndex] || "").trim() : "",
+      manufacturer: manufacturerIndex >= 0 ? String(cells[manufacturerIndex] || "").trim() : "",
+      division: divisionIndex >= 0 ? String(cells[divisionIndex] || "").trim() : "",
       bestLap: bestLapIndex >= 0 ? String(cells[bestLapIndex] || "").trim() : ""
     });
   }

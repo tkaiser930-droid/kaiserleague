@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const { URL } = require("url");
 const { createGithubBackup } = require("./github-backup");
 const { fetchOfficialResults } = require("./race-results-import");
+const { researchRaceTeam } = require("./race-team-research");
 
 const ROOT = __dirname;
 const githubBackup = createGithubBackup(ROOT);
@@ -15,7 +16,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-secondary-series-numbers-smx-import-20261126a";
+const BUILD_ID = "kf-batch-season-athlete-import-20261127b";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -728,6 +729,43 @@ async function handleApi(req, res, url) {
       activeYear, seasons, records,
       career: { totalPoints, rounds, average: rounds ? totalPoints / rounds : 0, segmentCount: records.length, currentSeasonPoints, averages }
     });
+  }
+
+  if (url.pathname === "/api/commissioner/team-research" && req.method === "POST") {
+    requireCommissioner(req);
+    const body = await readBody(req);
+    const year = Number(body.year || activeYear);
+    if (!validYear(year)) throw new Error("Choose a valid season year for team research.");
+    requireYearAccess(req, year);
+    const series = String(body.series || "").trim();
+    const allowedSeries = new Set(["SMX", "Triple Crown Series", "MXGP", "MXON", "F1", "MotoGP"]);
+    if (!allowedSeries.has(series)) throw new Error("Choose a valid series before researching race teams.");
+    const riders = Array.isArray(body.riders) ? body.riders.slice(0, 40) : [];
+    if (!riders.length) throw new Error("No riders were supplied for team research.");
+    const results = new Array(riders.length);
+    const knownTeams = Array.isArray(body.knownTeams) ? body.knownTeams.map(value => String(value || "").trim()).filter(Boolean).slice(0, 120) : [];
+    // Keep public search traffic modest while avoiding a slow sequential
+    // request chain for a full 250/450 entry list.
+    let nextIndex = 0;
+    const worker = async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= riders.length) return;
+        const rider = riders[index] || {};
+        const name = String(rider.name || "").trim().slice(0, 100);
+        const number = String(rider.number || "").trim().slice(0, 12);
+        const division = String(rider.division || body.division || "").trim().slice(0, 40);
+        if (!name && !number) { results[index] = { index, error: "A rider name or number is required." }; continue; }
+        try {
+          const found = await researchRaceTeam({ name, number, series, division, year, knownTeams });
+          results[index] = { index, name, number, ...found };
+        } catch (error) {
+          results[index] = { index, name, number, error: error.message || "Team research failed." };
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, riders.length) }, () => worker()));
+    return send(res, 200, { ok: true, year, series, results });
   }
 
   if (url.pathname === "/api/results/preview" && req.method === "POST") {

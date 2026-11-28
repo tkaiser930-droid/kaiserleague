@@ -890,7 +890,9 @@ const OFFICIAL_RESULT_SOURCES={
  MotoGP:{url:"https://www.motogp.com/en/gp-results/",help:"Use the official MotoGP results archive. The importer matches the scheduled Grand Prix by season, round, event name and date, then reads the official MotoGP Race (RAC) or Sprint (SPR) classification according to the selected scoring tab. Classified riders are followed by all Non-classified / DNF riders in the official order shown by MotoGP. The separate Q2 session classification supplies the fastest-qualifier bonus, and the selected RAC / SPR session's Fast Lap Rider PDF supplies the fastest-lap bonus."}
 };
 let officialImportRows=[],officialImportMeta=null,officialImportScopeSnapshot=null;
+let batchTeamResearchResults=[],batchSeasonScopeSnapshot=null;
 function officialImportScope(){return JSON.stringify(currentScoringScope())}
+function batchSeasonImportScope(){return JSON.stringify({year:Number(selectedSeasonYear||activeSeasonYear()),scope:currentScoringScope()})}
 function officialSourceInfo(){return OFFICIAL_RESULT_SOURCES[$("scoreSeries")?.value||"SMX"]||OFFICIAL_RESULT_SOURCES.SMX}
 function renderOfficialSourceHelp(){
  const series=$("scoreSeries")?.value||"SMX",source=officialSourceInfo(),link=$("officialResultsSourceLink"),help=$("officialResultsSourceHelp"),urlInput=$("officialResultsUrl");
@@ -924,6 +926,134 @@ function matchOfficialResultAthlete(row){
  if(match)return {athlete:match,status:smxPlateDiffers?`Matched by name: official plate #${clean(row.number)}; roster #${clean(seriesNumber(match))||"—"}`:`Matched: #${clean(seriesNumber(match))||"—"} ${name(match)}`,state:"matched"};
  return {athlete:null,status:conflict?"Name / number conflict":byNumber.length>1?"Number is ambiguous":"No matching league athlete",state:"unmatched"};
 }
+function batchResultDivision(row={}){
+ const series=$("scoreSeries")?.value||"SMX",selected=$("scoreClass")?.value||"";
+ if(series!=="MXON")return selected;
+ const raw=clean(row.batchDivision||row.division||"").toLowerCase();
+ if(raw.includes("mx2"))return "MXON MX2";
+ if(raw.includes("mxgp"))return "MXON MXGP";
+ if(raw.includes("open"))return "MXON Open";
+ const phase=clean(scoringPhase).toLowerCase();
+ if(phase.includes("mx2"))return "MXON MX2";
+ if(phase.includes("mxgp"))return "MXON MXGP";
+ if(phase.includes("open"))return "MXON Open";
+ return "";
+}
+function batchResultAthleteMatch(row={}){
+ const nameValue=clean(row.batchName??row.name),numberValue=clean(row.batchNumber??row.number),division=batchResultDivision(row),all=athletes().filter(a=>!a.seriesArchived);
+ if(!division)return {state:"conflict",athlete:null,status:"Select a specific class; this combined MXON segment needs a class on each row."};
+ if(!nameValue&&!numberValue)return {state:"conflict",athlete:null,status:"Rider name or number is required."};
+ const sameName=nameValue?all.filter(a=>normalizeImportedRiderName(name(a))===normalizeImportedRiderName(nameValue)):[];
+ const eligibleName=sameName.filter(a=>athleteSeries(a).includes(division));
+ let match=null;
+ if(eligibleName.length===1)match=eligibleName[0];
+ else if(sameName.length===1)match=sameName[0];
+ else if(sameName.length>1)return {state:"conflict",athlete:null,status:"More than one athlete has this name; resolve the duplicate before applying."};
+ if(!match&&numberValue){
+  const byNumber=all.filter(a=>athleteSeries(a).includes(division)&&importedAthleteNumber(athleteNumberForSeries(a,division))===importedAthleteNumber(numberValue));
+  if(byNumber.length===1){
+   if(!nameValue||normalizeImportedRiderName(name(byNumber[0]))===normalizeImportedRiderName(nameValue))match=byNumber[0];
+   else return {state:"conflict",athlete:null,status:`Number #${numberValue} is already assigned to ${name(byNumber[0])}; the supplied name is different.`};
+  } else if(byNumber.length>1)return {state:"conflict",athlete:null,status:`Number #${numberValue} is assigned to multiple athletes in ${division}.`};
+ }
+ if(match&&numberValue){
+  const collision=all.find(a=>id(a)!==id(match)&&athleteSeries(a).includes(division)&&importedAthleteNumber(athleteNumberForSeries(a,division))===importedAthleteNumber(numberValue));
+  if(collision)return {state:"conflict",athlete:match,status:`New number #${numberValue} is already assigned to ${name(collision)} in ${division}.`};
+ }
+ if(match){
+  const oldNumber=athleteNumberForSeries(match,division);
+  const updateNumber=numberValue&&importedAthleteNumber(oldNumber)!==importedAthleteNumber(numberValue);
+  return {state:"update",athlete:match,division,updateNumber,oldNumber,status:updateNumber?`Update ${name(match)}: #${oldNumber||"—"} → #${numberValue}`:`Update existing ${name(match)}${athleteSeries(match).includes(division)?"":" · add " + division + " affiliation"}`};
+ }
+ if(!nameValue)return {state:"conflict",athlete:null,status:"A rider name is required before a new athlete can be created."};
+ if(!SERIES.includes(division))return {state:"conflict",athlete:null,status:`${division} cannot be used as a primary class for a new athlete.`};
+ return {state:"create",athlete:null,division,status:`Create new ${division} athlete ${nameValue} (#${numberValue||"—"})`};
+}
+function batchResultTeamValue(row){
+ if(row.batchTeam!==undefined)return clean(row.batchTeam);
+ if(clean(row.team))return clean(row.team);
+ const match=batchResultAthleteMatch(row);
+ return clean(match.athlete?.raceTeam||"");
+}
+function renderBatchSeasonResultsTools(){
+ const tools=$("batchSeasonResultsTools"),tableNode=$("batchSeasonResultsTable"),summary=$("batchSeasonResultsSummary"),researchNode=$("batchTeamResearchResults");
+ if(!tools||!tableNode||!summary||!researchNode)return;
+ tools.hidden=!officialImportRows.length;
+ if(!officialImportRows.length){tableNode.innerHTML="";summary.textContent="";researchNode.innerHTML="";return}
+ const analyses=officialImportRows.map(row=>batchResultAthleteMatch(row));
+ const creates=analyses.filter(item=>item.state==="create").length,updates=analyses.filter(item=>item.state==="update").length,conflicts=analyses.filter(item=>item.state==="conflict").length;
+ summary.textContent=`Season ${selectedSeasonYear||activeSeasonYear()} · ${creates} new athletes · ${updates} existing athletes to update · ${conflicts} rows need attention. Numbers are matched within the selected class; name matches can update a changed number for an available or rostered rider.`;
+ tableNode.innerHTML=table(["Number","Athlete","Planned action","Race team (editable)","Online team research"],officialImportRows.map((row,index)=>{
+  const analysis=analyses[index],number=clean(row.batchNumber??row.number),riderName=clean(row.batchName??row.name),team=batchResultTeamValue(row),research=batchTeamResearchResults[index];
+  const candidates=(research?.teamCandidates||[]).map(candidate=>`<button class="inline batch-team-candidate" type="button" data-team-candidate-index="${index}" data-team-candidate="${esc(candidate)}">Use ${esc(candidate)}</button>`).join(" ");
+  const sourceLinks=(research?.results||[]).slice(0,5).map(result=>`<a href="${esc(result.url)}" rel="noopener noreferrer" target="_blank">${esc(result.title||result.url)}</a><small>${esc(result.snippet||"")}</small>`).join("");
+  const researchText=research?`${research.provider&&research.provider!=="Unavailable"?`<small>${esc(research.provider)} search</small>`:""}${candidates||""}${sourceLinks||`<small>${esc(research.error||"No search results returned. Use the search link below.")}</small>`}${research.searchUrl?`<a href="${esc(research.searchUrl)}" rel="noopener noreferrer" target="_blank">Open web search ↗</a>`:""}`:'<span class="muted">Not researched</span>';
+  return `<tr><td><input class="batch-result-number" data-batch-result-index="${index}" type="text" inputmode="numeric" value="${esc(number)}" aria-label="${esc(riderName)} racing number"></td><td><input class="batch-result-name" data-batch-result-index="${index}" type="text" value="${esc(riderName)}" aria-label="Athlete name"></td><td class="${analysis.state==="conflict"?"official-import-unmatched":analysis.state==="create"?"official-import-blocked":"official-import-match"}">${esc(analysis.status)}</td><td><input class="batch-result-team" data-batch-result-index="${index}" type="text" value="${esc(team)}" placeholder="Keep current / enter team" aria-label="Race team for ${esc(riderName)}"></td><td class="batch-team-research-cell">${researchText}</td></tr>`;
+ }));
+ tableNode.querySelectorAll("[data-batch-result-index]").forEach(input=>input.addEventListener("change",()=>{
+  const index=Number(input.dataset.batchResultIndex),row=officialImportRows[index];if(!row)return;
+  if(input.classList.contains("batch-result-number"))row.batchNumber=clean(input.value);
+  else if(input.classList.contains("batch-result-name"))row.batchName=clean(input.value);
+  else if(input.classList.contains("batch-result-team"))row.batchTeam=clean(input.value);
+  renderBatchSeasonResultsTools();
+ }));
+ tableNode.querySelectorAll("[data-team-candidate-index]").forEach(button=>button.addEventListener("click",()=>{
+  const index=Number(button.dataset.teamCandidateIndex),row=officialImportRows[index];if(!row)return;
+  row.batchTeam=clean(button.dataset.teamCandidate);renderBatchSeasonResultsTools();
+ }));
+ researchNode.innerHTML=batchTeamResearchResults.length?`<p class="muted">Online research results are suggestions, not automatic assignments. Review the source links and choose a team to confirm it.</p>`:"";
+}
+async function researchMissingBatchRaceTeams(){
+ const button=$("researchBatchRaceTeams"),message=$("batchSeasonResultsMessage");
+ if(!officialImportRows.length){message.textContent="Fetch or upload a result list first.";return}
+ if(!batchSeasonScopeSnapshot||batchSeasonScopeSnapshot!==batchSeasonImportScope()){message.textContent="The selected season, series, class, event, round or scoring segment changed after preview. Fetch the results again before researching teams.";return}
+ const series=$("scoreSeries")?.value||"SMX",division=$("scoreClass")?.value||"",riders=officialImportRows.map((row,index)=>({row,index})).filter(({row})=>{
+  const current=batchResultAthleteMatch(row).athlete;
+  return !clean(row.batchTeam??row.team??current?.raceTeam)&&(clean(row.batchName??row.name)||clean(row.batchNumber??row.number));
+ });
+ if(!riders.length){message.textContent="Every imported athlete already has a race team. You can still edit the Race team fields before applying.";return}
+ button.disabled=true;message.textContent=`Searching the web for race-team information for ${riders.length} rider${riders.length===1?"":"s"}…`;
+ try{
+  const response=await fetch("/api/commissioner/team-research",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({year:Number(selectedSeasonYear||activeSeasonYear()),series,division,knownTeams:athletes().map(athlete=>clean(athlete.raceTeam)).filter(Boolean),riders:riders.map(({row})=>({name:clean(row.batchName??row.name),number:clean(row.batchNumber??row.number),division:batchResultDivision(row)}))})});
+  const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||`Team research failed (HTTP ${response.status}).`);
+  batchTeamResearchResults=[];
+  for(const result of payload.results||[]){const target=riders[result.index];if(target)batchTeamResearchResults[target.index]=result;}
+  renderBatchSeasonResultsTools();
+  const searched=(payload.results||[]).filter(item=>item.provider&&item.provider!=="Unavailable").length;
+  message.textContent=`Searched ${riders.length} riders online. ${searched} searches returned web results. Review the source links and confirm any team suggestion before applying.`;
+ }catch(error){message.textContent=`Online team research could not be completed: ${error.message}. The riders remain safe; use the Open web search links if returned, or enter a verified team manually.`;}
+ finally{button.disabled=false}
+}
+function applyBatchSeasonAthletesFromResults(){
+ const message=$("batchSeasonResultsMessage");if(!officialImportRows.length){message.textContent="Fetch or upload a result list first.";return}
+ if(!batchSeasonScopeSnapshot||batchSeasonScopeSnapshot!==batchSeasonImportScope()){message.textContent="The selected season, series, class, event, round or scoring segment changed after preview. Fetch the results again before creating or updating athletes.";return}
+ const series=$("scoreSeries")?.value||"SMX",current=athletes().map(item=>({...item})),currentTeams=teams().map(team=>({...team,roster:roster(team).map(rider=>({...rider}))}));
+ let created=0,updatedCount=0,skipped=0;const changed=new Map();
+ for(let index=0;index<officialImportRows.length;index++){
+  const row=officialImportRows[index],analysis=batchResultAthleteMatch(row),division=analysis.division||batchResultDivision(row);
+  const riderName=clean(row.batchName??row.name),number=clean(row.batchNumber??row.number),teamName=clean(row.batchTeam!==undefined?row.batchTeam:(row.team||"")),manufacturer=clean(row.manufacturer||"");
+  if(analysis.state==="conflict"||!division||!riderName){skipped++;continue}
+  row.name=riderName;row.number=number;row.team=teamName||row.team;row.manufacturer=manufacturer||row.manufacturer;
+  if(analysis.state==="create"){
+   if(!SERIES.includes(division)||!number){skipped++;continue}
+   const createdAthlete={id:uid(),name:riderName,number,primarySeries:division,class:division,secondarySeries:[],secondaryNumbers:{},raceTeam:teamName,manufacturer,nationality:"",nationalityRegion:"",pointsLeader:false,reigningSMXChampion:false,reigningTripleCrownChampion:false,reigningWorldChampion:false};
+   current.push(createdAthlete);changed.set(id(createdAthlete),createdAthlete);created++;continue;
+  }
+  const existing=analysis.athlete;if(!existing){skipped++;continue}
+  const oldId=id(existing),primary=cls(existing),secondary=[...(Array.isArray(existing.secondarySeries)?existing.secondarySeries:[])],secondaryNumbers={...(existing.secondaryNumbers&&typeof existing.secondaryNumbers==="object"?existing.secondaryNumbers:{})};
+  if(division!==primary&&!secondary.includes(division))secondary.push(division);
+  let mainNumber=clean(existing.number);
+  if(number){if(division===primary)mainNumber=number;else secondaryNumbers[division]=number;}
+  const updated={...existing,name:existing.name||riderName,number:mainNumber,primarySeries:primary,class:primary,secondarySeries:secondary,secondaryNumbers,raceTeam:teamName||clean(existing.raceTeam),manufacturer:manufacturer||clean(existing.manufacturer)};
+  const position=current.findIndex(item=>id(item)===oldId);if(position>=0)current[position]=updated;else{skipped++;continue;}
+  changed.set(oldId,updated);updatedCount++;
+ }
+ const nextTeams=currentTeams.map(team=>({...team,roster:roster(team).map(rider=>changed.get(id(rider))?{...rider,...changed.get(id(rider))}:rider)}));
+ if(created||updatedCount){saveAthletes(current);saveTeams(nextTeams);}
+ message.textContent=`Batch complete for season ${selectedSeasonYear||activeSeasonYear()}: created ${created} athletes, updated ${updatedCount} existing athletes (including current roster copies), skipped ${skipped} rows. Numbers were set for ${clean($("scoreClass")?.value)||series}; race-team data from the result list or confirmed research was applied. No scores were recorded yet.`;
+ rematchOfficialResults();renderBatchSeasonResultsTools();renderComm();refresh();
+}
+
 function renderOfficialResultsPreview(){
  const preview=$("officialResultsImportPreview"),summary=$("officialResultsImportSummary"),el=$("officialResultsImportTable");if(!preview||!el)return;
  if(!officialImportRows.length){preview.hidden=true;summary.innerHTML="";el.innerHTML="";return}
@@ -941,12 +1071,13 @@ function renderOfficialResultsPreview(){
  const ncCount=officialImportRows.filter(row=>row.status==="NC"||String(row.displayPosition||"").toUpperCase()==="NC").length;
  summary.innerHTML=`<span>Source: ${esc(sourceLabel)}</span>${divisionLabel?`<span class="official-import-match">Class: ${esc(divisionLabel)}</span>`:""}${sessionLabel?`<span>Session: ${esc(sessionLabel)}</span>`:""}${fastestQualifierLabel}${fastestQualifierWarning}${fastestLapLabel}${fastestLapWarning}${heatWinnerLabel}${heatWinnerWarning}<span>${officialImportRows.length} official rows</span>${ncCount?`<span class="official-import-match">${ncCount} NC driver${ncCount===1?"":"s"} retained in official order</span>`:""}<span class="official-import-match">${matched} matched</span><span class="official-import-blocked">${blocked} already scored</span><span class="official-import-unmatched">${unmatched} need attention</span>`;
  el.innerHTML=table(["Pos","No.","Official rider / driver","Official team","Best lap","League match"],officialImportRows.map(row=>`<tr><td>${esc(row.displayPosition||row.position)}</td><td>${esc(row.number||"—")}</td><td>${esc(row.name)}</td><td>${esc(row.team||"—")}</td><td>${esc(row.bestLap||"—")}</td><td class="official-import-${row.match.state}">${esc(row.match.status)}</td></tr>`));
+ renderBatchSeasonResultsTools();
 }
 function rematchOfficialResults(){if(!officialImportRows.length)return;officialImportRows=officialImportRows.map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();renderOfficialResultsPreview()}
 async function previewOfficialResults(){
  const button=$("previewOfficialResults"),message=$("officialResultsImportMessage"),file=$("officialResultsCsv")?.files?.[0],url=clean($("officialResultsUrl")?.value),series=$("scoreSeries")?.value||"SMX";
  if(!file&&!url){message.textContent="Paste an official results URL or choose an official CSV file.";return}
- button.disabled=true;message.textContent="Fetching the official results and matching riders…";officialImportRows=[];officialImportMeta=null;renderOfficialResultsPreview();
+ button.disabled=true;message.textContent="Fetching the official results and matching riders…";officialImportRows=[];officialImportMeta=null;batchTeamResearchResults=[];batchSeasonScopeSnapshot=null;renderOfficialResultsPreview();
  try{
   const scheduled=selectedScoreScheduleEvent();
   const body={
@@ -964,13 +1095,13 @@ async function previewOfficialResults(){
   const response=await fetch("/api/results/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   let payload={};try{payload=await response.json()}catch{}
   if(!response.ok)throw new Error(payload.error||`Import request failed (${response.status}).`);
-  officialImportMeta=payload;officialImportRows=(payload.rows||[]).map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();
+  officialImportMeta=payload;officialImportRows=(payload.rows||[]).map(row=>({...row,match:matchOfficialResultAthlete(row)}));officialImportScopeSnapshot=officialImportScope();batchSeasonScopeSnapshot=batchSeasonImportScope();
   if(!officialImportRows.length)throw new Error("No driver rows were returned by that source.");
   renderOfficialResultsPreview();
   const importedClass=payload.division?` for the ${payload.division} class`:"";
   const importedSession=payload.sessionTitle?` (${payload.sessionTitle})`:"";
   message.textContent=`Preview loaded${importedClass}${importedSession} from ${payload.title||"the official source"}. Only this class/session was imported. Review the matches below, then load positions into the scoring grid.`;
- }catch(error){message.textContent=error.message||"Could not import the official results.";if(String(error.message||"").includes("Failed to fetch"))message.textContent="Could not reach the results-import endpoint. Run the site with npm start (not VS Code Live Server) and try again."}
+ }catch(error){batchSeasonScopeSnapshot=null;message.textContent=error.message||"Could not import the official results.";if(String(error.message||"").includes("Failed to fetch"))message.textContent="Could not reach the results-import endpoint. Run the site with npm start (not VS Code Live Server) and try again."}
  finally{button.disabled=false}
 }
 function applyOfficialResults(){
@@ -1049,13 +1180,15 @@ function applyOfficialResults(){
  message.textContent=`Loaded ${loaded} driver position${loaded===1?"":"s"} into the scoring table. ${skipped} unmatched/already-scored rows, ${duplicate} duplicate driver rows and ${outOfRange} positions outside this scoring table were skipped. ${qualifierMessage}${fastestLapMessage}${heatWinnerMessage}Verify all bonuses and positions before recording results.`;
  $("scoreEntryTable")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
-function clearOfficialResults(){officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;if($("officialResultsUrl"))$("officialResultsUrl").value="";if($("officialResultsCsv"))$("officialResultsCsv").value="";if($("officialResultsImportMessage"))$("officialResultsImportMessage").textContent="Import preview cleared.";renderOfficialSourceHelp();renderOfficialResultsPreview()}
+function clearOfficialResults(){officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;batchTeamResearchResults=[];batchSeasonScopeSnapshot=null;if($("officialResultsUrl"))$("officialResultsUrl").value="";if($("officialResultsCsv"))$("officialResultsCsv").value="";if($("officialResultsImportMessage"))$("officialResultsImportMessage").textContent="Import preview cleared.";renderOfficialSourceHelp();renderOfficialResultsPreview()}
 function setupOfficialResultsImport(){
  renderOfficialSourceHelp();
  $("previewOfficialResults")?.addEventListener("click",previewOfficialResults);
  $("applyOfficialResults")?.addEventListener("click",applyOfficialResults);
+ $("researchBatchRaceTeams")?.addEventListener("click",researchMissingBatchRaceTeams);
+ $("applyBatchSeasonAthletes")?.addEventListener("click",applyBatchSeasonAthletesFromResults);
  $("clearOfficialResults")?.addEventListener("click",clearOfficialResults);
- $("scoreSeries")?.addEventListener("change",()=>{officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;renderOfficialResultsPreview();renderOfficialSourceHelp()});
+ $("scoreSeries")?.addEventListener("change",()=>{officialImportRows=[];officialImportMeta=null;officialImportScopeSnapshot=null;batchSeasonScopeSnapshot=null;batchTeamResearchResults=[];renderOfficialResultsPreview();renderOfficialSourceHelp()});
  $("scoreClass")?.addEventListener("change",rematchOfficialResults);
 }
 function setupScoreGrid(){
