@@ -17,7 +17,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-batch-season-athlete-import-20261127c";
+const BUILD_ID = "kf-batch-hometown-city-suffix-20261127a";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");

@@ -80,6 +80,12 @@ const importedWithHometown = parser.parseCsv('Pos,No,Rider,Manufacturer\n1,35,"D
 assert.equal(importedWithHometown.rows[0].name, "Drew Adams", "a city / state suffix is removed from the imported rider name");
 assert.equal(importedWithHometown.rows[0].hometown, "Chattanooga,TN", "the removed city / state suffix remains available for location enrichment");
 assert.equal(importedWithHometown.rows[0].manufacturer, "GASGAS", "manufacturer source text is retained for canonical display normalization");
+const singleWordHometown = parser.parseCsv('Pos,No,Rider\n1,30,"Jo Shimoda Suzuka"', "Official CSV", { series: "SMX", division: "250" });
+assert.equal(singleWordHometown.rows[0].name, "Jo Shimoda", "a known one-word city appended without punctuation is removed from the rider name");
+assert.equal(singleWordHometown.rows[0].hometown, "Suzuka", "a known one-word city appended without punctuation is preserved as the hometown");
+const multiwordHometown = parser.parseCsv('Pos,No,Rider\n1,30,"Jo Shimoda Rio de Janeiro"', "Official CSV", { series: "SMX", division: "250" });
+assert.equal(multiwordHometown.rows[0].name, "Jo Shimoda", "a recognized multiword city suffix is removed from the rider name");
+assert.equal(multiwordHometown.rows[0].hometown, "Rio de Janeiro", "a recognized multiword city is preserved as the hometown");
 const fullStateHometown = parser.parseCsv('Pos,No,Rider,Manufacturer\n1,35,"Drew Adams Chattanooga, Tennessee",KAWASAKI', "Official CSV", { series: "SMX", division: "250" });
 assert.equal(fullStateHometown.rows[0].name, "Drew Adams", "full state names are removed from the imported rider name");
 assert.equal(fullStateHometown.rows[0].hometown, "Chattanooga, Tennessee", "full state hometown remains available for location enrichment");

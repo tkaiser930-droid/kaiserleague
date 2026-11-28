@@ -74,6 +74,51 @@ const COUNTRY_CODES = new Set("AF AL DZ AR AU AT BE BR CA CL CN CO HR CZ DK FI F
 const COUNTRY_WORDS = new Set([
   "afghanistan", "albania", "algeria", "argentina", "australia", "austria", "belgium", "brazil", "canada", "chile", "china", "colombia", "croatia", "czechia", "denmark", "finland", "france", "germany", "greece", "india", "indonesia", "ireland", "israel", "italy", "japan", "mexico", "monaco", "netherlands", "new zealand", "norway", "poland", "portugal", "qatar", "romania", "russia", "saudi arabia", "serbia", "singapore", "slovenia", "south africa", "spain", "sweden", "switzerland", "thailand", "türkiye", "turkey", "ukraine", "united kingdom", "united states", "united states of america", "usa", "vietnam"
 ]);
+// Some official results sources append a one-word hometown directly after the
+// linked rider name with no comma or other separator (for example,
+// "Jo Shimoda Suzuka"). Only split recognized place names here: arbitrary last
+// words are ambiguous and could be part of a rider's real name. Keep this list
+// deliberately focused on established motorsport hometowns and major cities.
+const KNOWN_HOMETOWN_NAMES = new Set([
+  "adelaide", "albuquerque", "amsterdam", "auckland", "barcelona", "basel", "bologna", "brisbane",
+  "buenos aires", "calgary", "cape town", "chiba", "clermont", "cologne", "copenhagen", "curitiba",
+  "dallas", "denver", "detroit", "doha", "durban", "edinburgh", "firenze", "florence", "frankfurt",
+  "fukuoka", "geneva", "glasgow", "goiania", "hamamatsu", "hamburg", "hamilton", "helsinki", "hiroshima",
+  "hong kong", "houston", "innsbruck", "istanbul", "jakarta", "johannesburg", "kobe", "kyoto", "lagos",
+  "las vegas", "leeds", "lille", "liverpool", "london", "los angeles", "lyon", "madrid", "manchester",
+  "mantova", "marseille", "melbourne", "mexico city", "miami", "milan", "montreal", "munich", "nagoya",
+  "nairobi", "naples", "nashville", "new york", "nice", "ocala", "okayama", "osaka", "orlando", "oslo",
+  "ottawa", "paris", "perth", "phoenix", "pietramurata", "portland", "prague", "rio de janeiro", "rome",
+  "rotorua", "saitama", "san diego", "san francisco", "sao paulo", "seattle", "seoul", "siena", "singapore",
+  "stockholm", "suzuka", "sydney", "tallinn", "tampa", "temecula", "tokyo", "toronto", "townsville",
+  "turin", "valencia", "vancouver", "venice", "vienna", "warsaw", "wellington", "yokohama", "zurich"
+]);
+const KNOWN_HOMETOWN_SUFFIXES = [...KNOWN_HOMETOWN_NAMES].sort((a, b) => b.length - a.length);
+
+function knownStandaloneHometown(value) {
+  return KNOWN_HOMETOWN_NAMES.has(String(value || "").trim().toLowerCase());
+}
+
+function plausibleAdjacentHometown(value) {
+  const location = String(value || "").replace(/\s+/g, " ").trim();
+  if (!location || location.length > 80 || !/\p{L}/u.test(location)) return false;
+  if (/\d/.test(location) || /\b(?:holeshot|fastest lap|dnf|dns|dsq|profile|view profile|image|details)\b/i.test(location)) return false;
+  return location.split(/\s+/).length <= 6;
+}
+
+function splitKnownHometownSuffix(value) {
+  const source = String(value || "").trim();
+  for (const hometown of KNOWN_HOMETOWN_SUFFIXES) {
+    const escaped = hometown.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = source.match(new RegExp(`^(.+?)\\s+(${escaped})$`, "i"));
+    if (!match) continue;
+    // Racing names are at least two words in these result sets. Requiring two
+    // name tokens avoids turning a two-word rider name into a one-word name.
+    if (match[1].trim().split(/\s+/).length < 2) continue;
+    return { name: cleanRiderNameBase(match[1]), hometown: match[2].trim() };
+  }
+  return null;
+}
 
 function cleanRiderNameBase(value) {
   let name = String(value || "").trim()
@@ -125,6 +170,8 @@ function splitRiderNameAndHometown(value) {
   if (match && looksLikeHometownSuffix(match[2])) {
     return { name: cleanRiderNameBase(match[1]), hometown: match[2].trim() };
   }
+  const knownCitySuffix = splitKnownHometownSuffix(source);
+  if (knownCitySuffix) return knownCitySuffix;
   return { name: cleanRiderNameBase(source), hometown: "" };
 }
 
@@ -138,13 +185,14 @@ function extractRiderCell(cellHtml) {
   // image's alt text so hometown / country text beside the image is not treated
   // as part of the athlete's name.
   const imageAlts = [...source.matchAll(/<img\b[^>]*\balt\s*=\s*(["'])(.*?)\1/gi)]
-    .map(match => cleanRiderName(decodeEntities(match[2])))
-    .filter(text => text && normalizeHeader(text) !== "image");
+    .map(match => splitRiderNameAndHometown(decodeEntities(match[2])))
+    .filter(parts => parts.name && normalizeHeader(parts.name) !== "image");
   if (imageAlts.length) {
     const remainder = stripHtml(source.replace(/<img\b[^>]*>/gi, " ")).trim();
     const trailing = splitRiderNameAndHometown(remainder);
-    const hometown = looksLikeHometownSuffix(remainder) ? remainder : trailing.hometown;
-    return { name: imageAlts[0], hometown };
+    const hometown = looksLikeHometownSuffix(remainder) || knownStandaloneHometown(remainder) || plausibleAdjacentHometown(remainder)
+      ? remainder : (trailing.hometown || imageAlts[0].hometown);
+    return { name: imageAlts[0].name, hometown };
   }
   const anchors = [...source.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)];
   for (const anchor of anchors) {
@@ -152,7 +200,8 @@ function extractRiderCell(cellHtml) {
     if (text && normalizeHeader(text) !== "image") {
       const outside = stripHtml(source.replace(anchor[0], " "));
       const parsed = splitRiderNameAndHometown(text);
-      return { name: parsed.name, hometown: looksLikeHometownSuffix(outside) ? outside : parsed.hometown };
+      const outsideHometown = looksLikeHometownSuffix(outside) || knownStandaloneHometown(outside) || plausibleAdjacentHometown(outside);
+      return { name: parsed.name, hometown: outsideHometown ? outside : parsed.hometown };
     }
   }
   return splitRiderNameAndHometown(stripHtml(source));

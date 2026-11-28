@@ -87,6 +87,21 @@ async function withMockFetch(map, callback) {
   assert.equal(imported250.rows[0].name, "COLE DAVIES", "use image alt text instead of hometown text");
   assert.equal(imported250.rows[0].hometown, "Waitoki, New Zealand", "the HTML rider cell retains the adjacent hometown separately from the rider name");
   assert.equal(imported250.rows[0].bestLap, "1:15.698");
+  const adjacentCityPage = `<!doctype html><html><body><h2>250 Moto #1 Results</h2><table>
+    <tr><th>Pos</th><th>#</th><th>Rider</th><th>Mfr</th></tr>
+    <tr><td>1</td><td>30</td><td><a href="/riders/jo-shimoda">JO SHIMODA</a> <span>Suzuka</span></td><td>Honda</td></tr>
+  </table></body></html>`;
+  const adjacentCityResult = parseHtml(adjacentCityPage, "250 Moto #1 Results", {
+    series: "SMX", division: "250", url: "https://www.supermotocross.com/results/2026/test/250-moto-1/"
+  });
+  assert.equal(adjacentCityResult.rows[0].name, "JO SHIMODA", "a standalone city beside a linked rider name is not included in the athlete name");
+  assert.equal(adjacentCityResult.rows[0].hometown, "Suzuka", "a standalone city beside a linked rider name is retained for country / region lookup");
+  const unlistedAdjacentCityPage = adjacentCityPage.replace("Suzuka", "Kakegawa");
+  const unlistedAdjacentCityResult = parseHtml(unlistedAdjacentCityPage, "250 Moto #1 Results", {
+    series: "SMX", division: "250", url: "https://www.supermotocross.com/results/2026/test/250-moto-1/"
+  });
+  assert.equal(unlistedAdjacentCityResult.rows[0].name, "JO SHIMODA", "an unlisted town beside a linked rider name is still kept out of the name");
+  assert.equal(unlistedAdjacentCityResult.rows[0].hometown, "Kakegawa", "an unlisted standalone town is preserved for online country / region lookup");
 
   const imported450 = await withMockFetch({ [archiveUrl]: archivePage, [eventUrl]: eventPage, [moto450Url]: moto450Page }, async calls => {
     const result = await fetchOfficialResults({
