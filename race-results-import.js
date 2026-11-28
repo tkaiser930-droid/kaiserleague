@@ -62,7 +62,20 @@ function stripHtml(value) {
     .replace(/\s+/g, " ").trim();
 }
 
-function cleanRiderName(value) {
+const US_STATE_CODES = new Set("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split(" "));
+const CANADA_REGION_CODES = new Set("AB BC MB NB NL NS NT NU ON PE QC SK YT".split(" "));
+const AUSTRALIA_REGION_CODES = new Set("ACT NSW NT QLD SA TAS VIC WA".split(" "));
+const FULL_REGION_NAMES = new Set([
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey", "new mexico", "new york", "north carolina", "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina", "south dakota", "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia", "wisconsin", "wyoming", "district of columbia",
+  "alberta", "british columbia", "manitoba", "new brunswick", "newfoundland and labrador", "nova scotia", "northwest territories", "nunavut", "ontario", "prince edward island", "quebec", "saskatchewan", "yukon",
+  "australian capital territory", "new south wales", "queensland", "south australia", "tasmania", "victoria", "western australia"
+]);
+const COUNTRY_CODES = new Set("AF AL DZ AR AU AT BE BR CA CL CN CO HR CZ DK FI FR DE GR IN ID IE IL IT JP MX MC NL NZ NO PL PT QA RO RU SA RS SG SI ZA ES SE CH TH TR UA GB US VN".split(" "));
+const COUNTRY_WORDS = new Set([
+  "afghanistan", "albania", "algeria", "argentina", "australia", "austria", "belgium", "brazil", "canada", "chile", "china", "colombia", "croatia", "czechia", "denmark", "finland", "france", "germany", "greece", "india", "indonesia", "ireland", "israel", "italy", "japan", "mexico", "monaco", "netherlands", "new zealand", "norway", "poland", "portugal", "qatar", "romania", "russia", "saudi arabia", "serbia", "singapore", "slovenia", "south africa", "spain", "sweden", "switzerland", "thailand", "türkiye", "turkey", "ukraine", "united kingdom", "united states", "united states of america", "usa", "vietnam"
+]);
+
+function cleanRiderNameBase(value) {
   let name = String(value || "").trim()
     .replace(/^Image:\s*/i, "")
     .replace(/\b(Holeshot|Fastest Lap|DNF|DNS|DSQ)\b/gi, " ")
@@ -74,6 +87,51 @@ function cleanRiderName(value) {
   return parts.join(" ").trim();
 }
 
+function looksLikeHometownSuffix(value) {
+  const location = String(value || "").trim().replace(/^\(|\)$/g, "");
+  if (!location) return false;
+  const parts = location.split(",").map(part => part.trim()).filter(Boolean);
+  const tail = String(parts.at(-1) || "").toUpperCase();
+  if (US_STATE_CODES.has(tail) || CANADA_REGION_CODES.has(tail) || AUSTRALIA_REGION_CODES.has(tail) || COUNTRY_CODES.has(tail) || FULL_REGION_NAMES.has(location.toLowerCase().split(",").at(-1).trim())) return true;
+  if (/^(?:USA|U\.S\.A\.|US|UNITED STATES|UNITED STATES OF AMERICA)$/.test(tail)) return true;
+  return COUNTRY_WORDS.has(tail.toLowerCase()) && parts.length >= 2;
+}
+
+function splitRiderNameAndHometown(value) {
+  let source = String(value || "").replace(/[\u200b\ufeff]/g, "").trim();
+  if (!source) return { name: "", hometown: "" };
+  // Sources commonly append a home city and state after the rider's name, e.g.
+  // "Drew Adams Chattanooga,TN" or "Drew Adams (Chattanooga, TN)".
+  source = source.replace(/\s*\(([^()]*(?:,[^()]*)+)\)\s*$/, " $1").trim();
+  let match = source.match(/^(.+?),\s*(.+,\s*(?:[A-Z]{2}|[A-Z]{3}|USA|United States|United States of America))$/i);
+  if (match && looksLikeHometownSuffix(match[2])) {
+    return { name: cleanRiderNameBase(match[1]), hometown: match[2].trim() };
+  }
+  const fullRegionPattern = [...FULL_REGION_NAMES].sort((a, b) => b.length - a.length).map(value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const compactRegionSuffix = `(?:[A-Z]{2,3}|USA|United States|United States of America|${fullRegionPattern})`;
+  match = source.match(new RegExp(`^(.+)\\s+([\\p{L}][\\p{L}.'’\\-]*(?:\\s+[\\p{L}][\\p{L}.'’\\-]*)*,\\s*${compactRegionSuffix})$`, "iu"));
+  if (match && looksLikeHometownSuffix(match[2])) {
+    return { name: cleanRiderNameBase(match[1]), hometown: match[2].trim() };
+  }
+  // A separate country-only hometown is only unambiguous when separated from
+  // the complete rider name by a comma (for example, "Andrea Adamo, Italy").
+  // Check this before the city + country matcher so it cannot drop the surname.
+  match = source.match(/^(.+?),\s*([\p{L}][\p{L} .'’\-]+)$/u);
+  if (match && COUNTRY_WORDS.has(match[2].trim().toLowerCase())) {
+    return { name: cleanRiderNameBase(match[1]), hometown: match[2].trim() };
+  }
+  const countryPattern = [...COUNTRY_WORDS].sort((a, b) => b.length - a.length).map(value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  match = source.match(new RegExp(`^(.+)\\s+(.+,\\s*(?:${countryPattern}))$`, "i"));
+  if (match && looksLikeHometownSuffix(match[2])) {
+    return { name: cleanRiderNameBase(match[1]), hometown: match[2].trim() };
+  }
+  return { name: cleanRiderNameBase(source), hometown: "" };
+}
+
+function cleanRiderName(value) {
+  return splitRiderNameAndHometown(value).name;
+}
+
 function extractRiderCell(cellHtml) {
   const source = String(cellHtml || "");
   // SuperMotocross result tables wrap rider names in linked images. Prefer the
@@ -82,13 +140,22 @@ function extractRiderCell(cellHtml) {
   const imageAlts = [...source.matchAll(/<img\b[^>]*\balt\s*=\s*(["'])(.*?)\1/gi)]
     .map(match => cleanRiderName(decodeEntities(match[2])))
     .filter(text => text && normalizeHeader(text) !== "image");
-  if (imageAlts.length) return imageAlts[0];
+  if (imageAlts.length) {
+    const remainder = stripHtml(source.replace(/<img\b[^>]*>/gi, " ")).trim();
+    const trailing = splitRiderNameAndHometown(remainder);
+    const hometown = looksLikeHometownSuffix(remainder) ? remainder : trailing.hometown;
+    return { name: imageAlts[0], hometown };
+  }
   const anchors = [...source.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)];
   for (const anchor of anchors) {
     const text = stripHtml(anchor[1]);
-    if (text && normalizeHeader(text) !== "image") return cleanRiderName(text);
+    if (text && normalizeHeader(text) !== "image") {
+      const outside = stripHtml(source.replace(anchor[0], " "));
+      const parsed = splitRiderNameAndHometown(text);
+      return { name: parsed.name, hometown: looksLikeHometownSuffix(outside) ? outside : parsed.hometown };
+    }
   }
-  return cleanRiderName(stripHtml(source));
+  return splitRiderNameAndHometown(stripHtml(source));
 }
 
 function parsePosition(value) {
@@ -132,7 +199,10 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
   let numberIndex = findColumn(headers, [/^(no|nr|number|racenumber|carnumber|ridernumber|ridernum|platenumber|plate)$/]);
   if (numberIndex < 0) numberIndex = headers.findIndex(header => String(header || "").trim() === "#");
   const teamIndex = findColumn(headers, [/^team/, /^raceteam/, /^constructor$/]);
-  const manufacturerIndex = findColumn(headers, [/^manufacturer$/, /^make$/]);
+  const manufacturerIndex = findColumn(headers, [/^manufacturer$/, /^manufacturername$/, /^make$/, /^mfr$/, /^brand$/, /^bike$/, /^motorcycle$/]);
+  const hometownIndex = findColumn(headers, [/^hometown$/, /^hometowncity$/, /^homecity$/, /^birthplace$/, /^location$/, /^city$/]);
+  const countryIndex = findColumn(headers, [/^country$/, /^nationality$/]);
+  const regionIndex = findColumn(headers, [/^state$/, /^province$/, /^region$/, /^stateprovince$/, /^subregion$/]);
   const bestLapIndex = findColumn(headers, [/^bestlap/, /^fastestlap/]);
   const divisionIndex = findColumn(headers, [/^(class|division|category|raceclass|seriesclass)$/]);
   const requestedDivision = options.series === "SMX" ? divisionKey(options.division) : "";
@@ -146,7 +216,8 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
     const rawPosition = String(cells[positionIndex] || "").trim();
     const status = options.series === "F1" && /^NC$/i.test(rawPosition) ? "NC" : "";
     const position = parsePosition(rawPosition);
-    const riderName = normalizeSeriesRiderName(cells[nameIndex], options.series);
+    const parsedRider = splitRiderNameAndHometown(cells[nameIndex]);
+    const riderName = normalizeSeriesRiderName(parsedRider.name, options.series);
     // Formula 1's official classifications display non-classified drivers as
     // NC after the numbered finishers. Keep those rows in source order and
     // give them sequential internal slots so they can be reviewed/imported.
@@ -165,6 +236,9 @@ function normalizeRows(rawRows, sourceTitle, options = {}) {
       name: riderName,
       team: teamIndex >= 0 ? String(cells[teamIndex] || "").trim() : "",
       manufacturer: manufacturerIndex >= 0 ? String(cells[manufacturerIndex] || "").trim() : "",
+      hometown: hometownIndex >= 0 ? String(cells[hometownIndex] || "").trim() : parsedRider.hometown,
+      nationality: countryIndex >= 0 ? String(cells[countryIndex] || "").trim() : "",
+      nationalityRegion: regionIndex >= 0 ? String(cells[regionIndex] || "").trim() : "",
       division: divisionIndex >= 0 ? String(cells[divisionIndex] || "").trim() : "",
       bestLap: bestLapIndex >= 0 ? String(cells[bestLapIndex] || "").trim() : ""
     });
@@ -303,10 +377,19 @@ function parseHtmlTable(tableHtml, sourceTitle, options = {}) {
     if (cols.position >= 0 && cols.name >= 0) { headerIndex = i; nameIndex = cols.name; break; }
   }
   if (headerIndex < 0) return null;
-  const mapped = rawRows.map((cells, rowIndex) => cells.map((cell, columnIndex) => {
-    if (rowIndex > headerIndex && columnIndex === nameIndex) return extractRiderCell(cell);
-    return stripHtml(cell);
-  }));
+  const hasHometownColumn = rawRows[headerIndex].some(cell => /^(?:hometown|home town|birthplace|location|city)$/i.test(stripHtml(cell).trim()));
+  const mapped = rawRows.map((cells, rowIndex) => {
+    const riderCell = rowIndex > headerIndex ? extractRiderCell(cells[nameIndex]) : null;
+    const values = cells.map((cell, columnIndex) => {
+      if (rowIndex > headerIndex && columnIndex === nameIndex) return riderCell?.name || "";
+      return stripHtml(cell);
+    });
+    if (!hasHometownColumn) {
+      if (rowIndex === headerIndex) values.push("Hometown");
+      else if (rowIndex > headerIndex) values.push(riderCell?.hometown || "");
+    }
+    return values;
+  });
   const headerCount = mapped[headerIndex].length;
   // Some live-timing result pages include lap-chart rows inside the same table.
   // Keep only rows shaped like the classification header; lap detail rows are shorter.

@@ -8,6 +8,7 @@ const { URL } = require("url");
 const { createGithubBackup } = require("./github-backup");
 const { fetchOfficialResults } = require("./race-results-import");
 const { researchRaceTeam } = require("./race-team-research");
+const { researchHometown } = require("./hometown-research");
 
 const ROOT = __dirname;
 const githubBackup = createGithubBackup(ROOT);
@@ -16,7 +17,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MIN_SEASON_YEAR = 2010;
 const MAX_SEASON_YEAR = 2099;
 const DEFAULT_ACTIVE_YEAR = Number(process.env.KF_ACTIVE_SEASON || 2027);
-const BUILD_ID = "kf-batch-season-athlete-import-20261127b";
+const BUILD_ID = "kf-batch-season-athlete-import-20261127c";
 const SEASON_DIRECTORY = safeRelativePath(process.env.GITHUB_SEASON_DIRECTORY || "league-data/seasons");
 const SEASON_INDEX_PATH = safeRelativePath(process.env.GITHUB_SEASON_INDEX_PATH || "league-data/season-index.json");
 if (!SEASON_DIRECTORY || !SEASON_INDEX_PATH) throw new Error("GitHub season paths must be safe repository-relative paths.");
@@ -766,6 +767,30 @@ async function handleApi(req, res, url) {
     };
     await Promise.all(Array.from({ length: Math.min(4, riders.length) }, () => worker()));
     return send(res, 200, { ok: true, year, series, results });
+  }
+
+  if (url.pathname === "/api/commissioner/hometown-research" && req.method === "POST") {
+    requireCommissioner(req);
+    const body = await readBody(req);
+    const year = Number(body.year || activeYear);
+    if (!validYear(year)) throw new Error("Choose a valid season year for hometown research.");
+    requireYearAccess(req, year);
+    const hometowns = Array.isArray(body.hometowns)
+      ? [...new Set(body.hometowns.map(value => String(value || "").trim()).filter(Boolean))].slice(0, 40)
+      : [];
+    if (!hometowns.length) throw new Error("No rider hometowns were supplied for lookup.");
+    const results = [];
+    // OpenStreetMap's public Nominatim service asks clients to keep requests
+    // at or below one request per second; researchHometown enforces that limit.
+    for (let index = 0; index < hometowns.length; index++) {
+      const hometown = hometowns[index];
+      try {
+        results.push({ index, ...await researchHometown(hometown) });
+      } catch (error) {
+        results.push({ index, hometown, found: false, provider: "OpenStreetMap Nominatim", error: error.message || "Hometown lookup failed." });
+      }
+    }
+    return send(res, 200, { ok: true, year, results });
   }
 
   if (url.pathname === "/api/results/preview" && req.method === "POST") {

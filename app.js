@@ -524,7 +524,7 @@ function standings(){
 }
 async function claim(k){const t=teams().find(t=>key(t)===k),msg=$("teamMessage");if(!t||t.owner){msg.textContent="That team is already claimed or unavailable.";return}const o=prompt("Enter the team owner's name:");if(o===null)return;if(!clean(o)){msg.textContent="Owner name is required.";return}const p=prompt("Create a team password (at least 6 characters):");if(p===null)return;if(p.length<6){msg.textContent="Password must be at least 6 characters.";return}t.owner=clean(o);t.passwordHash=await hash(p);saveTeams(teams().map(x=>key(x)===k?t:x));msg.textContent=`${tname(t)} claimed. Save the password somewhere safe.`;renderTeams()}
 function renderTeams(){const el=$("teamsGrid");if(!el)return;el.innerHTML=teams().map(t=>{const riders=sortRiders(roster(t));const rosterPreview=`<details class="team-roster-preview"><summary>View Roster (${riders.length})</summary><div class="team-roster-preview-list">${riders.length?riders.map(a=>`<div class="team-roster-preview-row">${athleteDetailButtonHTML(a,true,false)}</div>`).join(""):'<p class="muted">No riders on this roster yet.</p>'}</div></details>`;return `<article class="team-card"><h2>${esc(tname(t))}</h2><p class="team-owner">${t.owner?"Owned by "+esc(t.owner):"Available to claim"}</p><div class="team-points">${total(t).toLocaleString()}</div><span class="muted">Season points</span><p class="team-meta">${riders.length}/${MAX_ROSTER_SIZE} athletes</p>${rosterPreview}${t.owner?`<button type="button" class="btn alt" data-open-manage="${esc(key(t))}">Manage / Sign In</button>`:`<button class="btn" data-claim="${esc(key(t))}">Claim Team</button>`}</article>`}).join("");el.querySelectorAll("[data-claim]").forEach(b=>b.onclick=()=>claim(b.dataset.claim));el.querySelectorAll("[data-open-manage]").forEach(b=>b.addEventListener("click",()=>openTeamManagePanel(b.dataset.openManage||"")));if($("requirements"))$("requirements").innerHTML=Object.entries(REQ).map(([s,n])=>`<div><strong>${n}</strong>${s} athletes</div>`).join("")}
-function renderAthletes(){const target=$("athleteTable");if(!target)return;const page=document.body.dataset.page,search=clean($("search")?.value).toLowerCase(),c=$("classFilter")?.value||"",of=$("ownerFilter")?.value||"",availability=$("availabilityFilter")?.value||(new URLSearchParams(location.search).get("availability")==="available"?"available":"all");const list=athletes().filter(a=>!a.seriesArchived&&SERIES.includes(cls(a))).filter(a=>{const o=owner(a),free=!o;return [name(a),a.number,a.raceTeam,a.manufacturer,cls(a),...(a.secondarySeries||[]),countryRegionLabel(a.nationality,a.nationalityRegion),o?tname(o):"free agent"].join(" ").toLowerCase().includes(search)&&(!c||athleteSeries(a).includes(c))&&(availability!=="available"||free)&&(!of||(of==="free"?free:!free))}).sort(compareRiderNumbers);target.innerHTML=table(["Athlete","Series","Race Team","Manufacturer","Season Points","Fantasy Team"],list.map(a=>{const o=owner(a),pts=athleteSeasonPoints(a),badges=[a.pointsLeader?"Points Leader":"",a.reigningTripleCrownChampion?"Triple Crown Champion":"",a.reigningSMXChampion?"SMX Champion":"",a.reigningWorldChampion?"World Champion":""].filter(Boolean).map(x=>`<span class="badge">${x}</span>`).join(" ");return `<tr><td><div class="manufacturer" style="--mfr:${athleteSidebarColor(a)}">${athleteDetailButtonHTML(a)}<div>${badges}</div></div></td><td class="series">${seriesDisplayHTML(a)}</td><td>${esc(a.raceTeam||"—")}</td><td>${brandBadge(a.manufacturer||"—")}</td><td class="points">${pts.toLocaleString()}</td><td>${esc(o?tname(o):"Free Agent")}</td></tr>`}))}
+function renderAthletes(){const target=$("athleteTable");if(!target)return;const page=document.body.dataset.page,search=clean($("search")?.value).toLowerCase(),c=$("classFilter")?.value||"",of=$("ownerFilter")?.value||"",availability=$("availabilityFilter")?.value||(new URLSearchParams(location.search).get("availability")==="available"?"available":"all");const list=athletes().filter(a=>!a.seriesArchived&&SERIES.includes(cls(a))).filter(a=>{const o=owner(a),free=!o;return [name(a),a.number,a.raceTeam,a.manufacturer,cls(a),...(a.secondarySeries||[]),countryRegionLabel(a.nationality,a.nationalityRegion),o?tname(o):"free agent"].join(" ").toLowerCase().includes(search)&&(!c||athleteSeries(a).includes(c))&&(availability!=="available"||free)&&(!of||(of==="free"?free:!free))}).sort((a,b)=>compareRiderNumbers({...a,number:athleteNumberForSeries(a,c&&athleteSeries(a).includes(c)?c:cls(a))},{...b,number:athleteNumberForSeries(b,c&&athleteSeries(b).includes(c)?c:cls(b))}));target.innerHTML=table(["Athlete","Series","Race Team","Manufacturer","Season Points","Fantasy Team"],list.map(a=>{const o=owner(a),pts=athleteSeasonPoints(a),displaySeries=c&&athleteSeries(a).includes(c)?c:cls(a),badges=[a.pointsLeader?"Points Leader":"",a.reigningTripleCrownChampion?"Triple Crown Champion":"",a.reigningSMXChampion?"SMX Champion":"",a.reigningWorldChampion?"World Champion":""].filter(Boolean).map(x=>`<span class="badge">${x}</span>`).join(" ");return `<tr><td><div class="manufacturer" style="--mfr:${athleteSidebarColor(a)}">${athleteDetailButtonHTML(a,true,true,displaySeries)}<div>${badges}</div></div></td><td class="series">${seriesDisplayHTML(a)}</td><td>${esc(a.raceTeam||"—")}</td><td>${brandBadge(a.manufacturer||"—")}</td><td class="points">${pts.toLocaleString()}</td><td>${esc(o?tname(o):"Free Agent")}</td></tr>`}))}
 let activeDirectoryPage="",activeDirectoryKey="";
 function directoryGroups(page){
  const field=page==="race-teams"?"raceTeam":"manufacturer",groups=new Map();
@@ -911,6 +911,39 @@ function renderOfficialSourceHelp(){
 }
 function normalizeImportedRiderName(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"")}
 function importedAthleteNumber(value){return String(value??"").replace(/[^0-9]/g,"").replace(/^0+(?=\d)/,"")}
+function canonicalImportedManufacturer(value){const raw=clean(value);if(!raw)return "";const known=brandKey(raw);if(known)return known;return raw.replace(/\s+/g," ").trim()}
+function batchResultManufacturer(row={},athlete=null){
+ const explicit=clean(row.batchManufacturer??row.manufacturer);if(explicit)return canonicalImportedManufacturer(explicit);
+ const fromTeam=brandKey(clean(row.batchTeam??row.team));if(fromTeam)return fromTeam;
+ return canonicalImportedManufacturer(athlete?.manufacturer);
+}
+function inferBatchHometownLocation(value){
+ const raw=clean(value).replace(/^\(|\)$/g,"");if(!raw)return {nationality:"",nationalityRegion:""};
+ const parts=raw.split(",").map(part=>part.trim()).filter(Boolean),tail=parts.at(-1)||"";
+ const aliases={USA:"US","U.S.A.":"US",US:"US","UNITED STATES OF AMERICA":"US",UK:"GB",ENGLAND:"GB",SCOTLAND:"GB",WALES:"GB",NIRELAND:"GB"};
+ const usRegion=normalizeRegion("US",tail);if(usRegion)return {nationality:"US",nationalityRegion:usRegion};
+ const canadaRegion=normalizeRegion("CA",tail);if(canadaRegion)return {nationality:"CA",nationalityRegion:canadaRegion};
+ const countryTail=aliases[tail.toUpperCase()]||normalizeNationality(tail);
+ if(countryTail){
+  let region="";
+  for(const candidate of parts.slice(0,-1).reverse()){
+   region=normalizeRegion(countryTail,candidate);if(region)break;
+  }
+  return {nationality:countryTail,nationalityRegion:region};
+ }
+ for(const [country,items] of Object.entries(REGION_OPTIONS)){
+  const match=items.find(([code,label])=>norm(code)===norm(tail)||norm(label)===norm(tail));
+  if(match)return {nationality:country,nationalityRegion:`${country}-${match[0]}`};
+ }
+ return {nationality:"",nationalityRegion:""};
+}
+function batchRowLocation(row={}){
+ const hometown=clean(row.batchHometown??row.hometown),inferred=inferBatchHometownLocation(hometown),lookup=row.batchHometownLookup||{};
+ const nationality=normalizeNationality(row.batchNationality??row.nationality)||normalizeNationality(lookup.countryCode)||inferred.nationality;
+ const regionCandidates=[row.batchNationalityRegion,row.nationalityRegion,lookup.regionCode,lookup.regionName,inferred.nationalityRegion];
+ const nationalityRegion=regionCandidates.map(value=>normalizeRegion(nationality,value)).find(Boolean)||"";
+ return {hometown,nationality,nationalityRegion,lookup};
+}
 function matchOfficialResultAthlete(row){
  const series=$("scoreSeries")?.value||"SMX",division=$("scoreClass")?.value||"",eligible=athletes().filter(a=>athleteEligibleForScoring(a,series,division));
  const seriesNumber=a=>athleteNumberForSeries(a,division||cls(a));
@@ -947,19 +980,12 @@ function batchResultAthleteMatch(row={}){
  const eligibleName=sameName.filter(a=>athleteSeries(a).includes(division));
  let match=null;
  if(eligibleName.length===1)match=eligibleName[0];
+ else if(eligibleName.length>1)return {state:"conflict",athlete:null,status:"More than one athlete with this name is already affiliated with the selected series; resolve the duplicate before applying."};
  else if(sameName.length===1)match=sameName[0];
  else if(sameName.length>1)return {state:"conflict",athlete:null,status:"More than one athlete has this name; resolve the duplicate before applying."};
- if(!match&&numberValue){
-  const byNumber=all.filter(a=>athleteSeries(a).includes(division)&&importedAthleteNumber(athleteNumberForSeries(a,division))===importedAthleteNumber(numberValue));
-  if(byNumber.length===1){
-   if(!nameValue||normalizeImportedRiderName(name(byNumber[0]))===normalizeImportedRiderName(nameValue))match=byNumber[0];
-   else return {state:"conflict",athlete:null,status:`Number #${numberValue} is already assigned to ${name(byNumber[0])}; the supplied name is different.`};
-  } else if(byNumber.length>1)return {state:"conflict",athlete:null,status:`Number #${numberValue} is assigned to multiple athletes in ${division}.`};
- }
- if(match&&numberValue){
-  const collision=all.find(a=>id(a)!==id(match)&&athleteSeries(a).includes(division)&&importedAthleteNumber(athleteNumberForSeries(a,division))===importedAthleteNumber(numberValue));
-  if(collision)return {state:"conflict",athlete:match,status:`New number #${numberValue} is already assigned to ${name(collision)} in ${division}.`};
- }
+ // A racing number is not an athlete identity. Numbers are reused, and riders
+ // can change plates between seasons. Only an exact name match updates a rider;
+ // a different name creates a new athlete even if its plate is already in use.
  if(match){
   const oldNumber=athleteNumberForSeries(match,division);
   const updateNumber=numberValue&&importedAthleteNumber(oldNumber)!==importedAthleteNumber(numberValue);
@@ -982,19 +1008,23 @@ function renderBatchSeasonResultsTools(){
  if(!officialImportRows.length){tableNode.innerHTML="";summary.textContent="";researchNode.innerHTML="";return}
  const analyses=officialImportRows.map(row=>batchResultAthleteMatch(row));
  const creates=analyses.filter(item=>item.state==="create").length,updates=analyses.filter(item=>item.state==="update").length,conflicts=analyses.filter(item=>item.state==="conflict").length;
- summary.textContent=`Season ${selectedSeasonYear||activeSeasonYear()} · ${creates} new athletes · ${updates} existing athletes to update · ${conflicts} rows need attention. Numbers are matched within the selected class; name matches can update a changed number for an available or rostered rider.`;
- tableNode.innerHTML=table(["Number","Athlete","Planned action","Race team (editable)","Online team research"],officialImportRows.map((row,index)=>{
-  const analysis=analyses[index],number=clean(row.batchNumber??row.number),riderName=clean(row.batchName??row.name),team=batchResultTeamValue(row),research=batchTeamResearchResults[index];
+ summary.textContent=`Season ${selectedSeasonYear||activeSeasonYear()} · ${creates} new athletes · ${updates} existing athletes to update · ${conflicts} rows need attention. Exact rider names identify athletes; changed plates update the correct series number. A plate number alone never matches a different rider.`;
+ tableNode.innerHTML=table(["Number","Athlete","Hometown","Country / region","Planned action","Race team (editable)","Manufacturer (editable)","Online team research"],officialImportRows.map((row,index)=>{
+  const analysis=analyses[index],number=clean(row.batchNumber??row.number),riderName=clean(row.batchName??row.name),team=batchResultTeamValue(row),research=batchTeamResearchResults[index],manufacturer=batchResultManufacturer(row,analysis.athlete),location=batchRowLocation(row);
   const candidates=(research?.teamCandidates||[]).map(candidate=>`<button class="inline batch-team-candidate" type="button" data-team-candidate-index="${index}" data-team-candidate="${esc(candidate)}">Use ${esc(candidate)}</button>`).join(" ");
   const sourceLinks=(research?.results||[]).slice(0,5).map(result=>`<a href="${esc(result.url)}" rel="noopener noreferrer" target="_blank">${esc(result.title||result.url)}</a><small>${esc(result.snippet||"")}</small>`).join("");
   const researchText=research?`${research.provider&&research.provider!=="Unavailable"?`<small>${esc(research.provider)} search</small>`:""}${candidates||""}${sourceLinks||`<small>${esc(research.error||"No search results returned. Use the search link below.")}</small>`}${research.searchUrl?`<a href="${esc(research.searchUrl)}" rel="noopener noreferrer" target="_blank">Open web search ↗</a>`:""}`:'<span class="muted">Not researched</span>';
-  return `<tr><td><input class="batch-result-number" data-batch-result-index="${index}" type="text" inputmode="numeric" value="${esc(number)}" aria-label="${esc(riderName)} racing number"></td><td><input class="batch-result-name" data-batch-result-index="${index}" type="text" value="${esc(riderName)}" aria-label="Athlete name"></td><td class="${analysis.state==="conflict"?"official-import-unmatched":analysis.state==="create"?"official-import-blocked":"official-import-match"}">${esc(analysis.status)}</td><td><input class="batch-result-team" data-batch-result-index="${index}" type="text" value="${esc(team)}" placeholder="Keep current / enter team" aria-label="Race team for ${esc(riderName)}"></td><td class="batch-team-research-cell">${researchText}</td></tr>`;
+  const locationLabel=location.nationality?countryRegionLabel(location.nationality,location.nationalityRegion):location.lookup?.error||"Country / region will be researched when applying";
+  const locationSource=location.lookup?.sourceUrl?`<a href="${esc(location.lookup.sourceUrl)}" rel="noopener noreferrer" target="_blank">Location source</a>`:"";
+  return `<tr><td><input class="batch-result-number" data-batch-result-index="${index}" type="text" inputmode="numeric" value="${esc(number)}" aria-label="${esc(riderName)} racing number"></td><td><input class="batch-result-name" data-batch-result-index="${index}" type="text" value="${esc(riderName)}" aria-label="Athlete name"></td><td><input class="batch-result-hometown" data-batch-result-index="${index}" type="text" value="${esc(location.hometown)}" placeholder="City, state / province / country" aria-label="Hometown for ${esc(riderName)}"></td><td><small>${esc(locationLabel)}</small>${locationSource?`<br>${locationSource}`:""}</td><td class="${analysis.state==="conflict"?"official-import-unmatched":analysis.state==="create"?"official-import-blocked":"official-import-match"}">${esc(analysis.status)}</td><td><input class="batch-result-team" data-batch-result-index="${index}" type="text" value="${esc(team)}" placeholder="Keep current / enter team" aria-label="Race team for ${esc(riderName)}"></td><td><input class="batch-result-manufacturer" data-batch-result-index="${index}" type="text" value="${esc(manufacturer)}" placeholder="Manufacturer" aria-label="Manufacturer for ${esc(riderName)}"></td><td class="batch-team-research-cell">${researchText}</td></tr>`;
  }));
  tableNode.querySelectorAll("[data-batch-result-index]").forEach(input=>input.addEventListener("change",()=>{
   const index=Number(input.dataset.batchResultIndex),row=officialImportRows[index];if(!row)return;
   if(input.classList.contains("batch-result-number"))row.batchNumber=clean(input.value);
   else if(input.classList.contains("batch-result-name"))row.batchName=clean(input.value);
+  else if(input.classList.contains("batch-result-hometown")){row.batchHometown=clean(input.value);delete row.batchHometownLookup;}
   else if(input.classList.contains("batch-result-team"))row.batchTeam=clean(input.value);
+  else if(input.classList.contains("batch-result-manufacturer"))row.batchManufacturer=canonicalImportedManufacturer(input.value);
   renderBatchSeasonResultsTools();
  }));
  tableNode.querySelectorAll("[data-team-candidate-index]").forEach(button=>button.addEventListener("click",()=>{
@@ -1024,19 +1054,31 @@ async function researchMissingBatchRaceTeams(){
  }catch(error){message.textContent=`Online team research could not be completed: ${error.message}. The riders remain safe; use the Open web search links if returned, or enter a verified team manually.`;}
  finally{button.disabled=false}
 }
-function applyBatchSeasonAthletesFromResults(){
+async function applyBatchSeasonAthletesFromResults(){
  const message=$("batchSeasonResultsMessage");if(!officialImportRows.length){message.textContent="Fetch or upload a result list first.";return}
  if(!batchSeasonScopeSnapshot||batchSeasonScopeSnapshot!==batchSeasonImportScope()){message.textContent="The selected season, series, class, event, round or scoring segment changed after preview. Fetch the results again before creating or updating athletes.";return}
+ const hometownRows=officialImportRows.map((row,index)=>({row,index,location:batchRowLocation(row)})).filter(item=>item.location.hometown&&(!item.location.nationality||!item.location.nationalityRegion));
+ const uniqueHometowns=[...new Set(hometownRows.map(item=>item.location.hometown))];let hometownResearchCount=0,hometownLookupWarning="";
+ if(uniqueHometowns.length){
+  message.textContent=`Searching hometowns for country and region details (${uniqueHometowns.length} location${uniqueHometowns.length===1?"":"s"})…`;
+  try{
+   const response=await fetch("/api/commissioner/hometown-research",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({year:Number(selectedSeasonYear||activeSeasonYear()),hometowns:uniqueHometowns.slice(0,40)})});
+   const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||`Hometown lookup failed (HTTP ${response.status}).`);
+   const lookups=new Map((payload.results||[]).map(result=>[norm(result.hometown),result]));
+   for(const {row,location} of hometownRows){const result=lookups.get(norm(location.hometown));if(result){row.batchHometownLookup=result;if(result.found)hometownResearchCount++;}}
+  }catch(error){hometownLookupWarning=` Hometown web lookup was unavailable (${error.message}); known state, province and country formats were still applied.`;}
+ }
  const series=$("scoreSeries")?.value||"SMX",current=athletes().map(item=>({...item})),currentTeams=teams().map(team=>({...team,roster:roster(team).map(rider=>({...rider}))}));
- let created=0,updatedCount=0,skipped=0;const changed=new Map();
+ let created=0,updatedCount=0,skipped=0,locationUpdated=0;const changed=new Map();
  for(let index=0;index<officialImportRows.length;index++){
   const row=officialImportRows[index],analysis=batchResultAthleteMatch(row),division=analysis.division||batchResultDivision(row);
-  const riderName=clean(row.batchName??row.name),number=clean(row.batchNumber??row.number),teamName=clean(row.batchTeam!==undefined?row.batchTeam:(row.team||"")),manufacturer=clean(row.manufacturer||"");
+  const riderName=clean(row.batchName??row.name),number=clean(row.batchNumber??row.number),teamName=clean(row.batchTeam!==undefined?row.batchTeam:(row.team||"")),manufacturer=batchResultManufacturer({...row,batchTeam:teamName},analysis.athlete),location=batchRowLocation(row);
   if(analysis.state==="conflict"||!division||!riderName){skipped++;continue}
-  row.name=riderName;row.number=number;row.team=teamName||row.team;row.manufacturer=manufacturer||row.manufacturer;
+  row.name=riderName;row.number=number;row.team=teamName||row.team;row.manufacturer=manufacturer||row.manufacturer;row.hometown=location.hometown;
   if(analysis.state==="create"){
    if(!SERIES.includes(division)||!number){skipped++;continue}
-   const createdAthlete={id:uid(),name:riderName,number,primarySeries:division,class:division,secondarySeries:[],secondaryNumbers:{},raceTeam:teamName,manufacturer,nationality:"",nationalityRegion:"",pointsLeader:false,reigningSMXChampion:false,reigningTripleCrownChampion:false,reigningWorldChampion:false};
+   const createdAthlete={id:uid(),name:riderName,number,primarySeries:division,class:division,secondarySeries:[],secondaryNumbers:{},raceTeam:teamName,manufacturer,hometown:location.hometown,nationality:location.nationality,nationalityRegion:location.nationalityRegion,pointsLeader:false,reigningSMXChampion:false,reigningTripleCrownChampion:false,reigningWorldChampion:false};
+   if(location.nationality||location.nationalityRegion)locationUpdated++;
    current.push(createdAthlete);changed.set(id(createdAthlete),createdAthlete);created++;continue;
   }
   const existing=analysis.athlete;if(!existing){skipped++;continue}
@@ -1044,13 +1086,14 @@ function applyBatchSeasonAthletesFromResults(){
   if(division!==primary&&!secondary.includes(division))secondary.push(division);
   let mainNumber=clean(existing.number);
   if(number){if(division===primary)mainNumber=number;else secondaryNumbers[division]=number;}
-  const updated={...existing,name:existing.name||riderName,number:mainNumber,primarySeries:primary,class:primary,secondarySeries:secondary,secondaryNumbers,raceTeam:teamName||clean(existing.raceTeam),manufacturer:manufacturer||clean(existing.manufacturer)};
+  const updated={...existing,name:existing.name||riderName,number:mainNumber,primarySeries:primary,class:primary,secondarySeries:secondary,secondaryNumbers,raceTeam:teamName||clean(existing.raceTeam),manufacturer:manufacturer||canonicalImportedManufacturer(existing.manufacturer),hometown:location.hometown||clean(existing.hometown),nationality:location.nationality||normalizeNationality(existing.nationality),nationalityRegion:location.nationalityRegion||normalizeRegion(location.nationality||existing.nationality,existing.nationalityRegion)};
+  if(updated.nationality||updated.nationalityRegion)locationUpdated++;
   const position=current.findIndex(item=>id(item)===oldId);if(position>=0)current[position]=updated;else{skipped++;continue;}
   changed.set(oldId,updated);updatedCount++;
  }
  const nextTeams=currentTeams.map(team=>({...team,roster:roster(team).map(rider=>changed.get(id(rider))?{...rider,...changed.get(id(rider))}:rider)}));
  if(created||updatedCount){saveAthletes(current);saveTeams(nextTeams);}
- message.textContent=`Batch complete for season ${selectedSeasonYear||activeSeasonYear()}: created ${created} athletes, updated ${updatedCount} existing athletes (including current roster copies), skipped ${skipped} rows. Numbers were set for ${clean($("scoreClass")?.value)||series}; race-team data from the result list or confirmed research was applied. No scores were recorded yet.`;
+ message.textContent=`Batch complete for season ${selectedSeasonYear||activeSeasonYear()}: created ${created} athletes, updated ${updatedCount} existing athletes (including current roster copies), skipped ${skipped} rows. Series-specific numbers were set for ${clean($("scoreClass")?.value)||series}; manufacturers were normalized; hometowns populated country / region details for ${locationUpdated} riders (${hometownResearchCount} hometowns found online). Race-team data from the result list or confirmed research was applied. No scores were recorded yet.${hometownLookupWarning}`;
  rematchOfficialResults();renderBatchSeasonResultsTools();renderComm();refresh();
 }
 
@@ -1238,7 +1281,7 @@ function renderCommissionerAthletes(){
   const searchable=[name(a),a.number,a.raceTeam,a.manufacturer,cls(a),...(athleteSeries(a)||[]),countryRegionLabel(a.nationality,a.nationalityRegion),teamName].join(" ").toLowerCase();
   return (!query||searchable.includes(query))&&(!seriesFilter||athleteSeries(a).includes(seriesFilter))&&(!ownerFilter||(ownerFilter==="__free_agent__"?!team:!!team&&key(team)===ownerFilter));
  });
- target.innerHTML=table(["Athlete","Series","Number","Manufacturer","Owner","Action"],filtered.map(a=>{const team=owner(a),status=[a.pointsLeader?"Points Leader":"",a.reigningTripleCrownChampion?"Triple Crown Champion":"",a.reigningSMXChampion?"SMX Champion":"",a.reigningWorldChampion?"World Champion":""].filter(Boolean).map(x=>`<span class="badge">${x}</span>`).join(" ");return `<tr><td>${athleteNameHTML(a)}<div>${status}</div></td><td>${seriesDisplayHTML(a)}</td><td>${numberHTML(a.number,a.manufacturer,a)||"—"}</td><td>${brandBadge(a.manufacturer||"—")}</td><td>${esc(team? tname(team):"Free Agent")}</td><td class="action-cell"><button class="inline" type="button" data-edit="${esc(id(a))}">Edit Rider</button> <button class="inline" type="button" data-delete="${esc(id(a))}">Delete</button></td></tr>`}));
+ target.innerHTML=table(["Athlete","Series","Number","Manufacturer","Owner","Action"],filtered.map(a=>{const team=owner(a),displaySeries=seriesFilter&&athleteSeries(a).includes(seriesFilter)?seriesFilter:cls(a),numberAthlete={...a,primarySeries:displaySeries,class:displaySeries},status=[a.pointsLeader?"Points Leader":"",a.reigningTripleCrownChampion?"Triple Crown Champion":"",a.reigningSMXChampion?"SMX Champion":"",a.reigningWorldChampion?"World Champion":""].filter(Boolean).map(x=>`<span class="badge">${x}</span>`).join(" ");return `<tr><td>${athleteNameHTML(a,true,true,displaySeries)}<div>${status}</div></td><td>${seriesDisplayHTML(a)}</td><td>${numberHTML(athleteNumberForSeries(a,displaySeries),a.manufacturer,numberAthlete)||"—"}</td><td>${brandBadge(a.manufacturer||"—")}</td><td>${esc(team? tname(team):"Free Agent")}</td><td class="action-cell"><button class="inline" type="button" data-edit="${esc(id(a))}">Edit Rider</button> <button class="inline" type="button" data-delete="${esc(id(a))}">Delete</button></td></tr>`}));
  const summary=$("commAthleteFilterSummary");if(summary)summary.textContent=`Showing ${filtered.length.toLocaleString()} of ${all.length.toLocaleString()} athletes.`;
  target.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>beginEditAthlete(b.dataset.edit));
  target.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{if(confirm("Delete athlete from database? Historic scores remain.")){const delId=b.dataset.delete;saveAthletes(athletes().filter(a=>id(a)!==delId));saveTeams(teams().map(t=>({...t,roster:roster(t).filter(a=>id(a)!==delId)})));renderComm();refresh()}});

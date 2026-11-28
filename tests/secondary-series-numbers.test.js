@@ -22,8 +22,8 @@ assert.equal(context.getSeriesNumber(sacha, "450"), "19", "an unconfigured secon
 assert.equal(context.getSeriesNumber({ ...sacha, secondaryNumbers: { "250": "" } }, "250"), "19", "blank secondary numbers reuse the primary number");
 assert.equal(context.getDraftSeries(sacha, "SMX"), "250", "the SMX draft room uses the athlete's eligible secondary class when their primary class is outside that room");
 assert.equal(context.getDraftNumber(sacha, "SMX"), "109", "projected and live SMX draft rows use the secondary 250 number");
-assert(source.includes('numberHTML(a.number,a.manufacturer,a)'), "Commissioner athlete directory must continue to display the main number");
-assert.match(source, /function renderAthletes\(\).*athleteDetailButtonHTML\(a\)/, "All Athletes page must continue to display the primary/main number, not a secondary-series number");
+assert(source.includes('numberHTML(athleteNumberForSeries(a,displaySeries),a.manufacturer,numberAthlete)'), "Commissioner athlete directory must display the plate for its selected series filter");
+assert.match(source, /function renderAthletes\(\).*athleteDetailButtonHTML\(a,true,true,displaySeries\)/, "All Athletes page must use the selected series' number when a series filter is active");
 assert(source.includes('secondaryNumbers:secondaryNumbersFromInputs("athSecondaryNumberFields")'), "new athlete form must save secondary numbers");
 assert(source.includes('secondaryNumbers:secondaryNumbersFromInputs("editAthSecondaryNumberFields")'), "edit athlete form must save secondary numbers");
 assert(source.includes('athleteNumberForSeries(a,division)'), "scoring dropdowns must display the selected class number");

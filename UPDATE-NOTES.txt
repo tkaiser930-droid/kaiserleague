@@ -263,7 +263,7 @@ Secondary-series racing numbers and SMX Supercross bonus import (kf-secondary-se
 - Commissioner scoring-import help now explains the Standard Supercross Heat 1/2, Combined Qualifying and Main Event Best Lap lookups, and distinguishes them from Triple Crown scoring.
 - Added the Standard Supercross heat/qualifying/fastest-lap workflow to RESULTS-IMPORT-SETUP.txt.
 
-Batch athlete creation and team research from season result lists (kf-batch-season-athlete-import-20261127b)
+Batch athlete creation and team research from season result lists (kf-batch-season-athlete-import-20261127c)
 - The Commissioner official-results preview now includes a batch athlete setup table for the selected season, series and class.
 - A batch operation creates missing athlete profiles from the result list and updates racing numbers for existing athletes by normalized rider name or a unique class-specific number match. It handles both free agents and rostered athletes, updates matching team-roster snapshots, and stores primary versus secondary series numbers in the appropriate fields.
 - A number already assigned to a different rider in the selected class is treated as a conflict rather than overwritten. Rows without a rider name cannot create a profile and are flagged for attention.
@@ -272,3 +272,12 @@ Batch athlete creation and team research from season result lists (kf-batch-seas
 - Batch research and athlete changes are bound to the exact year, series, class, event, round and scoring segment that was selected when the result preview was loaded. Changing that context requires a fresh results preview before applying changes.
 - This workflow creates or updates athlete profiles only. To record race scoring, use “Load Matched Positions into Scoring Table”, verify positions/bonuses, and then record results through the normal scoring flow.
 - The feature uses the existing season-scoped GitHub state and does not introduce a separate data store. Local JSON backup/restore remains unchanged.
+
+Batch athlete import identity, hometown, manufacturer and series-number refinements (kf-batch-import-cleanup-20261127a)
+- Rider name parsing strips appended hometown text such as “Drew Adams Chattanooga,TN” from the rider name while retaining the hometown as a separate import field. Parenthesized hometowns, full US state names, full Canadian province names, Australian region names and country suffixes are supported; country-only hometowns no longer truncate a rider's surname.
+- Batch identity matching is name-led. A known athlete is updated by normalized full rider name even when their plate changes between seasons (for example, Drew Adams #39 to #35). A plate belonging to a different name never causes a number-only identity match; a new athlete is created instead.
+- Number updates remain class-specific: an existing primary-series number is updated only for the primary class, and secondary-series numbers update only the selected secondary class. Current team-roster copies receive the same athlete updates.
+- Imported manufacturer values are normalized to the league's canonical manufacturer labels (including GasGas and Kawasaki). Manufacturer columns may be named Manufacturer, Make, Mfr, Brand, Bike or Motorcycle; when the source has no explicit manufacturer, a recognizable make can be inferred from the imported race-team name without replacing the race-team value.
+- Hometown state/province/country suffixes populate nationality and ISO region codes directly when possible. Missing country or region details trigger commissioner-authenticated OpenStreetMap Nominatim lookups, with source links retained in the batch preview. US, Canada, Australia and UK region abbreviations are expanded before searching.
+- Series-filtered athlete views and draft/scoring/profile outputs consistently use the number assigned to the selected series, including Sacha Coenen #109 in SMX 250 and #19 in MX2.
+- Added regression tests for changed-name/plate collisions, primary and secondary plate changes, full-name hometown parsing, country-only hometown handling, manufacturer capitalization/inference and international region lookup.

@@ -85,6 +85,7 @@ async function withMockFetch(map, callback) {
   assert.equal(imported250.sessionTitle, "250 Moto #1");
   assert.deepEqual(imported250.rows.map(row => row.number), ["37", "47"]);
   assert.equal(imported250.rows[0].name, "COLE DAVIES", "use image alt text instead of hometown text");
+  assert.equal(imported250.rows[0].hometown, "Waitoki, New Zealand", "the HTML rider cell retains the adjacent hometown separately from the rider name");
   assert.equal(imported250.rows[0].bestLap, "1:15.698");
 
   const imported450 = await withMockFetch({ [archiveUrl]: archivePage, [eventUrl]: eventPage, [moto450Url]: moto450Page }, async calls => {
